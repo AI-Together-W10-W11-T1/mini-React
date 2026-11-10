@@ -79,6 +79,23 @@ export function applyPatch(list: AreaChildren, patch: Patch): AreaChildren {
         const rest = [...children.slice(0, patch.from), ...children.slice(patch.from + 1)];
         return [...rest.slice(0, patch.to), moved, ...rest.slice(patch.to)];
       });
+    case 'SET_EVENT':
+      // 이벤트 이름 `click` → props 이름 `onClick` (on + 첫 글자 대문자). `null`이면 뺀다
+      return mapNode(list, patch.path, (node) => {
+        const name = `on${patch.event.charAt(0).toUpperCase()}${patch.event.slice(1)}`;
+        const props = new Map(Object.entries(node.props));
+        if (patch.after === null) props.delete(name);
+        else props.set(name, patch.after);
+        return withProps(node, Object.fromEntries(props));
+      });
+    case 'SET_PROP':
+      // `value` · `checked`: `name` prop을 after로 두고 `null`이면 뺀다
+      return mapNode(list, patch.path, (node) => {
+        const props = new Map(Object.entries(node.props));
+        if (patch.after === null) props.delete(patch.name);
+        else props.set(patch.name, patch.after);
+        return withProps(node, Object.fromEntries(props));
+      });
   }
 }
 
