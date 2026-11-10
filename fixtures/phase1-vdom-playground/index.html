@@ -5,9 +5,63 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="icon" href="data:," />
     <title>Phase 1 VDOM Playground</title>
+    <style>
+      :root {
+        --line: #c9ced6;
+        --label: #3b4252;
+        --accent: #2b6cb0;
+      }
+      * { box-sizing: border-box; }
+      body { margin: 0; padding: 16px; font-family: system-ui, sans-serif; color: #1f2430; background: #fff; }
+      h1 { margin: 0 0 12px; font-size: 1.25rem; }
+      .toolbar { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+      .toolbar button { padding: 8px 16px; font: inherit; cursor: pointer; }
+      .panes { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: start; }
+      .pane { min-width: 0; border: 2px solid var(--line); border-radius: 8px; padding: 12px; }
+      .pane-real { border-color: var(--accent); }
+      .pane h2 { margin: 0 0 8px; font-size: 1rem; color: var(--label); }
+      .pane h3 { margin: 12px 0 4px; font-size: 0.875rem; color: var(--label); }
+      .area { min-height: 3rem; overflow-wrap: anywhere; border: 1px dashed var(--line); padding: 8px; }
+      #html-editor { display: block; width: 100%; min-height: 14rem; font: 0.8125rem/1.4 ui-monospace, monospace; }
+      /* 모바일: 두 영역이 위아래로 쌓이고 가로 스크롤이 없다 */
+      @media (max-width: 720px) {
+        .panes { grid-template-columns: 1fr; }
+      }
+    </style>
   </head>
   <body>
-    <div id="root"></div>
+    <h1>Phase 1 VDOM 검증 페이지</h1>
+    <div class="toolbar">
+      <button type="button" data-testid="btn-patch">Patch</button>
+      <button type="button" data-testid="btn-back">뒤로</button>
+      <button type="button" data-testid="btn-forward">앞으로</button>
+    </div>
+    <div class="panes">
+      <section class="pane pane-real">
+        <h2>실제 영역</h2>
+        <!-- 초기 샘플 HTML: 이 영역 안 글을 로드 때 읽어 초기 VNode(0번 기록)로 삼는다 (P1-20). 줄 들여쓰기도 샘플의 일부 -->
+        <div class="area" data-testid="real-area">
+<section id="card" class="card">
+  <h2>제목</h2>
+  <!-- 안내 문구 -->
+  <p class="note" style="color: red; font-size: 16px">안녕</p>
+  <ul>
+    <li>하나</li>
+    <li>둘</li>
+    <li>셋</li>
+  </ul>
+  <button disabled>잠김</button>
+</section>
+        </div>
+      </section>
+      <section class="pane pane-test">
+        <h2>테스트 영역</h2>
+        <label for="html-editor">HTML 편집창</label>
+        <textarea id="html-editor" data-testid="html-editor" spellcheck="false"></textarea>
+        <h3>미리보기</h3>
+        <div class="area" data-testid="test-area"></div>
+      </section>
+    </div>
     <script type="module" src="./main.ts"></script>
   </body>
 </html>

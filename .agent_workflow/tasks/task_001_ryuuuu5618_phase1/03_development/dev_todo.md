@@ -249,7 +249,7 @@ script:` · `" JAVA	script:"`), `<iframe> 제거 — srcdoc 안에 <script>paren
     - 변이 확인: `back`에서 `history.back()`을 patch보다 먼저 하면(이동 먼저) back 예외 테스트 2건이 실패 · 역패치를 다시 뒤집어 적용하면 `최상위가 여러 개 · 0개인 상태 사이를 오가도 맞다` 실패하는 것을 확인하고 되돌림
     - 실행: `npx vitest run` 13 files · 334 passed, `npx tsc --noEmit` 오류 0, 커밋 d022767
 
-- [ ] **Dev-14** (`fixture` + `e2e`): 검증 페이지 — 실제 영역 · 테스트 영역(편집창 + 미리보기) · 버튼 3개를 놓고, 로드 때 실제 영역을 읽어 편집창 · 테스트 영역을 채운다. 기존 최소 페이지를 대체한다. e2e 헬퍼에 구조 비교 · dialog 감시 · 콘솔 감시를 둔다 [P1-19 ~ P1-22 · P1-32 · A4 · A5]
+- [x] **Dev-14** (`fixture` + `e2e`): 검증 페이지 — 실제 영역 · 테스트 영역(편집창 + 미리보기) · 버튼 3개를 놓고, 로드 때 실제 영역을 읽어 편집창 · 테스트 영역을 채운다. 기존 최소 페이지를 대체한다. e2e 헬퍼에 구조 비교 · dialog 감시 · 콘솔 감시를 둔다 [P1-19 ~ P1-22 · P1-32 · A4 · A5]
   - 의존: Dev-2, Dev-7, Dev-8, Dev-12
   - 만들 · 고칠 파일: `fixtures/phase1-vdom-playground/index.html`(샘플 HTML을 `real-area` 안에 직접 씀, 이름표 · 편집창 · 버튼 3개, 모바일에서 위아래로 쌓임 · 가로 스크롤 없음), `fixtures/phase1-vdom-playground/main.ts`(`createVDomRoot(realArea)` → `renderAreaChildren(testArea, snapshot)` → `html-editor.value = vnodesToHtml(snapshot)`, **입력 때마다 즉시** `setAreaHtml(testArea, 글)` — 타이머 · debounce를 쓰지 않는다, B6), `e2e/phase1-helpers.ts`(새로: 위 「e2e 공통 장치」 전부 — `test` 확장(dialog 감시 · 콘솔 감시) · `structureOf` · `structureOfHtml`(속성 이름 → 값 집합, style cssText + 쪼갠 항목 집합) · `holdNodes` · `observeMutations` · `edit` · `captureAlert`), `e2e/phase1-render.spec.ts`(**고쳐 쓴다**)
   - 기존 e2e 처리: `phase1-render.spec.ts` 파일 이름은 유지하고 **내용을 새 페이지 기준으로 고친다**. 유지 = "페이지를 연다(콘솔 오류 · 경고 없음)" · "새로고침" · "mobile 가로 스크롤 없음" 3건(검사 대상만 새 화면으로), 대체 = 최소 페이지 전용 4건(`main#app` · `h1` 문구 · `hidden:false` li · 특수문자 `<p>`)은 QA-1(초기 화면, 특수문자는 미리보기에 글자로 보임까지)과 QA-A1(특수문자를 Patch까지, Dev-20)로 옮겨 쓴다. 최소 페이지와 같은 커밋에서 함께 고쳐 e2e가 깨진 채 남지 않게 한다
@@ -257,6 +257,14 @@ script:` · `" JAVA	script:"`), `<iframe> 제거 — srcdoc 안에 <script>paren
   - 테스트(바깥 루프, 먼저 쓰고 실패 확인): `e2e/phase1-render.spec.ts` — QA-1, QA-A4(새로고침), mobile · desktop / 단위: 없음 (엔진 로직 없음)
   - 알고리즘: 결정 6 A (HTML 편집창 + 미리보기) · P1-20 실제 영역 샘플은 페이지에 미리 써 두고 로드 때 `domToVNode`로 읽음
   - 완료 근거로 남길 것: `npx playwright test e2e/phase1-render.spec.ts` desktop · mobile 통과 개수, 옛 4건이 어느 QA로 옮겨졌는지, 헬퍼의 dialog 감시 · 콘솔 감시가 동작함(일부러 선언 없는 alert · `console.error`를 낸 임시 테스트가 실패하는 것을 한 번 확인하고 지움), `npx vitest run` 영향 없음
+  - **완료 근거 (Evidence)**:
+    - 만든 · 고친 파일: `fixtures/phase1-vdom-playground/index.html`(두 영역 이름표 "실제 영역" · "테스트 영역", `real-area` 안에 샘플 HTML 직접 기록, 편집창 `html-editor` + 미리보기 `test-area`, 버튼 3개 `btn-patch` · `btn-back` · `btn-forward`, 720px 이하에서 위아래로 쌓임), `fixtures/phase1-vdom-playground/main.ts`(`createVDomRoot(realArea)` → `renderAreaChildren(testArea, snapshot)` → `html-editor.value = vnodesToHtml(snapshot)`, `input` 이벤트마다 즉시 `setAreaHtml(testArea, 글)` — 타이머 · debounce 없음), `e2e/phase1-helpers.ts`(새로: `test` 확장(auto 장치 dialog 감시 · 콘솔 error · pageerror 감시) · `captureAlert` · `expectNoConsoleWarnings` · `structureOf` · `structureOfHtml`(속성 이름 → 값 집합, style은 `cssText` + `parseStyleText` 항목 집합) · `expectThreeSame` · `holdNodes` · `sameNode` · `isStillConnected` · `observeMutations` · `edit` · `editorValue` · `SAMPLE_HTML`), `e2e/phase1-render.spec.ts`(새 페이지 기준으로 고쳐 씀)
+    - 테스트(바깥 루프): 먼저 스펙 · 헬퍼만 쓰고 옛 페이지에서 `npx playwright test e2e/phase1-render.spec.ts` 10 failed(`getByTestId('real-area')` element(s) not found)를 확인한 뒤 구현. 구현 후 `npx playwright test e2e/phase1-render.spec.ts` desktop 5 · mobile 5 = 10 passed
+    - 테스트 이름: `QA-1 페이지를 처음 연다: 이름표 · 두 영역 구조 · 편집창 · 버튼 · 특수문자는 글자로` · `페이지를 연다 (콘솔 오류 · 경고 없음)` · `새로고침` · `QA-A4 새로고침: 편집한 글은 사라지고 초기 샘플로 다시 뜨며 뒤로가 무시된다` · `가로 스크롤이 없다 (mobile 375x812에서는 두 영역이 위아래로 쌓인다)`
+    - 옛 4건 이동: `main#app` · `h1` 문구 → QA-1(샘플 `section#card` · `h2` 구조 비교), `hidden:false` li · `disabled` → QA-1(`<button disabled>` 확인) + QA-A8(boolean 속성, Dev-20), 특수문자 `<p>` → QA-1(편집창에 `<p>&lt;b&gt; 😀</p>`를 쳐 미리보기에 글자로 보임, `<b>` 요소 없음) + QA-A1(Patch까지, Dev-20). 유지 3건(페이지를 연다 · 새로고침 · mobile 가로 스크롤)은 검사 대상만 새 화면으로 고침
+    - 헬퍼 감시 확인: 임시 스펙으로 선언 없는 `alert('몰래')` → `선언하지 않은 dialog가 떴다`로 실패, `console.error('몰래 오류')` → `콘솔 error · pageerror가 있다`로 실패, 던진 `Error('boom')` → `pageerror: boom`으로 실패하는 것을 확인한 뒤 임시 스펙을 지움
+    - QA-A4는 Patch 단계(Dev-15) 전이라 "편집창에 친 글(Patch 안 함) → 새로고침 → 초기 샘플 · 뒤로 무시"로 두었고, Dev-15가 같은 테스트에 "Patch 한 뒤"를 덧붙임
+    - 실행: `npx vitest run` 13 files · 334 passed (영향 없음), `npx tsc --noEmit` 오류 0
 
 - [ ] **Dev-15** (`fixture` + `e2e`): Patch 버튼 흐름 — 편집창 글 → 테스트 영역 DOM 읽기 → diff → 실제 영역 반영 → 기록 [P1-23 ~ P1-25 · P1-32 · T-03 · T-04 · T-06 · T-07 · B1 · B2 · B7 · A2 · A3]
   - 의존: Dev-14
