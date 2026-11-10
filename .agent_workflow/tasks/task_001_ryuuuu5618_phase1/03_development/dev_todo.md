@@ -201,12 +201,21 @@ script:` · `" JAVA	script:"`), `<iframe> 제거 — srcdoc 안에 <script>paren
     - 명세에 없어 판단한 세부(검수 확인 요청): ① 선택적 닫는 태그(`<li>` · `<p>` · `<td>` 생략)도 엄격히 짝 문제로 본다(명세 예 `<div><p>글</div>` 따름) ② `a<b`처럼 `<` 바로 뒤가 글자면 HTML 표준대로 태그로 본다(dev_todo의 "`a<b` 뒤에 공백"은 `a < b`로 읽고 테스트 — 글자 바로 붙은 `a<b`는 태그가 맞아 `>`가 없으면 UNPAIRED로 알림) ③ `>`로 닫히지 않은 태그는 브라우저가 글째 버려 글이 사라지므로 UNPAIRED로 알림 ④ 짝 문제 줄은 5줄까지 + "그 밖에 N건" ⑤ 구조 문제는 처음 다른 곳 한 줄만 ⑥ SVG 안 `/>`는 자기 닫는 태그로 봐서 짝 오탐을 막음 ⑦ `<meta http-equiv=refresh>` · `<base>` 등 위험 목록(C3 · C5)에 없는 요소는 막지 않음
     - 실행: `npx vitest run` 11 files · 279 passed, `npx tsc --noEmit` 오류 0, 커밋 4a0e885
 
-- [ ] **Dev-11** (`react-dom`): `History` — 양방향 연결 리스트 (초기 0번 · 갈림길 끊기 · 경계 무시 · 한도 50) [P1-26 · P1-27 · T-08 · §3.3 · B17]
+- [x] **Dev-11** (`react-dom`): `History` — 양방향 연결 리스트 (초기 0번 · 갈림길 끊기 · 경계 무시 · 한도 50) [P1-26 · P1-27 · T-08 · §3.3 · B17]
   - 의존: 없음 (타입만. 데이터 구조라 DOM 없음)
   - 만들 · 고칠 파일: `packages/react-dom/src/history.ts`, `packages/react-dom/src/index.ts`(새로)
   - 테스트: `packages/react-dom/src/__tests__/history.test.ts` — 만들 때 넘긴 초기 기록이 0번(바닥), `push`가 current 뒤에 이어 붙임(head · current · 개수), `back` · `forward`는 prev · next 따라 이동하고 이동한 기록을 돌려줌, 처음에서 뒤로 · 끝에서 앞으로는 `null`을 돌려주고 아무 것도 안 바뀜(경계 무시), 뒤로 간 뒤 `push`하면 앞쪽(redo) 기록이 끊겨 앞으로가 안 됨(갈림길), 51번째 기록을 넣으면 head를 다음으로 옮기고 개수 50 유지(0번 초기도 한 개로 셈), 60번 `push` 뒤 뒤로를 끝까지 하면 49번 이동 후 멈춤, 저장한 snapshot · patches · inverse를 이후 `push`가 바꾸지 않음(깊게 얼린 기록으로 확인, P1-27) / **한도 근처 갈림길(B17): 50개 꽉 찬 상태(0번 포함)에서 뒤로 10번 → `push` → 개수 41(갈림길로 잘린 10개를 개수에서 뺌) · head는 그대로 · 앞으로 불가, 이어서 9번 `push` → 50, 한 번 더 `push` → head가 다음으로 밀리고 개수 50 유지(잘린 만큼 개수를 안 줄이면 head를 잘못 빼는 버그를 잡음), 그 뒤 뒤로 끝까지 = 49번**
   - 알고리즘: History 자료구조 = 양방향 연결 리스트(head · current · 개수) · 정책(§3.3)
   - 완료 근거로 남길 것: `history.test.ts` 통과 개수, 한도 50 · 갈림길 · 경계 · 한도 근처 갈림길(B17) 테스트 이름
+  - **완료 근거 (Evidence)**:
+    - 만든 파일: `packages/react-dom/src/history.ts`(`class History` — `head` · `current` · `size` getter, `push(entry)` · `back()` · `forward()`. 생성자에 넘긴 초기 기록이 0번(바닥). `push`는 current.next 이후를 끊으며 끊은 개수만큼 size를 빼고, size가 `HISTORY_LIMIT`(50)을 넘으면 head를 다음으로 옮겨 옛 head와 연결을 끊음. `back` · `forward`는 이동한 `HistoryEntry`를 돌려주고 경계에서는 `null`. 저장한 entry는 고치지 않고 노드의 prev · next만 바꿈), `packages/react-dom/src/index.ts`(새로, `History` 내보냄)
+    - 테스트: `packages/react-dom/src/__tests__/history.test.ts` 18건 통과 (`npx vitest run packages/react-dom/src` 18 passed). `../history` 모듈이 없는 상태(`Failed to resolve import "../history"`)에서 실패하는 것을 먼저 확인한 뒤 구현
+    - 한도 50: `한도 상수는 HISTORY_LIMIT = 50` · `50개까지는 head가 그대로이고 개수가 50이다 (0번 + 49번 push)` · `51번째 기록을 넣으면 head를 다음으로 옮기고 개수 50을 유지한다 (0번 초기도 한 개로 셈)` · `60번 push 뒤 뒤로를 끝까지 하면 49번 이동 후 멈춘다 (새 맨 앞이 새 바닥)` · `빠진 head는 연결 리스트에서 완전히 떨어져 나간다`
+    - 경계: `경계 무시: 처음에서 뒤로는 null을 돌려주고 아무 것도 안 바뀐다` · `경계 무시: 끝에서 앞으로는 null을 돌려주고 아무 것도 안 바뀐다` · `0번만 있을 때는 뒤로 · 앞으로 모두 null (0번이 바닥)`
+    - 갈림길: `뒤로 간 뒤 push하면 앞쪽(redo) 기록이 끊겨 앞으로가 안 된다` · `갈림길 뒤에는 갈림길 쪽 기록만 이어진다`
+    - 저장 기록 불변(P1-27): `깊게 얼린 기록을 넣어도 push · back · forward · 갈림길 · 한도 제거가 snapshot · patches · inverse를 고치지 않는다`(`deepFreeze`한 기록 55개 push + 이동 + 갈림길 + 한도 제거를 예외 없이 마침) · `push한 기록 객체를 그대로 보관한다 (복사 · 변형 없음)`
+    - B17: `50개 꽉 찬 상태에서 뒤로 10번 → push: 개수 41(잘린 10개를 뺌) · head 그대로 · 앞으로 불가` · `이어서 9번 push → 50, 한 번 더 push → head가 다음으로 밀리고 개수 50 유지` · `그 뒤 뒤로를 끝까지 하면 49번 이동하고, 앞으로로 current까지 되돌아온다`. 변이 확인: `push`의 끊기 루프에서 `this.#size--`를 빼면 위 B17 3건 + 갈림길 1건, 총 4건이 실패하는 것을 확인한 뒤 되돌림
+    - 실행: `npx tsc --noEmit` 오류 0, 커밋 (마지막 docs 커밋에서 기록)
 
 - [ ] **Dev-12** (`react-dom`): `createVDomRoot` 1 — 로드 때 실제 영역을 읽어 0번 기록으로, `update`(Patch 흐름)로 diff → patch → 기록, Patch 도중 예외 복구 [P1-24 · P1-25 · P1-26 · P1-13 · P1-33 · P1-34 · T-03 ~ T-06 · C2 · B22]
   - 의존: Dev-2, Dev-3, Dev-4, Dev-5, Dev-6, Dev-11
