@@ -76,12 +76,17 @@
     - 테스트: `style.test.ts` 18건 통과(쪼개기 · 다시 쓰기 · B21 경계 `!important` / 값 안 주석 `/* ; */` / 끝 `;;;` / 빈 값 `color:` / 빈 값 뒤 정상 항목), `renderVNode.test.ts` 21건 통과(기존 4+6건 유지, "객체 props 경고"는 `style` 아닌 객체(`data`)만 경고하도록 수정, 주석 · style · `renderAreaChildren` 추가). 먼저 모듈이 없는 상태에서 두 파일이 실패하는 것을 확인한 뒤 구현
     - 실행: `npx vitest run` 3 files · 46 passed, `npx tsc --noEmit` 오류 0, 커밋: 메시지 `(Dev-1)` (`git log --oneline --grep "Dev-1)"`)
 
-- [ ] **Dev-2** (`react-dom-bindings`): `domToVNode` · `readAreaChildren` — 요소 · 텍스트(공백 포함) · 주석 · 속성 · boolean · style · 중첩을 VNode로 [P1-01 ~ P1-04 · P1-20 · P1-23 · T-01]
+- [x] **Dev-2** (`react-dom-bindings`): `domToVNode` · `readAreaChildren` — 요소 · 텍스트(공백 포함) · 주석 · 속성 · boolean · style · 중첩을 VNode로 [P1-01 ~ P1-04 · P1-20 · P1-23 · T-01]
   - 의존: Dev-1 (`style.ts`, 되돌려 그리는 비교용 `renderVNode`)
   - 만들 · 고칠 파일: `packages/react-dom-bindings/src/client/domToVNode.ts`, `packages/react-dom-bindings/src/index.ts`
   - 테스트: `packages/react-dom-bindings/src/client/__tests__/domToVNode.test.ts` — 요소 태그 · 중첩 · 형제 순서(P1-01 · 04), 텍스트와 글자 사이 위치(P1-02), 속성 이름 · 값(P1-03), 공백 텍스트 · 주석을 번호 그대로 남김, boolean 속성 = 값 `""`, `style` → StyleMap(빈 style은 props 없음), 영역 상자 안 자식 목록(여러 개 · 하나 · 0개, 영역 상자 자신의 속성은 읽지 않음), 특수문자 텍스트, DOM → VNode → DOM 되돌려 그린 결과가 원본과 같음 (T-01 · T-02)
   - 알고리즘: 결정 1 B · 결정 5 B · §5 boolean · style · 단일 · 복수 루트
   - 완료 근거로 남길 것: `domToVNode.test.ts` 통과 개수, 샘플 HTML(위 샘플)을 읽은 VNode 요약 1건
+  - **완료 근거 (Evidence)**:
+    - 만든 · 고친 파일: `packages/react-dom-bindings/src/client/domToVNode.ts`(`domToVNode` · `readAreaChildren` · 속성 읽기, `style`은 `parseStyleText`로 StyleMap, 빈 style은 props 없음), `packages/react-dom-bindings/src/index.ts`(내보내기)
+    - 테스트: `domToVNode.test.ts` 24건 통과 (태그 · 중첩 · 형제 순서 · 글자 사이 위치 · 속성 · boolean `""` · style StyleMap · 공백 텍스트 · 주석 · 번호 일치 · 영역 상자 0 · 1 · 여러 개 · 상자 자신 속성 안 읽음 · 특수문자 · DOM → VNode → DOM 왕복). 모듈이 없는 상태에서 실패하는 것을 먼저 확인
+    - 샘플 HTML 읽은 VNode 요약(테스트 "샘플 HTML을 읽은 VNode (요약)"): `section{id:card,class:card}` 자식 종류 = `#text, h2, #text, #comment, #text, p{class:note, style:{color:red,font-size:16px}}, #text, ul, #text, button{disabled:""}, #text` (11개)
+    - 실행: `npx vitest run` 4 files · 70 passed, `npx tsc --noEmit` 오류 0, 커밋: 메시지 `(Dev-2)`
 
 - [ ] **Dev-3** (`react-reconciler`): `diff` 기본 — 글자 · 주석 글 · 속성 추가 · 수정 · 삭제 · style 항목 · 교체 · 무변경 (자식은 같은 길이까지) [P1-06 ~ P1-09 · P1-12 · P1-13 · P1-33 · T-03 · T-04]
   - 의존: 없음 (DOM 없이 VNode만)
