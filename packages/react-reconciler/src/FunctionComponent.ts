@@ -1,6 +1,7 @@
 import { setHookDispatcher } from '@mini-react/react';
-import type { HookDispatcher } from '@mini-react/react';
-import type { AreaChildren, Component, HookSlot, Patch, Props, VNode } from '@mini-react/shared';
+import type { HookDispatcher, SetStateAction } from '@mini-react/react';
+import type { AreaChildren, Component, HookSlot, Patch, Props, StateHook, VNode } from '@mini-react/shared';
+import { scheduleRender } from '@mini-react/scheduler';
 import { diff } from './diff';
 import { resolveComponents } from './resolveComponents';
 
@@ -30,6 +31,8 @@ export class FunctionComponent {
   private previous: VNode | null = null;
   private patches: readonly Patch[] = [];
   private mounted = false;
+  // 이번 렌더에서 지금까지 부른 Hook 수 = 다음 Hook이 쓸 hooks 배열 번호 (렌더마다 0번부터)
+  private hookIndex = 0;
 
   constructor(component: Component, props: Props, host: FunctionComponentHost) {
     this.component = component;
@@ -64,6 +67,7 @@ export class FunctionComponent {
 
   // 컴포넌트를 실행해 새 VNode를 만들고 자식 컴포넌트를 풀어 요소 · 글자만 남긴다
   private render(): VNode {
+    this.hookIndex = 0;
     const previousDispatcher = setHookDispatcher(this.dispatcher);
     let result: VNode;
     try {
@@ -74,11 +78,9 @@ export class FunctionComponent {
     return resolveComponents(result);
   }
 
-  // [AI Note]: 루트 컴포넌트가 렌더 중에 부르는 Hook 구현. useState · useMemo · useEffect는 Dev-11 ~ 13에서 채운다.
+  // [AI Note]: 루트 컴포넌트가 렌더 중에 부르는 Hook 구현. useMemo · useEffect는 Dev-12 · 13에서 채운다.
   private readonly dispatcher: HookDispatcher = {
-    useState: () => {
-      throw new Error('useState는 아직 구현되지 않았습니다');
-    },
+    useState: <S>(initial: S | (() => S)) => this.useState(initial),
     useEffect: () => {
       throw new Error('useEffect는 아직 구현되지 않았습니다');
     },
@@ -86,4 +88,34 @@ export class FunctionComponent {
       throw new Error('useMemo는 아직 구현되지 않았습니다');
     },
   };
+
+  // [AI Note]: 이름 없는 useState를 구분하는 방법 = "부른 순서". 렌더마다 0번부터 세어 hooks[번호]에서 자기 슬롯을 찾는다.
+  // 그래서 if · for 안에서 Hook을 부르면 번호가 밀려 상태가 섞인다 (정책: 금지 + 개수가 달라지면 오류).
+  private useState<S>(initial: S | (() => S)): [S, (next: SetStateAction<S>) => void] {
+    const index = this.hookIndex++;
+    let slot = this.hooks[index];
+    if (slot === undefined) {
+      // 지연 초기화는 이 슬롯을 처음 만들 때만 실행한다
+      const value = typeof initial === 'function' ? (initial as () => S)() : initial;
+      const created: StateHook = {
+        kind: 'state',
+        value,
+        setter: (next: unknown) => this.setState(created, next),
+      };
+      this.hooks[index] = created;
+      slot = created;
+    } else if (slot.kind !== 'state') {
+      throw new Error(`Hook 호출 순서가 달라졌습니다: ${index}번 Hook이 지난번에는 ${slot.kind}, 이번에는 state입니다`);
+    }
+    return [slot.value as S, slot.setter as (next: SetStateAction<S>) => void];
+  }
+
+  // [AI Note]: setter = 값을 바꾸고 즉시 동기 렌더 (알고리즘 결정 9 A). 같은 값(Object.is)이면 아무 일 없음.
+  // 한 핸들러에서 여러 번 부르면 그 수만큼 렌더한다. 함수형 setter는 가장 최근 값을 받는다.
+  private setState(slot: StateHook, next: unknown): void {
+    const value = typeof next === 'function' ? (next as (prev: unknown) => unknown)(slot.value) : next;
+    if (Object.is(value, slot.value)) return;
+    slot.value = value;
+    scheduleRender(() => this.update());
+  }
 }
