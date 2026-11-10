@@ -353,13 +353,20 @@ script:` · `" JAVA	script:"`), `<iframe> 제거 — srcdoc 안에 <script>paren
 
 ## Dev 항목 — 선택 확장 (필수 뒤, 이 순서)
 
-- [ ] **Dev-21** (`react-reconciler`): Key 비교 — key 표 매칭 + MOVE [Key 확장 · PRD §5 · §6.2]
+- [x] **Dev-21** (`react-reconciler`): Key 비교 — key 표 매칭 + MOVE [Key 확장 · PRD §5 · §6.2]
   - 의존: Dev-3, Dev-4, Dev-5
   - 만들 · 고칠 파일: `packages/react-reconciler/src/diff.ts`(자식 목록 비교에 key 분기 추가), `packages/react-reconciler/src/__tests__/applyPatches.ts`(MOVE 검산 확인)
   - 규칙: **자식 목록 단위**로 판단한다. 그 목록(옛 · 새 모두)의 모든 자식이 key가 있고 목록 안에서 중복이 없을 때만 key 비교, 아니면 그 목록은 위치 비교(필수 동작 그대로). key 비교 순서: ① 새 목록에 없는 옛 key를 **뒤에서부터** REMOVE → ② 새 목록을 앞에서부터 보며 key가 현재 목록에 있으면 자리(`from`)가 다를 때 MOVE(`from` → `to`), 없으면 INSERT → ③ 짝이 맞은 노드끼리 재귀 diff(태그가 다르면 REPLACE). 최소 이동 수는 보장하지 않는다
   - 테스트: `packages/react-reconciler/src/__tests__/diffKeyed.test.ts` — `h()`로 key를 준 VNode: 중간 삽입(INSERT) · 중간 삭제(REMOVE) · 재정렬(MOVE) · 삽입 + 삭제 + 재정렬 동시, key가 같고 내용이 바뀌면 이동 없이 글자 · 속성 patch만, key가 같고 태그가 다르면 REPLACE, 같은 key 중복 · key 없는 자식이 섞인 목록은 위치 비교로 돌아감(필수 동작과 같은 결과), 무작위 key 순열(고정 씨앗) 200쌍에서 `applyPatches(old, diff(old, new))`가 new와 같고 `applyPatches(new, invertPatches(…))`가 old와 같음 (PRD §5 Key 검증)
   - 알고리즘: 결정 2 B (Key 확장: key 표) · Key 출처 = 단위 테스트로만
   - 완료 근거로 남길 것: `diffKeyed.test.ts` 통과 개수, `diff.test.ts` · `invertPatches.test.ts` 회귀 통과 개수, 무작위 200쌍
+  - **완료 근거 (Evidence)**:
+    - 만든 · 고친 파일: `packages/react-reconciler/src/diff.ts`(`isKeyed` · `diffKeyedChildren` 추가, `diffChildren`이 목록 단위로 분기), `packages/react-reconciler/src/__tests__/diffKeyed.test.ts`(새로, 25건). `applyPatches.ts`(MOVE 검산) · `invertPatches.ts`(MOVE 역)는 이미 있어 고치지 않음
+    - 실행: `npx vitest run packages/react-reconciler` 3 files · **83 passed**(diffKeyed 25 · diff 45 · invertPatches 13). 전체 `npx vitest run` 14 files · **359 passed**(334 + 25), `npx tsc --noEmit` 0
+    - 무작위 200쌍: `고정 씨앗 200쌍: applyPatches(old, diff) = new, 역패치로 old 복원, key 순서 일치`(씨앗 20261111, 12개 key 풀에서 부분집합 · 섞기, 같은 key의 내용 · 속성 · 태그 변경 섞임, MOVE가 합계 200개 넘게 나왔는지도 확인)
+    - 기존 테스트 변경 1건: `diff.test.ts`의 `key는 props가 아니라 비교하지 않는다`는 "모든 자식에 key가 있는 목록"이 이제 key 비교로 가서(key 1 → 2는 REMOVE + INSERT) 그대로는 성립하지 않아, 같은 의도(key는 props가 아님)를 key 없는 자식이 섞인 목록(위치 비교)에서 확인하도록 고침
+    - 결정한 세부: 이동 수 최소 보장 안 함(`[a,b,c] → [b,c,a]`는 2번), 숫자 `1`과 문자열 `"1"`은 다른 key, 글자 · 주석 노드는 key가 없어 섞이면 위치 비교, 빈 목록은 key 목록으로 취급(결과는 위치 비교와 같음), 위치 비교로 돌아간 목록에서 key는 patch로 옮기지 않음(key는 props가 아님)
+    - 커밋: (해시는 이 Dev 묶음의 마지막 docs 커밋에 기록)
 
 - [ ] **Dev-22** (`react-dom-bindings`): `patch`의 MOVE — 같은 DOM 노드를 옮긴다 [Key 확장]
   - 의존: Dev-6, Dev-21

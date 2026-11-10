@@ -102,10 +102,12 @@ describe('diff 기본 — 속성', () => {
     expect(patches).toEqual([]);
   });
 
-  it('key는 props가 아니라 비교하지 않는다 (필수 위치 비교)', () => {
+  it('key는 props가 아니라 위치 비교 목록에서는 비교하지 않는다 (key 없는 자식이 섞인 목록)', () => {
+    // [AI Note]: Key 확장(Dev-21) 이후 "모든 자식에 key가 있는" 목록은 key 비교로 간다 (diffKeyed.test.ts).
+    // 이 테스트는 key 없는 자식이 섞여 있어 위치 비교로 돌아가는 목록에서 key 자체는 patch를 만들지 않음을 확인한다.
     const a = { ...el('li', { id: 'x' }), key: 1 };
     const b = { ...el('li', { id: 'x' }), key: 2 };
-    expect(diff([a], [b])).toEqual([]);
+    expect(diff([a, el('li')], [b, el('li')])).toEqual([]);
   });
 });
 
