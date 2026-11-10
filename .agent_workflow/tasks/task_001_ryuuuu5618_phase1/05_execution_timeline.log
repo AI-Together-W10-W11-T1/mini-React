@@ -1,0 +1,19 @@
+2026-11-10T18:39 | stage=0 | agent=master | round=- | signal=START | task_001 생성 (작업자 ryuuuu5618, 작업명 phase1), seeds 복사
+2026-11-10T18:53 | stage=0 | agent=master | round=- | signal=DECISION | 가벼운 모드 · 범위 P1-01~34 · T-01~08 + 확장(Key · 시각화) · 깊게 ①②③
+2026-11-10T20:56 | stage=0 | agent=master | round=- | signal=DECISION | 알고리즘 결정 2: 필수 위치 기반 + Key 확장 B(key 표)
+2026-11-10T21:12 | stage=0 | agent=master | round=- | signal=DECISION | 알고리즘 결정 7: A → B(패치 + 역패치), 보관 한도 50, key = 엔진 증가 번호
+2026-11-10T21:51 | stage=0 | agent=master | round=- | signal=DECISION | 알고리즘 결정 7 최종: B + VNode도 저장
+2026-11-10T22:40 | stage=0 | agent=master | round=- | signal=DECISION | 역순 · 결정 1 B · 결정 3 A · 결정 4 경로+순서대로, 기존 코드 유지
+2026-11-10T22:50 | stage=0 | agent=master | round=- | signal=DECISION | 알고리즘 결정 5: B 모두 유지 + 주석도 남김
+2026-11-10T22:55 | stage=0 | agent=master | round=- | signal=DECISION | 최상위: 영역 상자 = 보이지 않는 감싸개
+2026-11-11T00:38 | stage=0 | agent=master | round=- | signal=DECISION | boolean = 보통 속성, style = 항목별
+2026-11-11T00:44 | stage=0 | agent=master | round=- | signal=DECISION | 알고리즘 결정 6: A HTML 편집창 + 미리보기
+2026-11-11T00:50 | stage=0 | agent=master | round=- | signal=DECISION | 미저장 편집 버림, 이동 때 세 칸 복원
+2026-11-11T00:58 | stage=0 | agent=master | round=- | signal=DECISION | 입력 검사: 미리보기 위험 코드 제거 + Patch 때 검사(위험 · 짝 · 구조) 후 alert로 막기
+2026-11-11T01:01 | stage=0 | agent=master | round=- | signal=DECISION | SVG 미지원 (Patch 때 alert), 구현 후 리마인드
+2026-11-11T01:09 | stage=0 | agent=master | round=- | signal=DECISION | 이력 정책: 초기 저장 · 무변경 무시 · 경계 무시 · 한도 50 앞에서 제거
+2026-11-11T01:12 | stage=0 | agent=master | round=- | signal=DECISION | History 자료구조: 양방향 연결 리스트
+2026-11-11T01:24 | stage=0 | agent=master | round=- | signal=DECISION | Key: Phase 1 화면 key 없음, Key 엔진은 단위 테스트, 시연은 Phase 2 데이터 id
+2026-11-11T01:30 | stage=0 | agent=master | round=- | signal=DECISION | Diff 시각화: 스위치 + 오버레이 깜빡임만
+2026-11-11T01:37 | stage=0 | agent=master | round=- | signal=SPEC_DRAFT | 01_request_spec.md 초안, 사용자 승인 대기
+2026-11-11T01:40 | stage=0 | agent=master | round=- | signal=APPROVE | 01_request_spec.md 사용자 승인
