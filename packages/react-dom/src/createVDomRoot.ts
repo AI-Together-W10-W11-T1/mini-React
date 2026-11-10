@@ -20,6 +20,7 @@ export interface VDomRoot {
    * Patch 흐름: 지금 기록의 VNode와 next를 diff → 실제 영역에 patch → 새 기록으로 저장.
    * 바뀐 게 없으면 아무것도 하지 않고 `false` (무변경 Patch는 기록하지 않는다, §3.3).
    * patch 도중 예외가 나면 기록은 그대로 두고 실제 영역을 지금 기록으로 복구한 뒤 원래 예외를 다시 던진다 (C2).
+   * 복구 그리기까지 실패하면 그래도 원래 예외를 던지고, 복구 예외는 그 예외의 `recoveryError`로 붙인다.
    */
   update(next: AreaChildren): boolean;
   /**
@@ -48,7 +49,15 @@ export function createVDomRoot(realArea: Element, options: CreateVDomRootOptions
       // [AI Note]: 세 동작(update · back · forward)이 모두 이 함수를 지나므로 관찰 콜백도 여기 한 곳에서 전달한다 (Diff 시각화).
       patch(realArea, patches, onPatch);
     } catch (error) {
-      renderAreaChildren(realArea, history.current.entry.snapshot);
+      // [AI Note]: 복구 그리기가 또 실패해도 던지는 것은 "원래 예외"다. 복구 예외가 원인을 덮으면 페이지가 엉뚱한 알림을 띄운다.
+      // `cause`는 "이 예외를 일으킨 원인"이라 방향이 반대여서 쓰지 않고, 원래 예외에 `recoveryError`로 붙여 둔다 (검수 1회차 NB-5).
+      try {
+        renderAreaChildren(realArea, history.current.entry.snapshot);
+      } catch (recoveryError) {
+        if (typeof error === 'object' && error !== null && Object.isExtensible(error)) {
+          Object.defineProperty(error, 'recoveryError', { value: recoveryError, configurable: true, writable: true });
+        }
+      }
       throw error;
     }
   }

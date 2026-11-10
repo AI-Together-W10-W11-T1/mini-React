@@ -239,6 +239,27 @@ describe('createVDomRoot.update — Patch 도중 예외 복구 (C2 · B22)', () 
     expect(area.innerHTML).toBe(START);
   });
 
+  it('복구 그리기도 실패하면 원래 예외가 던져진다 (복구 실패는 recoveryError로 붙음, 검수 1회차 NB-5)', () => {
+    const area = box(START);
+    const root = createVDomRoot(area);
+    const before = root.snapshot();
+    area.firstElementChild!.remove(); // patch가 경로를 못 찾아 실패한다
+    // 복구는 영역을 통째로 다시 그리는 replaceChildren을 쓴다 — 이것도 실패하게 만든다
+    area.replaceChildren = () => {
+      throw new Error('복구 그리기 실패');
+    };
+    let thrown: unknown;
+    try {
+      root.update(parse(NEXT));
+    } catch (error) {
+      thrown = error;
+    }
+    expect(thrown).toBeInstanceOf(Error);
+    expect((thrown as Error).message).toMatch(/patch: 경로/); // 복구 실패가 원래 예외를 덮지 않는다
+    expect(((thrown as { recoveryError?: Error }).recoveryError as Error).message).toBe('복구 그리기 실패');
+    expect(root.snapshot()).toBe(before); // current는 그대로
+  });
+
   it('B22: 복구 뒤 이어서 정상 update가 성공하고 기록이 정확히 한 칸 늘어난다', () => {
     const area = box(START);
     const root = createVDomRoot(area);
