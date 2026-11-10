@@ -251,3 +251,226 @@ describe('createVDomRoot.update — Patch 도중 예외 복구 (C2 · B22)', () 
     // 기록이 정확히 한 칸 늘었다는 확인(back)은 Dev-13 테스트에서 이어서 한다
   });
 });
+
+/** html 목록을 순서대로 update한 root와 area (각 단계의 snapshot도 함께 돌려줌) */
+function setup(states: readonly string[]) {
+  const area = box(states[0]);
+  const root = createVDomRoot(area);
+  const snaps: AreaChildren[] = [root.snapshot()];
+  for (const html of states.slice(1)) {
+    expect(root.update(parse(html))).toBe(true);
+    snaps.push(root.snapshot());
+  }
+  return { area, root, snaps };
+}
+
+describe('createVDomRoot.back · forward — 기록 이동 (P1-28 ~ P1-30 · T-08)', () => {
+  it('처음에는 뒤로 · 앞으로 모두 null이고 DOM 변경 0건 (0번이 바닥, 경계 무시)', () => {
+    const area = box('<p>안녕</p>');
+    const root = createVDomRoot(area);
+    const observer = observe(area);
+    expect(root.back()).toBeNull();
+    expect(root.forward()).toBeNull();
+    expect(observer.takeRecords()).toHaveLength(0);
+  });
+
+  it('Patch 2회 → back → back → forward → forward: 매번 실제 영역이 그 기록의 snapshot과 같고, 이동한 기록의 snapshot을 돌려준다', () => {
+    const states = ['<p>a</p>', '<p>b</p><ul><li>1</li></ul>', '<p>c</p><ul><li>1</li><li>2</li></ul><!-- 끝 -->'];
+    const { area, root, snaps } = setup(states);
+    expect(readAreaChildren(area)).toEqual(snaps[2]);
+
+    expect(root.back()).toBe(snaps[1]);
+    expect(area.innerHTML).toBe(states[1]);
+    expect(readAreaChildren(area)).toEqual(root.snapshot());
+
+    expect(root.back()).toBe(snaps[0]);
+    expect(area.innerHTML).toBe(states[0]);
+    expect(root.snapshot()).toBe(snaps[0]);
+
+    expect(root.forward()).toBe(snaps[1]);
+    expect(area.innerHTML).toBe(states[1]);
+
+    expect(root.forward()).toBe(snaps[2]);
+    expect(area.innerHTML).toBe(states[2]);
+    expect(readAreaChildren(area)).toEqual(snaps[2]);
+  });
+
+  it('경계 무시: 처음에서 뒤로 · 끝에서 앞으로는 null이고 DOM 변경 0건 · snapshot 그대로', () => {
+    const { area, root, snaps } = setup(['<p>a</p>', '<p>b</p>']);
+    const observer = observe(area);
+    expect(root.forward()).toBeNull(); // 끝
+    expect(root.snapshot()).toBe(snaps[1]);
+    expect(root.back()).toBe(snaps[0]);
+    observer.takeRecords();
+    expect(root.back()).toBeNull(); // 처음
+    expect(root.snapshot()).toBe(snaps[0]);
+    expect(observer.takeRecords()).toHaveLength(0);
+  });
+
+  it('무변경 update는 기록이 안 늘어난다: 한 번 Patch 뒤 같은 내용을 다시 Patch해도 뒤로는 한 번뿐 (T-04 · §3.3)', () => {
+    const { root, snaps } = setup(['<p>a</p>', '<p>b</p>']);
+    expect(root.update(parse('<p>b</p>'))).toBe(false);
+    expect(root.back()).toBe(snaps[0]);
+    expect(root.back()).toBeNull();
+  });
+
+  it('갈림길: 뒤로 간 뒤 새 update를 하면 앞쪽 기록이 끊겨 앞으로가 안 된다', () => {
+    const { area, root, snaps } = setup(['<p>a</p>', '<p>b</p>', '<p>c</p>']);
+    root.back(); // b
+    root.back(); // a
+    expect(root.update(parse('<p>새로</p>'))).toBe(true);
+    expect(area.innerHTML).toBe('<p>새로</p>');
+    expect(root.forward()).toBeNull();
+    expect(area.innerHTML).toBe('<p>새로</p>');
+    expect(root.back()).toBe(snaps[0]);
+    expect(root.back()).toBeNull();
+  });
+
+  it('되돌린 뒤 다음 update의 기준은 되돌린 상태의 snapshot이다 (P1-25 · P1-30)', () => {
+    const { area, root } = setup(['<p>a</p>', '<p>b</p>']);
+    root.back(); // 실제 영역 · snapshot 모두 a
+    expect(root.update(parse('<p>a</p>'))).toBe(false); // 되돌린 상태(a)와 같으니 무변경
+    expect(root.update(parse('<p>b</p>'))).toBe(true);
+    expect(area.innerHTML).toBe('<p>b</p>');
+  });
+
+  it('한도 50을 넘겨도 뒤로가 남은 기록 안에서 맞게 동작한다 (60번 update → 뒤로 49번 → 11번 기록에서 멈춤)', () => {
+    const area = box('<p>0</p>');
+    const root = createVDomRoot(area);
+    for (let i = 1; i <= 60; i++) root.update(parse(`<p>${i}</p>`));
+    expect(area.innerHTML).toBe('<p>60</p>');
+    let moves = 0;
+    while (root.back() !== null) moves++;
+    expect(moves).toBe(49);
+    expect(area.innerHTML).toBe('<p>11</p>');
+    expect(readAreaChildren(area)).toEqual(root.snapshot());
+    expect(root.back()).toBeNull();
+    expect(root.forward()).not.toBeNull();
+    expect(area.innerHTML).toBe('<p>12</p>');
+  });
+
+  it('뒤로 · 앞으로도 부분 갱신이다: 관련 없는 노드의 참조가 유지된다 (역패치 · patch 모두 그 자리에서 고침)', () => {
+    const { area, root } = setup([
+      '<section><h2>제목</h2><p>안녕</p><ul><li>하나</li></ul></section>',
+      '<section><h2>제목</h2><p>반가워</p><ul><li>하나</li></ul></section>',
+    ]);
+    const section = area.firstElementChild!;
+    const h2 = section.children[0];
+    const ul = section.children[2];
+    const li = ul.children[0];
+    const observer = observe(area);
+    root.back();
+    expect(area.firstElementChild).toBe(section);
+    expect(section.children[0]).toBe(h2);
+    expect(section.children[2]).toBe(ul);
+    expect(ul.children[0]).toBe(li);
+    let records = observer.takeRecords();
+    expect(records).toHaveLength(1);
+    expect(records[0].type).toBe('characterData');
+    root.forward();
+    expect(section.children[0]).toBe(h2);
+    expect(ul.children[0]).toBe(li);
+    records = observer.takeRecords();
+    expect(records).toHaveLength(1);
+    expect(records[0].type).toBe('characterData');
+  });
+
+  it('최상위가 여러 개 · 0개인 상태 사이를 오가도 맞다 (§5 영역 상자)', () => {
+    const states = ['', '<p>a</p><p>b</p>', 'text<!-- c --><span>x</span>', '<p>a</p>'];
+    const { area, root, snaps } = setup(states);
+    for (let i = states.length - 2; i >= 0; i--) {
+      expect(root.back()).toBe(snaps[i]);
+      expect(area.innerHTML).toBe(states[i]);
+    }
+    for (let i = 1; i < states.length; i++) {
+      expect(root.forward()).toBe(snaps[i]);
+      expect(area.innerHTML).toBe(states[i]);
+    }
+  });
+
+  it('D-01 ~ D-05를 차례로 Patch한 뒤 끝까지 뒤로 · 끝까지 앞으로 가면 매 단계가 맞다', () => {
+    const states = [
+      '<section id="card"><h2>제목</h2><ul><li>1</li><li>2</li></ul></section>',
+      '<section id="card"><h2>새 제목</h2><ul><li>1</li><li>2</li></ul></section>', // D-01
+      '<section id="card" class="on"><h2>새 제목</h2><ul><li>1</li><li>2</li></ul></section>', // D-02
+      '<section id="card" class="on"><h2>새 제목</h2><ul><li>1</li><li>2</li><li>3</li></ul></section>', // D-03
+      '<section id="card" class="on"><h2>새 제목</h2><ul><li>2</li><li>3</li></ul></section>', // D-04
+      '<article id="card"><h1>교체</h1></article>', // D-05
+    ];
+    const { area, root, snaps } = setup(states);
+    for (let i = states.length - 2; i >= 0; i--) {
+      expect(root.back()).toBe(snaps[i]);
+      expect(area.innerHTML).toBe(states[i]);
+    }
+    expect(root.back()).toBeNull();
+    for (let i = 1; i < states.length; i++) {
+      expect(root.forward()).toBe(snaps[i]);
+      expect(area.innerHTML).toBe(states[i]);
+    }
+    expect(root.forward()).toBeNull();
+  });
+});
+
+describe('createVDomRoot.back · forward — 이동 도중 예외 복구 (C2)', () => {
+  it('B22(이어서): update 도중 예외 뒤에도 기록이 안 늘어난다 - 뒤로가 없고, 복구 뒤 정상 update는 정확히 한 칸 늘린다', () => {
+    const START = '<ul><li>1</li></ul><p>a</p>';
+    const area = box(START);
+    const root = createVDomRoot(area);
+    const zero = root.snapshot();
+    area.firstElementChild!.remove();
+    expect(() => root.update(parse('<ul><li>1</li><li>2</li></ul><p>b</p>'))).toThrow();
+    expect(root.back()).toBeNull(); // 실패한 update는 기록을 붙이지 않았다
+    expect(root.forward()).toBeNull();
+
+    const next = parse('<ul><li>1</li></ul><p>다시</p>');
+    expect(root.update(next)).toBe(true);
+    expect(root.back()).toBe(zero); // 정확히 한 칸
+    expect(area.innerHTML).toBe(START);
+    expect(root.back()).toBeNull();
+    expect(root.forward()).toBe(next);
+  });
+
+  it('back 도중 예외: 원래 예외가 다시 던져지고 current가 안 움직이며 실제 영역이 current 기록으로 다시 그려진다', () => {
+    const states = ['<p>a</p>', '<p>b</p>', '<p>c</p>'];
+    const { area, root, snaps } = setup(states);
+    area.replaceChildren(); // 바깥에서 망가뜨림 → 역패치 SET_TEXT [0,0]이 경로를 못 찾음
+    expect(() => root.back()).toThrow(/patch: 경로/);
+    expect(root.snapshot()).toBe(snaps[2]); // 이동 도중 실패한 이동은 없던 일
+    expect(area.innerHTML).toBe(states[2]);
+    expect(readAreaChildren(area)).toEqual(snaps[2]);
+
+    expect(root.back()).toBe(snaps[1]); // 이어서 정상 back이 성공
+    expect(area.innerHTML).toBe(states[1]);
+    expect(root.back()).toBe(snaps[0]);
+    expect(area.innerHTML).toBe(states[0]);
+  });
+
+  it('back 도중 일부만 적용되다 실패해도 되돌려진다 (역패치 첫 줄은 성공, 둘째 줄에서 실패)', () => {
+    const states = ['<p>a</p><p>b</p>', '<p>A</p>'];
+    const { area, root, snaps } = setup(states);
+    // 역패치 = INSERT [1] <p>b</p> → SET_TEXT [0,0] A→a. 첫 <p>의 글자를 떼면 앞 줄은 성공하고 뒷 줄이 실패한다
+    area.firstElementChild!.firstChild!.remove();
+    expect(() => root.back()).toThrow();
+    expect(root.snapshot()).toBe(snaps[1]);
+    expect(area.innerHTML).toBe(states[1]);
+    expect(root.back()).toBe(snaps[0]);
+    expect(area.innerHTML).toBe(states[0]);
+  });
+
+  it('forward 도중 예외: 원래 예외가 다시 던져지고 current가 안 움직이며 실제 영역이 current 기록으로 다시 그려진다', () => {
+    const states = ['<p>a</p>', '<p>b</p>', '<p>c</p>'];
+    const { area, root, snaps } = setup(states);
+    root.back();
+    root.back(); // current = a
+    area.replaceChildren();
+    expect(() => root.forward()).toThrow(/patch: 경로/);
+    expect(root.snapshot()).toBe(snaps[0]);
+    expect(area.innerHTML).toBe(states[0]);
+
+    expect(root.forward()).toBe(snaps[1]); // 이어서 정상 forward가 성공
+    expect(area.innerHTML).toBe(states[1]);
+    expect(root.forward()).toBe(snaps[2]);
+    expect(area.innerHTML).toBe(states[2]);
+    expect(root.forward()).toBeNull();
+  });
+});

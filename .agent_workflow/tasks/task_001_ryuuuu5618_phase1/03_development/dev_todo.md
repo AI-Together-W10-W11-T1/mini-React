@@ -233,12 +233,21 @@ script:` · `" JAVA	script:"`), `<iframe> 제거 — srcdoc 안에 <script>paren
     - 미룬 확인: `back()`이 필요한 단언(처음에 뒤로 · 앞으로가 `null` · 무변경 · 예외 뒤 "기록이 늘지 않음" · 복구 뒤 "정확히 한 칸 늘어남")은 `back`이 Dev-13에서 만들어지므로 Dev-13 테스트에 이어서 넣음. Dev-12에서는 `snapshot()` 참조 그대로로 같은 사실을 확인
     - 실행: `npx tsc --noEmit` 오류 0, 커밋 (마지막 docs 커밋에서 기록)
 
-- [ ] **Dev-13** (`react-dom`): `createVDomRoot` 2 — `back` · `forward`: 실제 영역은 역패치 · patch로, 돌려주는 스냅샷으로 테스트 영역 · 편집창이 따라가게 [P1-28 ~ P1-30 · T-08 · §3.3 · C2]
+- [x] **Dev-13** (`react-dom`): `createVDomRoot` 2 — `back` · `forward`: 실제 영역은 역패치 · patch로, 돌려주는 스냅샷으로 테스트 영역 · 편집창이 따라가게 [P1-28 ~ P1-30 · T-08 · §3.3 · C2]
   - 의존: Dev-12
   - 만들 · 고칠 파일: `packages/react-dom/src/createVDomRoot.ts`
   - 테스트: `packages/react-dom/src/__tests__/createVDomRoot.test.ts`(추가) — Patch 2회 → `back` → `forward`마다 `readAreaChildren(realArea)`가 그 기록의 snapshot과 같음, `back`은 이동한 기록의 snapshot을 돌려줌, 처음 · 끝에서는 `null`을 돌려주고 DOM 변경 0건(경계 무시), 뒤로 간 뒤 새 `update`를 하면 앞으로가 안 됨(갈림길), 한도 50을 넘겨도 뒤로가 남은 기록 안에서 맞게 동작, 되돌린 뒤 다음 `update`의 기준이 되돌린 상태의 snapshot(P1-25 · 30), 뒤로 때 관련 없는 노드 참조가 유지됨(역패치도 부분 갱신), 최상위 여러 개 · 0개 상태 사이 이동 / **`back` · `forward` 도중 예외(C2): 실제 영역을 바깥에서 망가뜨린 뒤 `back()` → 예외가 다시 던져짐 · current가 안 움직임(이동 도중 실패한 이동은 없던 일) · 실제 영역이 current 기록의 snapshot으로 다시 그려짐 · 이어서 정상 `back()`이 성공**
   - 알고리즘: 결정 7 B + VNode · 되돌리는 순서 = 역순 · 정책(경계 무시 · 갈림길) · C2(이동은 patch가 성공한 뒤에 확정한다: 예 — 먼저 엿보고 성공하면 이동, 또는 실패하면 되돌려 놓기. 방식은 Dev에서 정하되 결과만 위 테스트로 고정)
   - 완료 근거로 남길 것: `createVDomRoot.test.ts` 통과 개수, `npx vitest run` 전체 통과 개수 · `npx tsc --noEmit` 0
+  - **완료 근거 (Evidence)**:
+    - 고친 파일: `packages/react-dom/src/createVDomRoot.ts`(`VDomRoot`에 `back()` · `forward()` 추가. `update` · `back` · `forward`가 모두 `applyOrRecover(patches)`를 지남 — `patch` 성공 뒤에만 `history.push` · `history.back()` · `history.forward()`로 current를 옮기고, 도중 예외면 `renderAreaChildren(realArea, current 기록 snapshot)`으로 복구한 뒤 원래 예외를 다시 던짐(`// [AI Note]`). `back`은 current 기록의 `inverse`(이미 역순)를 그대로 순서대로 적용, `forward`는 다음 기록의 `patches`를 적용. 경계(`prev`/`next`가 `null`)면 아무것도 안 하고 `null`. 이동한 기록의 snapshot을 돌려줘 호출한 쪽이 테스트 영역 · 편집창을 채움)
+    - 테스트: `packages/react-dom/src/__tests__/createVDomRoot.test.ts` 37건 통과 (Dev-12 23건 + Dev-13 14건; `npx vitest run packages/react-dom/src` 2 files · 55 passed = history 18 + createVDomRoot 37). `root.back is not a function`으로 14건이 실패하는 것을 먼저 확인한 뒤 구현
+    - 이동: `Patch 2회 → back → back → forward → forward: 매번 실제 영역이 그 기록의 snapshot과 같고, 이동한 기록의 snapshot을 돌려준다` · `D-01 ~ D-05를 차례로 Patch한 뒤 끝까지 뒤로 · 끝까지 앞으로 가면 매 단계가 맞다` · `최상위가 여러 개 · 0개인 상태 사이를 오가도 맞다`
+    - 경계 · 갈림길 · 한도: `처음에는 뒤로 · 앞으로 모두 null이고 DOM 변경 0건 (0번이 바닥, 경계 무시)` · `경계 무시: 처음에서 뒤로 · 끝에서 앞으로는 null이고 DOM 변경 0건 · snapshot 그대로` · `무변경 update는 기록이 안 늘어난다 …` · `갈림길: 뒤로 간 뒤 새 update를 하면 앞쪽 기록이 끊겨 앞으로가 안 된다` · `한도 50을 넘겨도 뒤로가 남은 기록 안에서 맞게 동작한다 (60번 update → 뒤로 49번 → 11번 기록에서 멈춤)` · `되돌린 뒤 다음 update의 기준은 되돌린 상태의 snapshot이다`
+    - 부분 갱신: `뒤로 · 앞으로도 부분 갱신이다: 관련 없는 노드의 참조가 유지된다` (역패치 · patch 모두 변경 기록 1건 `characterData`, 부모 · 형제 · 자식 참조 그대로)
+    - 이동 도중 예외(C2): `back 도중 예외: 원래 예외가 다시 던져지고 current가 안 움직이며 실제 영역이 current 기록으로 다시 그려진다` · `back 도중 일부만 적용되다 실패해도 되돌려진다 (역패치 첫 줄은 성공, 둘째 줄에서 실패)` · `forward 도중 예외: …` (각각 이어서 정상 back · forward가 성공). Dev-12에서 미룬 `B22(이어서): update 도중 예외 뒤에도 기록이 안 늘어난다 - 뒤로가 없고, 복구 뒤 정상 update는 정확히 한 칸 늘린다`도 여기서 확인
+    - 변이 확인: `back`에서 `history.back()`을 patch보다 먼저 하면(이동 먼저) back 예외 테스트 2건이 실패 · 역패치를 다시 뒤집어 적용하면 `최상위가 여러 개 · 0개인 상태 사이를 오가도 맞다` 실패하는 것을 확인하고 되돌림
+    - 실행: `npx vitest run` 13 files · 334 passed, `npx tsc --noEmit` 오류 0, 커밋 (마지막 docs 커밋에서 기록)
 
 - [ ] **Dev-14** (`fixture` + `e2e`): 검증 페이지 — 실제 영역 · 테스트 영역(편집창 + 미리보기) · 버튼 3개를 놓고, 로드 때 실제 영역을 읽어 편집창 · 테스트 영역을 채운다. 기존 최소 페이지를 대체한다. e2e 헬퍼에 구조 비교 · dialog 감시 · 콘솔 감시를 둔다 [P1-19 ~ P1-22 · P1-32 · A4 · A5]
   - 의존: Dev-2, Dev-7, Dev-8, Dev-12
