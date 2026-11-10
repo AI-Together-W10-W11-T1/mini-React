@@ -11,3 +11,8 @@
 2026-11-11T07:55 | stage=0 | agent=master | round=- | signal=DECISION | 범위 변경: 피그마 편집기 제외(미니 React 뒤 별도), Phase 2 = 엔진 + 검증 페이지
 2026-11-11T08:00 | stage=0 | agent=master | round=- | signal=DECISION | 검증 페이지 구성 확정(카운터 · 입력창 · 목록 · 기록판), 명세 다시 씀
 2026-11-11T08:05 | stage=0 | agent=master | round=- | signal=APPROVE | 01_request_spec.md 사용자 승인
+2026-11-11T08:07 | stage=0.5 | agent=master | round=- | signal=PASS | types.ts 커밋 (SET_EVENT · SET_PROP · Hook 슬롯), vitest 432, tsc 2건은 Dev-1에서 해결
+2026-11-11T08:20 | stage=1 | agent=mr-worker | round=- | signal=UNKNOWN | - | by=hook
+2026-11-11T08:21 | stage=1 | agent=master | round=- | signal=SKIP_REVIEW | 가벼운 모드: 기획 검수 생략, 테스트 케이스 확인으로 (Dev 28 = 필수 22 + 확장 6, QA 19 + 공격 9 + 확장 2)
+2026-11-11T08:30 | stage=1 | agent=master | round=- | signal=TESTCASE_REVIEW | 사용자 "응": 확인 요청 1~5 작업자 안, 6 숫자 칸 기록만, 7 Dev-16 제외 → 작업자 반영 요청
+2026-11-11T08:33 | stage=1 | agent=mr-worker | round=- | signal=UNKNOWN | - | by=hook
