@@ -176,6 +176,7 @@ test('QA-32 <style> · <link rel="stylesheet">는 미리보기에서 빠져 모�
 
 test('QA-31 두 영역 안의 링크 클릭 · 폼 버튼 클릭에도 페이지가 이동하거나 새로고침되지 않는다', async ({ page }) => {
   await open(page);
+  const initialReal = await structureOf(page, 'real-area');
   const typed = await edit(page, (t) => t + '<a href="https://example.com">링크</a><form><button>보내기</button></form>');
   await page.getByTestId('btn-patch').click(); // 두 영역에 모두 있고 기록이 한 칸 있다 (alert가 뜨면 헬퍼가 실패시킨다)
   const real = page.getByTestId('real-area');
@@ -209,7 +210,12 @@ test('QA-31 두 영역 안의 링크 클릭 · 폼 버튼 클릭에도 페이지
   // 클릭 뒤에도 Patch한 상태가 그대로다 (새로고침됐다면 초기 샘플로 돌아갔을 것). 편집창 글도 그대로
   expect(await structureOf(page, 'real-area')).toEqual(structBefore);
   expect(await editorValue(page)).toBe(typed);
-  // [AI Note]: "뒤로가 동작해 기록이 살아 있다"는 뒤로 버튼이 연결되는 Dev-18에서 이 테스트에 덧붙인다
+  // 기록이 살아 있다: 뒤로를 누르면 Patch 전(초기 샘플) 상태로 돌아가고 세 칸이 일치한다
+  await page.getByTestId('btn-back').click();
+  expect(await structureOf(page, 'real-area')).toEqual(initialReal);
+  expect(await structureOf(page, 'test-area')).toEqual(initialReal);
+  await expect(real.locator('a[href]')).toHaveCount(0);
+  await expect(testArea.locator('a[href]')).toHaveCount(0);
 });
 
 test('QA-A12 Patch 도중 예외가 나면 [Patch 오류] alert 뒤 실제 영역이 마지막 기록 상태로 복구되고 다시 Patch하면 성공한다', async ({ page }) => {
@@ -233,11 +239,24 @@ test('QA-A12 Patch 도중 예외가 나면 [Patch 오류] alert 뒤 실제 영�
   const previewStruct = await structureOf(page, 'test-area');
   expect(previewStruct).not.toEqual(initialReal);
   await expect(page.getByTestId('test-area').locator('p.note')).toHaveText('바뀜');
+  // 기록 그대로: 새 기록이 안 생겼으므로 뒤로는 무시된다 (실제 영역 · 편집창 변화 없음)
+  const watcher = await observeMutations(page);
+  await page.getByTestId('btn-back').click();
+  expect((await watcher.takeSummary()).total).toBe(0);
+  expect(await structureOf(page, 'real-area')).toEqual(initialReal);
+  expect(await editorValue(page)).toBe(typed);
 
   // 다시 Patch하면 정상 반영된다 (기록이 오류 때 앞으로 가지 않았다는 증거: 기준이 여전히 초기 샘플이라 diff가 비지 않는다)
   await page.getByTestId('btn-patch').click();
   await expect(real.locator('p.note')).toHaveText('바뀜');
   await expect(real.locator('li').first()).toHaveText('하나!');
   expect(await structureOf(page, 'real-area')).toEqual(await structureOf(page, 'test-area'));
-  // [AI Note]: "뒤로가 무시된다 · 다시 Patch 뒤 기록이 정확히 한 칸"은 뒤로 버튼이 연결되는 Dev-18에서 이 테스트에 덧붙인다
+  // 기록이 정확히 한 칸 늘었다: 뒤로 한 번 → 초기 샘플, 한 번 더 뒤로는 무시
+  await page.getByTestId('btn-back').click();
+  expect(await structureOf(page, 'real-area')).toEqual(initialReal);
+  expect(await structureOf(page, 'test-area')).toEqual(initialReal);
+  await watcher.takeSummary();
+  await page.getByTestId('btn-back').click();
+  expect((await watcher.takeSummary()).total).toBe(0);
+  expect(await structureOf(page, 'real-area')).toEqual(initialReal);
 });

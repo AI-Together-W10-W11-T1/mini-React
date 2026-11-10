@@ -4,7 +4,7 @@
 - 실행: `npx playwright test <파일>` (desktop 1280x800 · mobile 375x812 두 프로젝트, 모든 시나리오가 두 프로젝트에서 돈다)
 - 시나리오 하나 = `e2e/*.spec.ts` 테스트 하나. 테스트 이름은 시나리오 문장 그대로
 - `QA-N`은 이 표의 행 번호일 뿐이고, 근거 ID는 PRD ID · T-ID(`P1-xx` · `T-0x` · `D-0x`)와 검토 문서 번호(A · B · C)만 쓴다
-- **번호 규칙**: 기존 QA-1 ~ QA-22 · QA-A1 ~ QA-A11은 번호를 바꾸지 않았다. 새 인수 시나리오는 **QA-23 ~ QA-32**, 새 공격 시나리오는 **QA-A12**. 기존 시나리오에 덧붙인 항목은 Then에 `(B1)`처럼 번호를 표시했다
+- **번호 규칙**: 기존 QA-1 ~ QA-22 · QA-A1 ~ QA-A11은 번호를 바꾸지 않았다. 새 인수 시나리오는 **QA-23 ~ QA-33**(QA-33 = 뒤로 · 앞으로 도중 예외, Dev-18), 새 공격 시나리오는 **QA-A12**. 기존 시나리오에 덧붙인 항목은 Then에 `(B1)`처럼 번호를 표시했다
 - 화면 약속: `data-testid` = `real-area` · `test-area` · `html-editor` · `btn-patch` · `btn-back` · `btn-forward` · `viz-toggle` · `viz-overlay`(확장은 `data-last-patch-count` · `data-last-flash-count`도 남김). 초기 샘플은 `dev_todo.md`의 샘플 HTML (글자 `제목` · `안녕` · `하나` · `둘` · `셋` · `잠김`)
 - 편집은 편집창 글을 읽어 **일부만 바꿔서 다시 채운다**(샘플의 들여쓰기에 기대지 않기 위해). 예: `글.replace('안녕', '반가워')`
 - 두 영역 · 편집창을 비교할 때는 `innerHTML` 글이 아니라 구조를 비교한다 (`e2e/phase1-helpers.ts`의 `structureOf`): 요소 태그 · 속성 · 글자(공백 포함) · 주석을 번호 순서대로. **속성은 이름 → 값 집합으로 비교한다(순서 무시)** — 실제 영역은 SET_ATTR로 속성이 맨 뒤에 붙고 테스트 영역은 편집창에 친 순서대로라 순서가 달라도 정상이다(A4). **`style`은 `el.style.cssText` 비교에 더해, `getAttribute('style')` 글을 엔진과 같은 규칙(`parseStyleText`)으로 쪼갠 항목 집합도 비교한다**(브라우저가 모르는 항목을 버려서 둘이 같아 보이는 경우를 잡음, A4). 편집창 글은 `<template>`에 넣어 파싱한 구조와 비교
@@ -51,6 +51,7 @@
 | QA-30 | §5 실행 가능한 HTML · B12 | 초기 상태 | `javascript:`를 숨긴 글을 각각 넣는다: `<a href="jav&#x61;script:window.__pwned=1">`(문자 참조), `<a href=" JAVA[탭 문자]script:window.__pwned=1">`(앞 공백 + 대문자 + 값 안에 실제 탭 문자 하나 — 테스트 코드에서는 `\t`로 씀). 칠 때(Patch 안 함)와 Patch 때 | **(B12)** 칠 때: alert 없음, `window.__pwned` 없음, 테스트 영역 `<a>`에 `href`가 없다(파싱한 뒤의 값으로 검사). Patch 때: `[위험한 코드]` alert, 실제 영역 · 기록 그대로 | `e2e/phase1-guard.spec.ts` |
 | QA-31 | §5 · P1-19 · B13 · C4 | 초기 상태에서 `<a href="https://example.com">링크</a>`와 `<form><button>보내기</button></form>`을 넣고 Patch 한 번(두 영역에 모두 있고 기록이 한 칸 있음) | 테스트 영역 안의 링크 클릭 · 폼 버튼 클릭, 실제 영역 안의 링크 클릭 · 폼 버튼 클릭 | **(B13 · C4)** 페이지가 이동 · 새로고침되지 않는다(주소 그대로, 페이지 안 표시용 변수 `window.__stay`가 살아 있음, 문서 이동 요청 0건). 클릭 뒤에도 뒤로가 동작해 기록이 살아 있다. 콘솔 오류 없음. (두 영역 안의 클릭 · 제출은 검증 페이지에서 기본 동작을 막음) | `e2e/phase1-guard.spec.ts` |
 | QA-32 | §5 실행 가능한 HTML · C5 | 초기 상태 | `<style>p { color: blue }</style>`와 `<link rel="stylesheet" href="x.css">`를 각각 편집창에 친다(Patch 안 함), 같은 글로 Patch | **(C5)** 칠 때: alert 없음, 테스트 영역에 `<style>` · `<link>`가 없고 페이지 모양이 바뀌지 않는다(두 영역 글자 색 그대로). Patch는 `[위험한 코드]`(요소 이름 포함)로 막히고 실제 영역 · 기록 그대로. (페이지에서는 `<style>`이 막히므로 `<style>` 안 글의 짝 검사 · 변환 경계는 단위 테스트로만 확인) | `e2e/phase1-guard.spec.ts` |
+| QA-33 | P1-28 · P1-29 · §5 오류 · C2 | Patch 한 번 한 상태(S1), 실제 영역의 `<p>`를 페이지 안에서 바깥으로 뗀다 | (a) 뒤로. (b) 복구 뒤 다시 뒤로 → 초기 상태에서 `<p>`를 떼고 (c) 앞으로 | **(C2)** `[Patch 오류]` alert가 한 번 뜬다(뒤로 · 앞으로 모두). 확인 뒤 실제 영역이 지금 기록의 VNode 상태로 다시 그려지고, 편집창 글 · 테스트 영역은 그대로이며, 기록은 움직이지 않아 이어서 정상 뒤로 · 앞으로가 된다 (Dev-18에서 추가) | `e2e/phase1-history.spec.ts` |
 
 ## 공격적 시나리오
 

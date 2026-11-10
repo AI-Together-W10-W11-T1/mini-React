@@ -1,4 +1,5 @@
 import { createVDomRoot } from '@mini-react/react-dom';
+import type { AreaChildren } from '@mini-react/shared';
 import { checkHtml, formatProblems, readAreaChildren, renderAreaChildren, setAreaHtml, vnodesToHtml } from '@mini-react/react-dom-bindings';
 
 // [AI Note]: 엔진 로직 없음. 패키지 공개 API만 이어 붙이는 연결 코드다.
@@ -44,20 +45,36 @@ byTestId<HTMLButtonElement>('btn-patch').addEventListener('click', () => {
   }
 });
 
-// [AI Note]: Patch 도중 예외(C2). react-dom이 이미 기록을 그대로 두고 실제 영역을 마지막 기록 모습으로 다시 그린 뒤
-// 원래 예외를 던져 준다. 페이지는 그 예외를 잡아 alert로만 알린다 — 편집창 글 · 테스트 영역은 그대로 둬서 다시 Patch해 볼 수 있다.
-// 뒤로 · 앞으로 도중 예외도 같은 알림을 쓴다(Dev-18).
-function reportPatchError(error: unknown): void {
+// [AI Note]: Patch · 뒤로 · 앞으로 도중 예외(C2). react-dom이 이미 기록을 그대로 두고 실제 영역을 마지막 기록 모습으로 다시 그린 뒤
+// 원래 예외를 던져 준다. 페이지는 그 예외를 잡아 alert로만 알린다 — 편집창 글 · 테스트 영역은 그대로 둬서 다시 해 볼 수 있다.
+function reportPatchError(error: unknown, doing = 'Patch를 적용하는 중'): void {
   const detail = error instanceof Error ? error.message : String(error);
   alert(
     formatProblems([
       {
         kind: 'PATCH_ERROR',
-        message: `Patch를 적용하는 중 오류가 났습니다 (${detail}). 실제 영역을 마지막 기록 상태로 되돌렸습니다. 다시 작성해 주세요.`,
+        message: `${doing} 오류가 났습니다 (${detail}). 실제 영역을 마지막 기록 상태로 되돌렸습니다. 다시 작성해 주세요.`,
       },
     ]),
   );
 }
+
+// [AI Note]: 뒤로 · 앞으로 (P1-28 ~ P1-30). 실제 영역은 root가 역패치 · patch로 바꾸고, 돌려받은 스냅샷(VNode)으로
+// 테스트 영역을 다시 그리고 편집창 글을 vnodesToHtml(스냅샷)로 채운다 — 이동하면 미저장 편집은 버려진다(§3.3).
+// null이면 처음 · 끝이라 아무 일도 없다: 편집창에 쳐 둔 글도 그대로 남는다(경계 이동 무시).
+function move(go: () => AreaChildren | null, doing: string): void {
+  try {
+    const snapshot = go();
+    if (snapshot === null) return;
+    renderAreaChildren(testArea, snapshot);
+    editor.value = vnodesToHtml(snapshot);
+  } catch (error) {
+    reportPatchError(error, doing);
+  }
+}
+
+byTestId<HTMLButtonElement>('btn-back').addEventListener('click', () => move(() => root.back(), '뒤로 이동하는 중'));
+byTestId<HTMLButtonElement>('btn-forward').addEventListener('click', () => move(() => root.forward(), '앞으로 이동하는 중'));
 
 // [AI Note]: 검증 페이지 보호(C4). 두 영역 안의 링크를 누르거나 폼을 제출하면 페이지가 이동해 기록이 모두 날아간다.
 // 엔진이 아니라 이 페이지의 일이라 여기서 기본 동작만 막는다. 캡처 단계에서 막아야 영역 안 어느 요소의 리스너보다 먼저 적용된다.
