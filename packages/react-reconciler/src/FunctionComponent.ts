@@ -1,7 +1,8 @@
 import { setHookDispatcher } from '@mini-react/react';
 import type { HookDispatcher, SetStateAction } from '@mini-react/react';
-import type { AreaChildren, Component, HookSlot, Patch, Props, StateHook, VNode } from '@mini-react/shared';
+import type { AreaChildren, Component, Deps, HookSlot, MemoHook, Patch, Props, StateHook, VNode } from '@mini-react/shared';
 import { scheduleRender } from '@mini-react/scheduler';
+import { depsChanged } from './deps';
 import { diff } from './diff';
 import { resolveComponents } from './resolveComponents';
 
@@ -78,15 +79,13 @@ export class FunctionComponent {
     return resolveComponents(result);
   }
 
-  // [AI Note]: 루트 컴포넌트가 렌더 중에 부르는 Hook 구현. useMemo · useEffect는 Dev-12 · 13에서 채운다.
+  // [AI Note]: 루트 컴포넌트가 렌더 중에 부르는 Hook 구현. useEffect는 Dev-13에서 채운다.
   private readonly dispatcher: HookDispatcher = {
     useState: <S>(initial: S | (() => S)) => this.useState(initial),
     useEffect: () => {
       throw new Error('useEffect는 아직 구현되지 않았습니다');
     },
-    useMemo: () => {
-      throw new Error('useMemo는 아직 구현되지 않았습니다');
-    },
+    useMemo: <T>(factory: () => T, deps?: Deps) => this.useMemo(factory, deps ?? null),
   };
 
   // [AI Note]: 이름 없는 useState를 구분하는 방법 = "부른 순서". 렌더마다 0번부터 세어 hooks[번호]에서 자기 슬롯을 찾는다.
@@ -108,6 +107,26 @@ export class FunctionComponent {
       throw new Error(`Hook 호출 순서가 달라졌습니다: ${index}번 Hook이 지난번에는 ${slot.kind}, 이번에는 state입니다`);
     }
     return [slot.value as S, slot.setter as (next: SetStateAction<S>) => void];
+  }
+
+  // [AI Note]: useMemo = 슬롯에 { 계산값, 의존성 }을 저장. 의존성이 안 바뀌면 factory를 부르지 않고 저장값(같은 참조)을 돌려준다.
+  // 생략(null)이면 depsChanged가 항상 true라 매 렌더 다시 계산한다.
+  private useMemo<T>(factory: () => T, deps: Deps): T {
+    const index = this.hookIndex++;
+    const slot = this.hooks[index];
+    if (slot === undefined) {
+      const created: MemoHook = { kind: 'memo', value: factory(), deps };
+      this.hooks[index] = created;
+      return created.value as T;
+    }
+    if (slot.kind !== 'memo') {
+      throw new Error(`Hook 호출 순서가 달라졌습니다: ${index}번 Hook이 지난번에는 ${slot.kind}, 이번에는 memo입니다`);
+    }
+    if (depsChanged(slot.deps, deps)) {
+      slot.value = factory();
+      slot.deps = deps;
+    }
+    return slot.value as T;
   }
 
   // [AI Note]: setter = 값을 바꾸고 즉시 동기 렌더 (알고리즘 결정 9 A). 같은 값(Object.is)이면 아무 일 없음.
