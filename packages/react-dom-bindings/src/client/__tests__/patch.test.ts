@@ -1,7 +1,8 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { patch } from '../patch';
 import { readAreaChildren } from '../domToVNode';
 import { renderAreaChildren } from '../renderVNode';
+import { setEventHandler } from '../events';
 import { diff, invertPatches } from '@mini-react/react-reconciler';
 import { makeRng, mutateTree, randomTree } from '../../../../react-reconciler/src/__tests__/randomTree';
 import { normalizeTree } from '../../../../react-reconciler/src/__tests__/applyPatches';
@@ -626,5 +627,153 @@ describe('patch — 관찰 콜백 (Diff 시각화 재료)', () => {
         throw new Error('콜백 오류');
       }),
     ).toThrow('콜백 오류');
+  });
+});
+
+describe('patch — SET_EVENT · SET_PROP (Phase 2)', () => {
+  it('SET_EVENT 교체 뒤 눌러도 새 핸들러만 한 번 (결정 8 B)', () => {
+    const box = area('<button>x</button>');
+    const button = box.firstChild as HTMLButtonElement;
+    const first = vi.fn();
+    const second = vi.fn();
+    patch(box, [{ kind: 'SET_EVENT', path: [0], event: 'click', before: null, after: first }]);
+    patch(box, [{ kind: 'SET_EVENT', path: [0], event: 'click', before: first, after: second }]);
+    button.click();
+    expect(first).not.toHaveBeenCalled();
+    expect(second).toHaveBeenCalledTimes(1);
+  });
+
+  it('SET_EVENT 교체는 리스너를 다시 달지 않는다 (addEventListener 1번)', () => {
+    const box = area('<button>x</button>');
+    const button = box.firstChild as HTMLButtonElement;
+    const spy = vi.spyOn(button, 'addEventListener');
+    let prev = vi.fn();
+    patch(box, [{ kind: 'SET_EVENT', path: [0], event: 'click', before: null, after: prev }]);
+    for (let i = 0; i < 20; i++) {
+      const next = vi.fn();
+      patch(box, [{ kind: 'SET_EVENT', path: [0], event: 'click', before: prev, after: next }]);
+      prev = next;
+    }
+    button.click();
+    expect(prev).toHaveBeenCalledTimes(1);
+    expect(spy).toHaveBeenCalledTimes(1);
+  });
+
+  it('SET_EVENT after null이면 눌러도 아무 일 없다 (핸들러만 비움)', () => {
+    const box = area('<button>x</button>');
+    const button = box.firstChild as HTMLButtonElement;
+    const handler = vi.fn();
+    setEventHandler(button, 'click', handler);
+    patch(box, [{ kind: 'SET_EVENT', path: [0], event: 'click', before: handler, after: null }]);
+    expect(() => button.click()).not.toThrow();
+    expect(handler).not.toHaveBeenCalled();
+  });
+
+  it('SET_PROP value: DOM 값과 같으면 대입하지 않는다 (타이핑 중 커서 유지)', () => {
+    const box = area('<input>');
+    document.body.appendChild(box);
+    const input = box.firstChild as HTMLInputElement;
+    input.value = 'hello';
+    input.setSelectionRange(2, 2);
+    const setter = vi.spyOn(HTMLInputElement.prototype, 'value', 'set');
+    patch(box, [{ kind: 'SET_PROP', path: [0], name: 'value', before: 'hell', after: 'hello' }]);
+    expect(setter).not.toHaveBeenCalled();
+    expect(input.selectionStart).toBe(2);
+    expect(input.selectionEnd).toBe(2);
+    setter.mockRestore();
+    box.remove();
+  });
+
+  it('SET_PROP value: DOM 값과 다르면 대입한다 (속성은 안 생김)', () => {
+    const box = area('<input>');
+    const input = box.firstChild as HTMLInputElement;
+    patch(box, [{ kind: 'SET_PROP', path: [0], name: 'value', before: '', after: 'x' }]);
+    expect(input.value).toBe('x');
+    expect(input.hasAttribute('value')).toBe(false);
+    patch(box, [{ kind: 'SET_PROP', path: [0], name: 'value', before: 'x', after: null }]);
+    expect(input.value).toBe('');
+  });
+
+  it('SET_PROP checked', () => {
+    const box = area('<input type="checkbox">');
+    const input = box.firstChild as HTMLInputElement;
+    patch(box, [{ kind: 'SET_PROP', path: [0], name: 'checked', before: false, after: true }]);
+    expect(input.checked).toBe(true);
+    patch(box, [{ kind: 'SET_PROP', path: [0], name: 'checked', before: true, after: false }]);
+    expect(input.checked).toBe(false);
+  });
+
+  it('요소가 아닌 경로면 오류 (SET_EVENT · SET_PROP)', () => {
+    const box = area('<p>글</p>');
+    expect(() => patch(box, [{ kind: 'SET_EVENT', path: [0, 0], event: 'click', before: null, after: () => {} }])).toThrow(/요소/);
+    expect(() => patch(box, [{ kind: 'SET_PROP', path: [0, 0], name: 'value', before: null, after: 'x' }])).toThrow(/요소/);
+  });
+
+  it('SET_EVENT · SET_PROP은 DOM 변경(MutationObserver)을 내지 않는다 (P2-21)', () => {
+    const box = area('<input><button>x</button>');
+    const observer = observe(box);
+    patch(box, [
+      { kind: 'SET_PROP', path: [0], name: 'value', before: '', after: 'abc' },
+      { kind: 'SET_EVENT', path: [1], event: 'click', before: null, after: () => {} },
+    ]);
+    expect(observer.takeRecords().length).toBe(0);
+    observer.disconnect();
+  });
+
+  it('같은 목록 안에서 MOVE와 섞여도 맞는 요소에 적용된다', () => {
+    const box = area('<ul><li>a</li><li>b</li><li>c</li></ul>');
+    const [a, b, c] = Array.from(box.querySelectorAll('li'));
+    const onC = vi.fn();
+    const onA = vi.fn();
+    patch(box, [
+      { kind: 'MOVE', parent: [0], from: 2, to: 0 }, // c a b
+      { kind: 'SET_EVENT', path: [0, 0], event: 'click', before: null, after: onC },
+      { kind: 'SET_EVENT', path: [0, 1], event: 'click', before: null, after: onA },
+    ]);
+    expect(Array.from(box.querySelectorAll('li'))).toEqual([c, a, b]);
+    a.click();
+    expect(onA).toHaveBeenCalledTimes(1);
+    expect(onC).not.toHaveBeenCalled();
+    c.click();
+    expect(onC).toHaveBeenCalledTimes(1);
+    b.click();
+    expect(onA).toHaveBeenCalledTimes(1);
+  });
+
+  it('관찰 콜백에 stage after로 알린다 (SET_EVENT · SET_PROP)', () => {
+    const box = area('<input>');
+    const input = box.firstChild as Element;
+    const seen: Array<{ kind: string; node: Node; stage: string }> = [];
+    patch(
+      box,
+      [
+        { kind: 'SET_PROP', path: [0], name: 'value', before: '', after: 'x' },
+        { kind: 'SET_EVENT', path: [0], event: 'input', before: null, after: () => {} },
+      ],
+      (e) => seen.push({ kind: e.patch.kind, node: e.node, stage: e.stage }),
+    );
+    expect(seen).toEqual([
+      { kind: 'SET_PROP', node: input, stage: 'after' },
+      { kind: 'SET_EVENT', node: input, stage: 'after' },
+    ]);
+  });
+
+  it('diff(이벤트 · 프로퍼티 포함) 결과를 적용하면 핸들러가 바뀌고 요소 참조가 유지된다', () => {
+    const f1 = vi.fn();
+    const f2 = vi.fn();
+    const oldTree = [el('div', {}, el('input', { value: 'a', onInput: f1 }), el('button', { onClick: f1 }, text('go')))];
+    const newTree = [el('div', {}, el('input', { value: 'ab', onInput: f2 }), el('button', { onClick: f2 }, text('go')))];
+    const box = area('');
+    renderAreaChildren(box, oldTree);
+    const input = box.querySelector('input') as HTMLInputElement;
+    const button = box.querySelector('button') as HTMLButtonElement;
+    patch(box, diff(oldTree, newTree));
+    expect(box.querySelector('input')).toBe(input);
+    expect(box.querySelector('button')).toBe(button);
+    expect(input.value).toBe('ab');
+    button.click();
+    input.dispatchEvent(new Event('input'));
+    expect(f1).not.toHaveBeenCalled();
+    expect(f2).toHaveBeenCalledTimes(2);
   });
 });
