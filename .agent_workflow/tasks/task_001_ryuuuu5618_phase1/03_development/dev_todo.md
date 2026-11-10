@@ -169,12 +169,21 @@ script:` · `" JAVA	script:"`), `<iframe> 제거 — srcdoc 안에 <script>paren
     - 한계(숨기지 않고 기록): 이 jsdom 설정은 인라인 핸들러 · 스크립트를 실제로 실행하지 않는다(처음에 "innerHTML로 바로 넣으면 `onclick`이 돈다"는 대조 테스트를 넣었더니 실행이 안 돼 실패 → 그 대조 테스트와 `click()` 호출은 뺌). 그래서 `window.__pwned` 미정의 확인은 보조이고, 핵심 확인은 "영역에 그 요소 · 속성이 남지 않았다"이다. 실제 브라우저에서 코드가 안 도는지는 e2e(Dev-16 QA-29 · QA-30)가 본다
     - 실행: `npx vitest run` 10 files · 220 passed, `npx tsc --noEmit` 오류 0, 커밋: 아래 마지막 docs 커밋에서 기록
 
-- [ ] **Dev-9** (`react-dom-bindings`): `checkHtml` 1 — 위험 코드 · SVG · 알림 글 만들기 [§5 실행 가능한 HTML · §5 HTML 범위(SVG 미지원) · §6.2 지원하지 않는 입력 · C3 · C5 · B11 · B12]
+- [x] **Dev-9** (`react-dom-bindings`): `checkHtml` 1 — 위험 코드 · SVG · 알림 글 만들기 [§5 실행 가능한 HTML · §5 HTML 범위(SVG 미지원) · §6.2 지원하지 않는 입력 · C3 · C5 · B11 · B12]
   - 의존: Dev-8 (`scanDangerous`)
   - 만들 · 고칠 파일: `packages/react-dom-bindings/src/client/checkHtml.ts`(`checkHtml` · `formatProblems` · `HtmlProblem` 타입), `packages/react-dom-bindings/src/index.ts`
   - 테스트: `packages/react-dom-bindings/src/client/__tests__/checkHtml.test.ts` — 위험 코드(`on…` · `<script>` · `javascript:`)가 있으면 `DANGEROUS` 문제, **숨긴 `javascript:`(문자 참조 · 값 안 탭 · 앞 공백 + 대문자)도 `DANGEROUS`(파싱한 뒤의 값으로 검사, B12)**, **`<iframe srcdoc="<script>…">` · `<object>` · `<embed>` · `<style>` · `<link rel="stylesheet">`도 `DANGEROUS`이고 알림 글에 요소 이름이 들어감(C3 · C5 · B11), `<link rel="icon">`은 문제 없음**, `<svg>`(대소문자 섞어도, 안에 자식이 있어도)가 있으면 `SVG` 문제, 정상 샘플 · 빈 글 · 공백만 · 주석만 · 최상위 여러 개는 문제 없음(`[]`), 문제가 여러 개면 모두 돌려줌, 알림 글이 `[위험한 코드]` · `[SVG 미지원]` 말마디와 "다시 작성해 주세요."를 담음
   - 알고리즘: §5 HTML 편집 · 오류 (Patch 때 검사, 문제가 있으면 Patch를 막는다)
   - 완료 근거로 남길 것: `checkHtml.test.ts` 통과 개수, 알림 글 예시 1건 (`<iframe>` 포함)
+  - **완료 근거 (Evidence)**:
+    - 만든 · 고친 파일: `packages/react-dom-bindings/src/client/checkHtml.ts`(`checkHtml(html)` — `<template>`에 파싱 → `scanDangerous` 결과를 `DANGEROUS` 문제로, `<svg>`(중첩 · 대소문자 무관)가 있으면 `SVG` 문제 한 줄. `formatProblems(problems)` — 문제 한 줄 = `[말머리] 설명` + 마지막 줄 "다시 작성해 주세요.". `HtmlProblem { kind, message }` · `HtmlProblemKind` = `DANGEROUS | UNPAIRED | STRUCTURE | SVG | PATCH_ERROR` · `PROBLEM_LABELS` = 말머리 5종), `packages/react-dom-bindings/src/index.ts`(내보내기)
+    - 테스트: `packages/react-dom-bindings/src/client/__tests__/checkHtml.test.ts` 19건 통과 (`npx vitest run packages/react-dom-bindings/src/client/__tests__/checkHtml.test.ts`). 모듈이 없는 상태에서 실패하는 것을 먼저 확인한 뒤 구현
+    - 테스트 이름: `숨긴 javascript:(문자 참조 · 값 안 탭 · 앞 공백 + 대문자)도 DANGEROUS — 파싱한 뒤의 값으로 검사 (B12)`, `<iframe srcdoc="<script>…">도 DANGEROUS이고 요소 이름이 들어간다 (B11 · C3)`, `<object> · <embed> · <style> · <link rel="stylesheet">도 DANGEROUS이고 알림 글에 요소 이름이 들어간다 (C3 · C5)`, `<link rel="icon">은 문제 없음 (C5)`, SVG 3건(대소문자 · 중첩 · `<svg onload>`는 DANGEROUS + SVG 둘 다), 정상 샘플 · 빈 글 · 공백만 · 주석만 · 최상위 여러 개 `[]`, 문제 여러 개 모두 돌려줌
+    - 알림 글 예시 (테스트 `알림 글 예시 (<iframe> 포함)`): `checkHtml('<p>글</p><iframe src="https://example.com"></iframe>')` → `formatProblems` = `"[위험한 코드] <iframe> 요소
+다시 작성해 주세요."`. `[위험한 코드]` · `[SVG 미지원]` 조합 예: `[위험한 코드] <iframe> 요소` / `[SVG 미지원] <svg> 요소는 지원하지 않습니다.` / `다시 작성해 주세요.`
+    - 말머리 5종(`[위험한 코드]` · `[태그 짝]` · `[구조 불일치]` · `[SVG 미지원]` · `[Patch 오류]`)은 `PROBLEM_LABELS`로 테스트(`말머리 5종: …`). `[Patch 오류]`(`PATCH_ERROR`)만 있으면 "다시 작성해 주세요." 줄을 붙이지 않는다(Dev-17이 자체 안내 "실제 영역을 마지막 기록 상태로 되돌렸습니다"를 message에 담는 전제)
+    - 짝(`UNPAIRED`) · 구조(`STRUCTURE`) 검사는 Dev-10 몫이라 이 Dev의 `checkHtml`은 아직 내지 않는다(타입 · 말머리만 준비)
+    - 실행: `npx vitest run` 11 files · 239 passed, `npx tsc --noEmit` 오류 0, 커밋: 아래 마지막 docs 커밋에서 기록
 
 - [ ] **Dev-10** (`react-dom-bindings`): `checkHtml` 2 — 태그 짝 검사 + 구조 비교(`tbody` 자동 추가만 예외) [§5 HTML 편집 · 오류 · §6.2 지원하지 않는 입력과 오류 복구 · C1 · B14 · B15 · B16]
   - 의존: Dev-9, Dev-7 (`vnodesToHtml` 결과가 항상 통과하는지 확인)
