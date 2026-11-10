@@ -45,13 +45,14 @@ export function applyPatch(list: AreaChildren, patch: Patch): AreaChildren {
       });
     case 'SET_STYLE':
       return mapNode(list, patch.path, (node) => {
-        const style: { [property: string]: string } = { ...((node.props as { style?: StyleMap }).style ?? {}) };
-        if (patch.after === null) delete style[patch.property];
-        else style[patch.property] = patch.after;
+        // [AI Note]: Map으로 고친다. 보통 객체에 `style['__proto__'] = '값'`을 쓰면 항목이 아니라 프로토타입 설정이라 무시된다 (검수 1회차 B-1).
+        const style = new Map(Object.entries((node.props as { style?: StyleMap }).style ?? {}));
+        if (patch.after === null) style.delete(patch.property);
+        else style.set(patch.property, patch.after);
         const props: { [name: string]: unknown } = { ...node.props };
         // 항목이 하나도 없으면 style props를 두지 않는다 (domToVNode와 같은 규칙)
-        if (Object.keys(style).length === 0) delete props.style;
-        else props.style = style;
+        if (style.size === 0) delete props.style;
+        else props.style = Object.fromEntries(style);
         return withProps(node, props);
       });
     case 'INSERT': {

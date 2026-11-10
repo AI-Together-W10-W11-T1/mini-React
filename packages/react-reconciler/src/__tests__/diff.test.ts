@@ -144,6 +144,34 @@ describe('diff 기본 — style 항목', () => {
     expect(diff([el('p', { style: { a: '1', b: '2' } })], [el('p', { style: { b: '2', a: '1' } })])).toEqual([]);
   });
 
+  // 검수 1회차 B-1: style 항목 이름이 Object.prototype 이름과 겹쳐도 "있는지 · 값"을 자기 것만 본다
+  describe('프로토타입 이름 항목 (constructor · __proto__ · toString)', () => {
+    // [AI Note]: `{ __proto__: 'x' }` 리터럴은 프로토타입 설정이라 항목이 되지 않는다. parseStyleText와 같은 방식(fromEntries)으로 자기 속성을 만든다.
+    const style = (entries: Array<[string, string]>) => Object.fromEntries(entries);
+
+    for (const name of ['constructor', '__proto__', 'toString', 'hasOwnProperty']) {
+      it(`${name} 항목 추가는 SET_STYLE before null`, () => {
+        const patches = run([el('p', { style: style([['color', 'red']]) })], [el('p', { style: style([['color', 'red'], [name, 'x']]) })]);
+        expect(patches).toEqual([{ kind: 'SET_STYLE', path: [0], property: name, before: null, after: 'x' }]);
+      });
+
+      it(`${name} 항목 삭제는 SET_STYLE after null (함수가 아니라 null)`, () => {
+        const patches = run([el('p', { style: style([['color', 'red'], [name, 'x']]) })], [el('p', { style: style([['color', 'red']]) })]);
+        expect(patches).toEqual([{ kind: 'SET_STYLE', path: [0], property: name, before: 'x', after: null }]);
+      });
+
+      it(`${name} 항목 값 수정은 SET_STYLE 전 · 후 값`, () => {
+        const patches = run([el('p', { style: style([[name, 'x']]) })], [el('p', { style: style([[name, 'y']]) })]);
+        expect(patches).toEqual([{ kind: 'SET_STYLE', path: [0], property: name, before: 'x', after: 'y' }]);
+      });
+    }
+
+    it('style이 통째로 없어질 때도 프로토타입 이름 항목을 지운다', () => {
+      const patches = run([el('p', { style: style([['__proto__', 'x']]) })], [el('p', {})]);
+      expect(patches).toEqual([{ kind: 'SET_STYLE', path: [0], property: '__proto__', before: 'x', after: null }]);
+    });
+  });
+
   it('문자열 style 속성은 보통 속성으로 비교한다', () => {
     const patches = run([el('p', { style: 'color: red' })], [el('p', { style: 'color: blue' })]);
     expect(patches).toEqual([{ kind: 'SET_ATTR', path: [0], name: 'style', before: 'color: red', after: 'color: blue' }]);

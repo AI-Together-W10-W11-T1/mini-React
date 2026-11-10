@@ -139,12 +139,14 @@ function diffAttrs(oldNode: VNode, newNode: VNode, path: Path, out: Patch[]): vo
 function diffStyle(oldNode: VNode, newNode: VNode, path: Path, out: Patch[]): void {
   const before = readStyle(oldNode);
   const after = readStyle(newNode);
+  // [AI Note]: 보통 객체의 `after[property]` · `property in before`는 프로토타입 체인까지 본다 (`constructor` · `__proto__` 등).
+  // 항목이 "자기 것으로" 있는지만 `Object.hasOwn`으로 보고, 값도 자기 것일 때만 읽는다 (검수 1회차 B-1).
   for (const [property, oldValue] of Object.entries(before)) {
-    const newValue = after[property];
+    const newValue = Object.hasOwn(after, property) ? after[property] : undefined;
     if (newValue === undefined) out.push({ kind: 'SET_STYLE', path, property, before: oldValue, after: null });
     else if (newValue !== oldValue) out.push({ kind: 'SET_STYLE', path, property, before: oldValue, after: newValue });
   }
   for (const [property, newValue] of Object.entries(after)) {
-    if (!(property in before)) out.push({ kind: 'SET_STYLE', path, property, before: null, after: newValue });
+    if (!Object.hasOwn(before, property)) out.push({ kind: 'SET_STYLE', path, property, before: null, after: newValue });
   }
 }

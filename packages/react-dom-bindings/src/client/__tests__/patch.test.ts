@@ -93,6 +93,42 @@ describe('patch — 종류별 반영 (손으로 쓴 Patch 목록)', () => {
     expect(readAreaChildren(box)[0].props).toEqual({ style: { 'not-a-real-prop': 'x', color: 'blue' } });
   });
 
+  // 검수 1회차 B-1: style 항목 이름이 `__proto__` · `constructor`여도 보통 항목처럼 담고 지운다
+  it('SET_STYLE __proto__ 항목 추가: 프로토타입이 바뀌지 않고 항목으로 들어간다', () => {
+    const box = area('<p style="color: red"></p>');
+    patch(box, [{ kind: 'SET_STYLE', path: [0], property: '__proto__', before: null, after: 'x' }]);
+    const p = box.firstChild as Element;
+    expect(p.getAttribute('style')).toBe('color: red; __proto__: x');
+    expect(Object.hasOwn((readAreaChildren(box)[0].props as { style: object }).style, '__proto__')).toBe(true);
+  });
+
+  it('SET_STYLE __proto__ 항목 삭제: 다른 항목은 남긴다', () => {
+    const box = area('<p style="color: red; __proto__: x"></p>');
+    patch(box, [{ kind: 'SET_STYLE', path: [0], property: '__proto__', before: 'x', after: null }]);
+    expect((box.firstChild as Element).getAttribute('style')).toBe('color: red');
+  });
+
+  it('SET_STYLE __proto__ 항목 값 수정', () => {
+    const box = area('<p style="__proto__: x; color: red"></p>');
+    patch(box, [{ kind: 'SET_STYLE', path: [0], property: '__proto__', before: 'x', after: 'y' }]);
+    expect((box.firstChild as Element).getAttribute('style')).toBe('__proto__: y; color: red');
+  });
+
+  it('SET_STYLE constructor 항목 추가 · 삭제', () => {
+    const box = area('<p style="color: red"></p>');
+    const p = box.firstChild as Element;
+    patch(box, [{ kind: 'SET_STYLE', path: [0], property: 'constructor', before: null, after: 'x' }]);
+    expect(p.getAttribute('style')).toBe('color: red; constructor: x');
+    patch(box, [{ kind: 'SET_STYLE', path: [0], property: 'constructor', before: 'x', after: null }]);
+    expect(p.getAttribute('style')).toBe('color: red');
+  });
+
+  it('SET_STYLE __proto__ 항목이 마지막이면 지울 때 style 속성도 제거한다', () => {
+    const box = area('<p style="__proto__: x"></p>');
+    patch(box, [{ kind: 'SET_STYLE', path: [0], property: '__proto__', before: 'x', after: null }]);
+    expect((box.firstChild as Element).hasAttribute('style')).toBe(false);
+  });
+
   it('D-03 INSERT: path 마지막 번호 자리에 끼운다 (P1-10)', () => {
     const box = area('<ul><li>a</li><li>c</li></ul>');
     patch(box, [{ kind: 'INSERT', path: [0, 1], node: el('li', {}, text('b')) }]);

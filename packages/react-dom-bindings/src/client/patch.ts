@@ -40,11 +40,12 @@ function applyPatch(area: Element, p: Patch, observer?: PatchObserver): void {
     case 'SET_STYLE': {
       const element = elementAt(area, p.path, 'SET_STYLE');
       // [AI Note]: style 속성 글을 직접 쪼개 항목 하나만 고치고 다시 쓴다. CSSOM(el.style)을 쓰면 축약형이 풀리고 모르는 항목이 사라진다.
-      const map: { [property: string]: string } = { ...parseStyleText(element.getAttribute('style') ?? '') };
-      if (p.after === null) delete map[p.property];
-      else map[p.property] = p.after;
-      if (Object.keys(map).length === 0) element.removeAttribute('style');
-      else element.setAttribute('style', styleMapToText(map));
+      // Map으로 고치는 이유: 보통 객체에 `map['__proto__'] = 값`을 쓰면 항목이 아니라 프로토타입이 바뀐다 (검수 1회차 B-1).
+      const map = new Map(Object.entries(parseStyleText(element.getAttribute('style') ?? '')));
+      if (p.after === null) map.delete(p.property);
+      else map.set(p.property, p.after);
+      if (map.size === 0) element.removeAttribute('style');
+      else element.setAttribute('style', styleMapToText(Object.fromEntries(map)));
       observer?.({ patch: p, node: element, stage: 'after' });
       return;
     }
