@@ -113,12 +113,17 @@
     - B20: `깊이 300 중첩의 맨 아래 글자 바꾸기가 스택 넘침 없이 끝난다 (B20)`(경로 길이 302), `형제 2,000개에서 끝에 추가 · 전부 삭제가 끝나고 결과가 목표와 같다 (B20)` 통과
     - 실행: `npx vitest run` 5 files · 115 passed, `npx tsc --noEmit` 오류 0, 커밋: 메시지 `(Dev-4)`
 
-- [ ] **Dev-5** (`react-reconciler`): `invertPatches` — 전후 뒤집기 + 역순 (역패치) [P1-26 · T-08]
+- [x] **Dev-5** (`react-reconciler`): `invertPatches` — 전후 뒤집기 + 역순 (역패치) [P1-26 · T-08]
   - 의존: Dev-3 (`applyPatches` 검산기 · patch 종류)
   - 만들 · 고칠 파일: `packages/react-reconciler/src/invertPatches.ts`, `packages/react-reconciler/src/index.ts`
   - 테스트: `packages/react-reconciler/src/__tests__/invertPatches.test.ts` — 종류별 뒤집기(SET_TEXT · SET_ATTR · SET_STYLE는 before ↔ after, INSERT ↔ REMOVE는 같은 경로 · 같은 node, REPLACE는 before ↔ after, MOVE는 from ↔ to), 순서가 뒤집힘, 두 번 뒤집으면 원래 목록, 입력 목록을 고치지 않음, `applyPatches(new, invert(diff(old, new)))`가 old와 같음 (Dev-4의 무작위 200쌍 재사용) (T-08)
   - 알고리즘: 되돌리는 순서 = 역순 (결정 7 세부)
   - 완료 근거로 남길 것: `invertPatches.test.ts` 통과 개수, 무작위 200쌍 왕복 통과
+  - **완료 근거 (Evidence)**:
+    - 만든 · 고친 파일: `packages/react-reconciler/src/invertPatches.ts`(`invertPatches` — 종류별 전후 뒤집기 + `reverse()`), `packages/react-reconciler/src/index.ts`(내보내기)
+    - 테스트: `packages/react-reconciler/src/__tests__/invertPatches.test.ts` 13건 통과 (`npx vitest run packages/react-reconciler/src/__tests__/invertPatches.test.ts`). 모듈이 없는 상태에서 실패하는 것을 먼저 확인. 종류별 뒤집기 6건(SET_TEXT · SET_ATTR · SET_STYLE · INSERT↔REMOVE · REPLACE · MOVE), 순서 뒤집힘, 두 번 뒤집으면 원래 목록, 입력을 고치지 않음(깊게 얼림), 빈 목록, 손으로 쓴 변경 왕복, MOVE 왕복
+    - 무작위 200쌍 왕복: `무작위(고정 씨앗) 트리 쌍 200개에서 applyPatches(new, invert(diff(old, new)))가 old와 같다 (왕복)` 통과 (Dev-4와 같은 `randomTree.ts` 재사용, 앞으로 적용 결과가 new인 것도 함께 확인)
+    - 실행: `npx vitest run` 6 files · 128 passed, `npx tsc --noEmit` 오류 0, 커밋: 메시지 `(Dev-5)`
 
 - [ ] **Dev-6** (`react-dom-bindings`): `patch` — 경로 + 순서대로 하나씩 실제 DOM에 반영 (SET_TEXT · SET_ATTR · SET_STYLE · INSERT · REMOVE · REPLACE) [P1-34 · P1-13 · P1-17 · P1-18 · T-03 · T-04 · T-06 · B20]
   - 의존: Dev-1 (INSERT · REPLACE가 `renderVNode` 사용), Dev-2 (결과를 `domToVNode`로 비교), Dev-4 (diff 결과 모양 확인)
