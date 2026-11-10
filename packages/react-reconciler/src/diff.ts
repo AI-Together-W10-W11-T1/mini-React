@@ -12,8 +12,17 @@ export function diff(oldChildren: AreaChildren, newChildren: AreaChildren): Patc
 
 function diffChildren(oldChildren: readonly VNode[], newChildren: readonly VNode[], parent: Path, out: Patch[]): void {
   const common = Math.min(oldChildren.length, newChildren.length);
+  // ① 겹치는 자리부터 재귀 비교
   for (let i = 0; i < common; i++) {
     diffNode(oldChildren[i], newChildren[i], [...parent, i], out);
+  }
+  // [AI Note]: 목록은 순서대로 하나씩 적용하고 경로는 "그 순간의 트리" 기준이라 순서가 중요하다 (알고리즘 결정 3 · 4).
+  // ② 남는 옛 자식은 뒤에서부터 REMOVE (앞 번호가 안 밀림) → ③ 남는 새 자식은 앞에서부터 INSERT (앞 번호가 먼저 자리 잡음)
+  for (let i = oldChildren.length - 1; i >= common; i--) {
+    out.push({ kind: 'REMOVE', path: [...parent, i], node: oldChildren[i] });
+  }
+  for (let i = common; i < newChildren.length; i++) {
+    out.push({ kind: 'INSERT', path: [...parent, i], node: newChildren[i] });
   }
 }
 

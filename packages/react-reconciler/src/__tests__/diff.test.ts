@@ -2,7 +2,8 @@ import { describe, it, expect } from 'vitest';
 import { diff } from '../diff';
 import { applyPatches, normalizeTree } from './applyPatches';
 import { comment, el, text } from '../../../shared/src/__tests__/helpers';
-import type { AreaChildren, Patch } from '@mini-react/shared';
+import { makeRng, mutateTree, randomTree } from './randomTree';
+import type { AreaChildren, Patch, VNode } from '@mini-react/shared';
 
 function deepFreeze<T>(v: T): T {
   if (v && typeof v === 'object' && !Object.isFrozen(v)) {
@@ -189,6 +190,136 @@ describe('diff 기본 — 무변경 (T-04)', () => {
 
   it('빈 목록 둘이면 빈 목록', () => {
     expect(diff([], [])).toEqual([]);
+  });
+});
+
+const pathOf = (p: Patch): readonly number[] => ('path' in p ? p.path : []);
+const li = (s: string) => el('li', {}, text(s));
+
+describe('diff 자식 추가 · 삭제 (Dev-4, 위치 기반)', () => {
+  it('D-03 끝에 노드 추가: INSERT 한 줄, 경로의 마지막 번호가 끼울 자리 (P1-10)', () => {
+    const patches = run([el('ul', {}, li('a'))], [el('ul', {}, li('a'), li('b'))]);
+    expect(patches).toEqual([{ kind: 'INSERT', path: [0, 1], node: li('b') }]);
+  });
+
+  it('D-04 끝 노드 삭제: REMOVE의 node는 원본 VNode 통째 (P1-11)', () => {
+    const removed = li('b');
+    const patches = run([el('ul', {}, li('a'), removed)], [el('ul', {}, li('a'))]);
+    expect(patches).toEqual([{ kind: 'REMOVE', path: [0, 1], node: removed }]);
+    expect((patches[0] as { node: unknown }).node).toBe(removed);
+  });
+
+  it('여러 형제를 한꺼번에 삭제하면 경로가 뒤에서부터 (P1-16)', () => {
+    const patches = run([el('ul', {}, li('a'), li('b'), li('c'), li('d'))], [el('ul', {}, li('a'))]);
+    expect(patches.map((p) => p.kind)).toEqual(['REMOVE', 'REMOVE', 'REMOVE']);
+    expect(patches.map((p) => pathOf(p))).toEqual([[0, 3], [0, 2], [0, 1]]);
+  });
+
+  it('여러 개를 한꺼번에 추가하면 경로가 앞에서부터', () => {
+    const patches = run([el('ul', {}, li('a'))], [el('ul', {}, li('a'), li('b'), li('c'), li('d'))]);
+    expect(patches.map((p) => p.kind)).toEqual(['INSERT', 'INSERT', 'INSERT']);
+    expect(patches.map((p) => pathOf(p))).toEqual([[0, 1], [0, 2], [0, 3]]);
+  });
+
+  it('가운데 형제를 지우면 위치 비교 결과(뒤 형제 글자 바꾸기 + 마지막 REMOVE)지만 최종 결과는 목표와 같다 (P1-16)', () => {
+    const patches = run([el('ul', {}, li('a'), li('b'), li('c'))], [el('ul', {}, li('a'), li('c'))]);
+    expect(patches).toEqual([
+      { kind: 'SET_TEXT', path: [0, 1, 0], before: 'b', after: 'c' },
+      { kind: 'REMOVE', path: [0, 2], node: li('c') },
+    ]);
+  });
+
+  it('최상위(영역 상자 바로 아래) 추가 · 삭제도 같은 규칙', () => {
+    expect(run([el('p')], [el('p'), el('h1')])).toEqual([{ kind: 'INSERT', path: [1], node: el('h1') }]);
+    expect(run([el('p'), el('h1')], [el('p')])).toEqual([{ kind: 'REMOVE', path: [1], node: el('h1') }]);
+  });
+
+  it('빈 목록 ↔ 여러 개 (복수 루트 · 0개)', () => {
+    expect(run([], [el('a'), text('x'), comment('c')]).map((p) => p.kind)).toEqual(['INSERT', 'INSERT', 'INSERT']);
+    expect(run([el('a'), text('x'), comment('c')], []).map((p) => pathOf(p))).toEqual([[2], [1], [0]]);
+  });
+
+  it('중첩 3단계 안의 변경이 올바른 대상에 반영된다 (P1-14)', () => {
+    const make = (leaf: string, extra: boolean) => [
+      el('div', {}, el('section', {}, el('ul', {}, li('a'), li(leaf), ...(extra ? [li('z')] : []))), el('p', {}, text('안 바뀜'))),
+    ];
+    const patches = run(make('b', false), make('B', true));
+    expect(patches).toEqual([
+      { kind: 'SET_TEXT', path: [0, 0, 0, 1, 0], before: 'b', after: 'B' },
+      { kind: 'INSERT', path: [0, 0, 0, 2], node: li('z') },
+    ]);
+  });
+
+  it('삭제와 수정이 함께 있어도 다른 노드를 잘못 수정하지 않는다 (P1-16)', () => {
+    const oldTree = [el('div', {}, el('p', { id: 'a' }, text('1')), el('p', { id: 'b' }, text('2')), el('p', { id: 'c' }, text('3')))];
+    const newTree = [el('div', {}, el('p', { id: 'a', class: 'x' }, text('1')), el('p', { id: 'b' }, text('two')))];
+    const patches = run(oldTree, newTree);
+    // 위치 기반: 0번은 속성 추가, 1번은 글자만, 마지막(2번)이 삭제
+    expect(patches).toEqual([
+      { kind: 'SET_ATTR', path: [0, 0], name: 'class', before: null, after: 'x' },
+      { kind: 'SET_TEXT', path: [0, 1, 0], before: '2', after: 'two' },
+      { kind: 'REMOVE', path: [0, 2], node: oldTree[0].children[2] },
+    ]);
+  });
+
+  it('복합 변경: 글자 + 속성 + 추가 + 삭제 + 교체가 한꺼번에 (P1-15 · T-05)', () => {
+    const oldTree = [
+      el('main', { id: 'm' }, el('h1', {}, text('제목')), el('p', { class: 'a' }, text('본문')), el('span', {}, text('s')), el('i', {}, text('끝1')), el('i', {}, text('끝2'))),
+    ];
+    const newTree = [
+      el('main', { id: 'm', lang: 'ko' }, el('h1', {}, text('새 제목')), el('p', { class: 'b' }, text('본문')), el('b', {}, text('s')), el('i', {}, text('끝1'))),
+    ];
+    const patches = run(oldTree, newTree);
+    expect(new Set(patches.map((p) => p.kind))).toEqual(new Set(['SET_ATTR', 'SET_TEXT', 'REPLACE', 'REMOVE']));
+    // 추가 포함 복합도 확인
+    const patches2 = run(newTree, [el('main', { id: 'm' }, el('h1', {}, text('새 제목')), el('p', { class: 'b' }, text('본문')), el('b', {}, text('s')), el('i', {}, text('끝1')), el('i'), el('u'))]);
+    expect(patches2.map((p) => p.kind)).toContain('INSERT');
+  });
+
+  it('경로가 공백 글자 · 주석 번호를 센다 (VNode 번호 = DOM childNodes 번호)', () => {
+    const make = (leaf: string) => [el('ul', {}, text('\n  '), comment(' c '), text('\n  '), el('li', {}, text(leaf)), text('\n'))];
+    const patches = run(make('a'), make('b'));
+    expect(patches).toEqual([{ kind: 'SET_TEXT', path: [0, 3, 0], before: 'a', after: 'b' }]);
+  });
+
+  it('INSERT · REMOVE도 주석 · 공백이 차지한 번호 기준', () => {
+    const oldTree = [el('ul', {}, text('\n'), comment('c'))];
+    const newTree = [el('ul', {}, text('\n'), comment('c'), text('\n'), el('li'))];
+    expect(run(oldTree, newTree)).toEqual([
+      { kind: 'INSERT', path: [0, 2], node: text('\n') },
+      { kind: 'INSERT', path: [0, 3], node: el('li') },
+    ]);
+  });
+
+  it('무작위(고정 씨앗) 트리 쌍 200개에서 applyPatches(old, diff(old, new))가 new와 같다 (T-03 · T-05)', () => {
+    const rng = makeRng(20261111);
+    for (let i = 0; i < 200; i++) {
+      const oldTree = randomTree(rng);
+      const newTree = i % 2 === 0 ? randomTree(rng) : mutateTree(rng, oldTree);
+      run(oldTree, newTree);
+    }
+  });
+
+  it('깊이 300 중첩의 맨 아래 글자 바꾸기가 스택 넘침 없이 끝난다 (B20)', () => {
+    const nest = (leaf: string): VNode[] => {
+      let node: VNode = el('span', {}, text(leaf));
+      for (let i = 0; i < 300; i++) node = el('div', {}, node);
+      return [node];
+    };
+    const patches = run(nest('a'), nest('b'));
+    expect(patches.length).toBe(1);
+    expect(patches[0].kind).toBe('SET_TEXT');
+    expect(pathOf(patches[0]).length).toBe(302);
+  });
+
+  it('형제 2,000개에서 끝에 추가 · 전부 삭제가 끝나고 결과가 목표와 같다 (B20)', () => {
+    const many = (n: number) => [el('ul', {}, ...Array.from({ length: n }, (_, i) => li(String(i))))];
+    const added = run(many(2000), many(2001));
+    expect(added).toEqual([{ kind: 'INSERT', path: [0, 2000], node: li('2000') }]);
+    const removed = run(many(2000), [el('ul')]);
+    expect(removed.length).toBe(2000);
+    expect(pathOf(removed[0])).toEqual([0, 1999]);
+    expect(pathOf(removed[1999])).toEqual([0, 0]);
   });
 });
 

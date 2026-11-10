@@ -99,12 +99,19 @@
     - 테스트: `diff.test.ts` 30건 통과 (`npx vitest run packages/react-reconciler`). 모듈이 없는 상태에서 실패하는 것을 먼저 확인. 이 Dev에서 통과한 기본 케이스: `D-01 글자가 바뀌면 SET_TEXT 한 줄`, `D-01 중첩 안의 글자`, `D-02 속성 추가 · 수정 · 삭제`, `D-05 태그가 다르면 REPLACE`, `D-05 중첩 안의 교체`, `글자 ↔ 요소 ↔ 주석 종류가 다르면 REPLACE`, `같은 입력이면 빈 목록 (P1-13)`, `입력 VNode를 고치지 않는다(깊게 얼린 입력)`, 모든 `run()` 테스트가 `applyPatches(old, diff(old, new))`가 new와 같음을 함께 확인
     - 실행: `npx vitest run` 5 files · 100 passed, `npx tsc --noEmit` 오류 0, 커밋: 메시지 `(Dev-3)`
 
-- [ ] **Dev-4** (`react-reconciler`): `diff` 자식 추가 · 삭제 · 중첩 · 복합 — 길이가 다른 자식 목록(INSERT 앞에서 · REMOVE 뒤에서) [P1-10 · P1-11 · P1-14 ~ P1-16 · T-03 · T-05 · B20]
+- [x] **Dev-4** (`react-reconciler`): `diff` 자식 추가 · 삭제 · 중첩 · 복합 — 길이가 다른 자식 목록(INSERT 앞에서 · REMOVE 뒤에서) [P1-10 · P1-11 · P1-14 ~ P1-16 · T-03 · T-05 · B20]
   - 의존: Dev-3
   - 만들 · 고칠 파일: `packages/react-reconciler/src/diff.ts`
   - 테스트: `packages/react-reconciler/src/__tests__/diff.test.ts` — D-03 끝에 추가 · D-04 끝 삭제(REMOVE의 node = 원본 통째) · 여러 형제 한꺼번에 삭제(경로가 뒤에서부터) · 여러 개 한꺼번에 추가(앞에서부터) · 가운데 형제 삭제는 위치 비교 결과(뒤 형제 글자 바꾸기 + 마지막 REMOVE)가 되어도 최종 결과가 목표와 같음 · 중첩 3단계 안의 변경 · 삭제와 수정이 함께 있을 때 다른 노드를 잘못 건드리지 않음 · 복합(글자 + 속성 + 추가 + 삭제 + 교체 동시) · 빈 목록 ↔ 여러 개 · 경로가 공백 · 주석 번호를 센다 · 무작위(고정 씨앗) 트리 쌍 200개에서 `applyPatches(old, diff(old, new))`가 new와 같음 (T-03 · T-05) · **깊은 트리 · 넓은 트리(B20): 깊이 300 중첩의 맨 아래 글자 바꾸기 · 형제 2,000개에서 끝에 추가 / 전부 삭제가 스택 넘침 없이 끝나고 `applyPatches` 결과가 목표와 같음(시간 제한은 걸지 않음)**
   - 알고리즘: 결정 2 (위치 기반: 남으면 추가 · 삭제) · 결정 4 A (그 순간 기준 경로)
   - 완료 근거로 남길 것: `diff.test.ts` 통과 개수, D-03 · D-04 · T-05 해당 테스트 이름, 무작위 200쌍 통과, 깊이 300 · 형제 2,000 테스트 이름
+  - **완료 근거 (Evidence)**:
+    - 만든 · 고친 파일: `packages/react-reconciler/src/diff.ts`(`diffChildren`에 ② 남는 옛 자식 뒤에서부터 REMOVE → ③ 남는 새 자식 앞에서부터 INSERT 추가), `packages/react-reconciler/src/__tests__/diff.test.ts`(Dev-4 테스트 추가), `packages/react-reconciler/src/__tests__/randomTree.ts`(테스트 전용 고정 씨앗 무작위 트리 · 변형 생성기, Dev-5도 재사용)
+    - 테스트: `diff.test.ts` 45건 통과 (`npx vitest run packages/react-reconciler`). INSERT 케이스가 없는 상태(Dev-3 구현)에서 "형제 2,000개 끝에 추가"가 실패하는 것을 먼저 확인한 뒤 구현
+    - 테스트 이름: `D-03 끝에 노드 추가`, `D-04 끝 노드 삭제: REMOVE의 node는 원본 VNode 통째`, `여러 형제를 한꺼번에 삭제하면 경로가 뒤에서부터`, `여러 개를 한꺼번에 추가하면 경로가 앞에서부터`, `가운데 형제를 지우면 위치 비교 결과(…)지만 최종 결과는 목표와 같다`, `삭제와 수정이 함께 있어도 다른 노드를 잘못 수정하지 않는다`, `중첩 3단계 안의 변경이 올바른 대상에 반영된다`, `복합 변경: 글자 + 속성 + 추가 + 삭제 + 교체가 한꺼번에 (P1-15 · T-05)`, `경로가 공백 글자 · 주석 번호를 센다`, `빈 목록 ↔ 여러 개`
+    - 무작위 200쌍: `무작위(고정 씨앗) 트리 쌍 200개에서 applyPatches(old, diff(old, new))가 new와 같다 (T-03 · T-05)` 통과 (씨앗 20261111, 100쌍 독립 생성 + 100쌍 변형)
+    - B20: `깊이 300 중첩의 맨 아래 글자 바꾸기가 스택 넘침 없이 끝난다 (B20)`(경로 길이 302), `형제 2,000개에서 끝에 추가 · 전부 삭제가 끝나고 결과가 목표와 같다 (B20)` 통과
+    - 실행: `npx vitest run` 5 files · 115 passed, `npx tsc --noEmit` 오류 0, 커밋: 메시지 `(Dev-4)`
 
 - [ ] **Dev-5** (`react-reconciler`): `invertPatches` — 전후 뒤집기 + 역순 (역패치) [P1-26 · T-08]
   - 의존: Dev-3 (`applyPatches` 검산기 · patch 종류)
