@@ -155,12 +155,19 @@
     - 무작위 왕복 생성기는 이 Dev에서 쓰지 않음(손으로 쓴 왕복 케이스로 대신, 따라서 "생성기가 인접 글자 노드를 만들지 않는다"는 해당 없음)
     - 실행: `npx vitest run` 8 files · 186 passed, `npx tsc --noEmit` 오류 0, 커밋: 아래 마지막 docs 커밋에서 기록
 
-- [ ] **Dev-8** (`react-dom-bindings`): `setAreaHtml` — 편집창 글을 위험한 것을 빼고 미리보기(테스트 영역)에 그린다 [P1-21 · P1-22 · §5 실행 가능한 HTML · C3 · C5 · B11 · B12]
+- [x] **Dev-8** (`react-dom-bindings`): `setAreaHtml` — 편집창 글을 위험한 것을 빼고 미리보기(테스트 영역)에 그린다 [P1-21 · P1-22 · §5 실행 가능한 HTML · C3 · C5 · B11 · B12]
   - 의존: Dev-1 (`renderAreaChildren`), Dev-2 (결과를 `readAreaChildren`으로 확인)
   - 만들 · 고칠 파일: `packages/react-dom-bindings/src/client/sanitize.ts`(`scanDangerous(root)` — 위 「미리보기에서 빼고 Patch 때 막는 목록」의 **단 하나의 기준**, 찾아서 알려 주는 함수 + 빼는 함수, Dev-9가 재사용), `packages/react-dom-bindings/src/client/setAreaHtml.ts`, `packages/react-dom-bindings/src/index.ts`
   - 테스트: `packages/react-dom-bindings/src/client/__tests__/setAreaHtml.test.ts` — `on…` 속성(대소문자 섞어도) 제거, `<script>` 제거, `javascript:` 주소 제거(앞 공백 · 제어문자 · 대문자 섞어도, `href` · `src` · `action` · `formaction`), **`javascript:`를 숨긴 것(B12): 문자 참조 `jav&#x61;script:` · `&#106;avascript:` · 값 안 탭 · 줄바꿈 `java\tscript:` · 앞 공백 + 대문자 `" JAVA\tscript:"` 모두 `href`가 빠짐**, **`<iframe>`(`srcdoc` 안에 `<script>parent.__pwned=1</script>` 포함 · `src`) · `<object>` · `<embed>` 제거(B11 · C3): 영역에 남지 않고 `window.__pwned`가 정의되지 않음**, **`<style>` · `<link rel="stylesheet">`(`rel="Stylesheet"` · `rel="alternate stylesheet"` 포함) 제거(C5), `<link rel="icon">` 등 다른 `rel`은 그대로 둠**, 나머지 속성 · 구조 · 공백 · 주석 · 인라인 `style` 속성은 그대로, 빈 글 → 영역 비움, 글을 `<template>`로 파싱한 뒤 영역에 옮겨서 **파싱 중에 코드가 실행되지 않음**(`<img src=x onerror=…>`를 넣어도 전역 변수가 안 바뀜), 영역 상자 자신은 그대로, 다시 호출하면 이전 내용이 완전히 바뀜 (§5 실행 가능한 HTML)
   - 알고리즘: §5 실행 가능한 HTML (미리보기는 빼고 그림). 살아 있는 요소에 `innerHTML`로 바로 넣지 않는다 (`<img onerror>`가 파싱 중 실행될 수 있음 → `<template>` 안에서 먼저 정리) `// [AI Note]`
   - 완료 근거로 남길 것: `setAreaHtml.test.ts` 통과 개수, "파싱 중 실행 안 됨" · "srcdoc iframe 제거" · "숨긴 javascript: 제거" 테스트 이름
+  - **완료 근거 (Evidence)**:
+    - 만든 · 고친 파일: `packages/react-dom-bindings/src/client/sanitize.ts`(`scanDangerous(root)` — 찾기만 함, `DangerousFinding { node, element, attribute, kind }` 문서 순서, 반복문 순회(깊은 트리 안전), 막힌 요소 안쪽은 따로 세지 않음, `<template>` 내용도 훑음 / `removeDangerous(root)` — 속성은 `removeAttribute`, 요소는 `remove`), `packages/react-dom-bindings/src/client/setAreaHtml.ts`(`<template>`에 파싱 → `removeDangerous` → `area.replaceChildren(template.content)`, 영역 상자 자신은 그대로), `packages/react-dom-bindings/src/index.ts`(내보내기: `setAreaHtml` · `scanDangerous` · `removeDangerous` · 타입)
+    - 테스트: `setAreaHtml.test.ts` 22건 + `sanitize.test.ts` 12건 = 34건 통과 (`npx vitest run packages/react-dom-bindings/src/client/__tests__/setAreaHtml.test.ts packages/react-dom-bindings/src/client/__tests__/sanitize.test.ts`). 모듈이 없는 상태(`Failed to resolve import`)에서 두 파일 모두 실패하는 것을 먼저 확인한 뒤 구현
+    - 테스트 이름: `javascript:를 숨긴 것(B12): 문자 참조 · 탭 · 줄바꿈 · 앞 공백 + 대문자 모두 href가 빠진다`(`jav&#x61;script:` · `&#106;avascript:` · `java	script:` · `java
+script:` · `" JAVA	script:"`), `<iframe> 제거 — srcdoc 안에 <script>parent.__pwned=1</script>가 있어도 영역에 안 남고 실행되지 않는다 (B11 · C3)`, `<iframe src> · <object> · <embed> 제거 (C3)`, `<style> 제거 (C5)`, `<link rel="stylesheet"> 제거 — rel="Stylesheet" · "alternate stylesheet" 포함 (C5)`, `<link rel="icon"> 등 다른 rel은 그대로 둔다 (C5)`, `글을 <template>로 파싱한 뒤 옮기므로 파싱 중에 코드가 실행되지 않는다 (<img onerror>)`, `javascript: 주소 제거 — %s on <%s>`(href · src · action · formaction, 앞 공백 · 제어문자 포함 6건), on… 속성(대소문자 섞어도) · `<script>` 제거 · 나머지 속성 · 구조 · 공백 · 주석 · 인라인 style 보존 · 빈 글 · 영역 상자 그대로 · 다시 호출 · 특수문자
+    - 한계(숨기지 않고 기록): 이 jsdom 설정은 인라인 핸들러 · 스크립트를 실제로 실행하지 않는다(처음에 "innerHTML로 바로 넣으면 `onclick`이 돈다"는 대조 테스트를 넣었더니 실행이 안 돼 실패 → 그 대조 테스트와 `click()` 호출은 뺌). 그래서 `window.__pwned` 미정의 확인은 보조이고, 핵심 확인은 "영역에 그 요소 · 속성이 남지 않았다"이다. 실제 브라우저에서 코드가 안 도는지는 e2e(Dev-16 QA-29 · QA-30)가 본다
+    - 실행: `npx vitest run` 10 files · 220 passed, `npx tsc --noEmit` 오류 0, 커밋: 아래 마지막 docs 커밋에서 기록
 
 - [ ] **Dev-9** (`react-dom-bindings`): `checkHtml` 1 — 위험 코드 · SVG · 알림 글 만들기 [§5 실행 가능한 HTML · §5 HTML 범위(SVG 미지원) · §6.2 지원하지 않는 입력 · C3 · C5 · B11 · B12]
   - 의존: Dev-8 (`scanDangerous`)
