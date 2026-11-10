@@ -124,6 +124,15 @@ describe('setAreaHtml — 위험한 것을 빼고 그린다 (§5 실행 가능�
     expect(globals.__pwned).toBeUndefined();
   });
 
+  it('SVG <a xlink:href="javascript:…">도 xlink:href가 빠진다 (검수 1회차 B-3)', () => {
+    const box = makeArea();
+    setAreaHtml(box, '<svg width="100" height="40"><a xlink:href="javascript:window.__pwned=1"><text y="20">x</text></a><a xlink:href="https://example.com/ok"><text y="20">ok</text></a></svg>');
+    const anchors = Array.from(box.querySelectorAll('svg a'));
+    expect(anchors).toHaveLength(2);
+    expect(anchors.map((a) => a.hasAttribute('xlink:href'))).toEqual([false, true]);
+    expect(globals.__pwned).toBeUndefined();
+  });
+
   it('javascript:가 아닌 주소는 그대로 둔다', () => {
     const box = makeArea();
     setAreaHtml(box, '<a href="/javascript:x">a</a><a href="#top">b</a><img src="data:image/png;base64,AAAA">');

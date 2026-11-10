@@ -49,6 +49,12 @@ describe('scanDangerous — 미리보기에서 빼고 Patch 때 막는 단 하�
     expect(summarize('<a title="javascript:a()" data-x="javascript:b()">javascript:c()</a>')).toEqual([]);
   });
 
+  it('SVG <a xlink:href="javascript:…">도 찾는다 (한정 이름 xlink:href)', () => {
+    expect(summarize('<svg><a xlink:href="javascript:x"><text y="1">t</text></a><a xlink:href="https://example.com"></a></svg>')).toEqual([
+      '<a> xlink:href',
+    ]);
+  });
+
   it('javascript: 판정은 파서가 읽은 값으로: 문자 참조 · 탭 · 줄바꿈 · 앞 공백 · 대문자', () => {
     expect(summarize('<a href="jav&#x61;script:x"></a>')).toEqual(['<a> href']);
     expect(summarize('<a href="&#106;avascript:x"></a>')).toEqual(['<a> href']);

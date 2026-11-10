@@ -51,6 +51,14 @@ describe('checkHtml 1 — 위험 코드', () => {
     expect(kinds('<a href=" JAVA\tscript:alert(1)">4</a>')).toEqual(['DANGEROUS']);
   });
 
+  it('SVG <a xlink:href="javascript:…">도 DANGEROUS이고 xlink:href가 메시지에 들어간다 (검수 1회차 B-3)', () => {
+    const problems = checkHtml('<svg><a xlink:href="javascript:alert(1)"><text y="20">x</text></a></svg>');
+    expect(problems.map((p) => p.kind)).toContain('DANGEROUS');
+    const dangerous = problems.find((p) => p.kind === 'DANGEROUS')!;
+    expect(dangerous.message).toContain('xlink:href');
+    expect(dangerous.message).toContain('javascript:');
+  });
+
   it('<iframe srcdoc="<script>…">도 DANGEROUS이고 요소 이름이 들어간다 (B11 · C3)', () => {
     const problems = checkHtml('<iframe srcdoc="&lt;script&gt;parent.__pwned=1&lt;/script&gt;"></iframe>');
     expect(problems.map((p) => p.kind)).toEqual(['DANGEROUS']);

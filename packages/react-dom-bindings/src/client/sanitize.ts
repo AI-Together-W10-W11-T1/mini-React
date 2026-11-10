@@ -5,8 +5,8 @@
 /** 요소째 빼는 것: <script> · <iframe> · <object> · <embed> · <style> (+ <link rel="stylesheet">은 아래에서 따로 판정) */
 const BLOCKED_ELEMENTS = new Set(['script', 'iframe', 'object', 'embed', 'style']);
 
-/** 주소를 담는 속성 중 `javascript:`를 막을 것 */
-const URL_ATTRIBUTES = new Set(['href', 'src', 'action', 'formaction']);
+/** 주소를 담는 속성 중 `javascript:`를 막을 것 (`xlink:href`는 SVG 링크의 한정 이름이라 따로 적는다, 검수 1회차 B-3) */
+const URL_ATTRIBUTES = new Set(['href', 'src', 'action', 'formaction', 'xlink:href']);
 
 export type DangerousKind =
   /** 요소 자체가 막힌 종류 (`<script>` · `<iframe>` · `<object>` · `<embed>` · `<style>` · `<link rel="stylesheet">`) */
