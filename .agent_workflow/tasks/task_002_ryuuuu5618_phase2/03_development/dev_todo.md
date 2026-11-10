@@ -119,61 +119,85 @@
     - `npx vitest run` 전체 516 passed (505 + 11, 21 files), `npx tsc --noEmit` 오류 0건
     - `npx playwright test e2e/phase1-*.spec.ts` 96 passed (11.7s), 끝난 뒤 5199 포트 LISTENING 없음. 커밋 959d7e9
 
-- [ ] **Dev-8** (`react`): Hook 공개 API — `useState` · `useEffect` · `useMemo`가 지금 렌더 중인 컴포넌트의 디스패처에 위임, 디스패처가 없으면 오류 [P2-08 · P2-11 ~ P2-17 · T-16]
+- [x] **Dev-8** (`react`): Hook 공개 API — `useState` · `useEffect` · `useMemo`가 지금 렌더 중인 컴포넌트의 디스패처에 위임, 디스패처가 없으면 오류 [P2-08 · P2-11 ~ P2-17 · T-16]
   - 의존: -
   - 만들 · 고칠 파일: `packages/react/src/hooks.ts`(`HookDispatcher` 인터페이스 `useState` · `useEffect` · `useMemo` 세 메서드, `setHookDispatcher(d | null)`, 공개 함수 셋은 현재 디스패처를 부름. **디스패처가 `null`이면 "Hook은 함수형 컴포넌트 렌더 중에만 부를 수 있습니다" 오류**), `packages/react/src/index.ts`에 내보내기(`h` 그대로), `packages/react/src/__tests__/hooks.test.ts`
   - 테스트(먼저 실패 확인): 디스패처 없이 부르면 세 Hook 모두 오류(렌더 밖 · 이벤트 핸들러 안), 가짜 디스패처를 꽂으면 인자(초기값 · 함수 · 의존성)와 반환값이 그대로 오감, `setHookDispatcher(null)`로 되돌림, 타입이 `any` 없이 `useState<number>(0)` 추론됨(컴파일), `react` 패키지가 `document` · `window`를 쓰지 않음
   - 알고리즘: 정책 「§4.2 허용하지 않는 호출」(자식 · 렌더 밖 호출은 오류). 디스패처 연결 방향은 초안 ④-5
   - 완료 근거로 남길 것: 통과 개수, 전체 vitest · tsc, 커밋 해시
-  - **완료 근거 (Evidence)**:
+  - **완료 근거 (Evidence)**: `packages/react/src/hooks.ts` 신규: `HookDispatcher`(`useState` · `useEffect` · `useMemo`) · `SetStateAction` · `setHookDispatcher(d | null)` · 공개 `useState` · `useEffect` · `useMemo`(꽂힌 디스패처에 인자 · 반환값 그대로 위임, 디스패처가 없으면 `Error('Hook은 함수형 컴포넌트 렌더 중에만 부를 수 있습니다')`), `packages/react/src/index.ts`에 내보내기(`h` 그대로)
+    - 새 테스트 `packages/react/src/__tests__/hooks.test.ts` 12건 (구현 전 12 failed → 12 passed): 렌더 밖 세 Hook 오류 + 렌더가 끝난 뒤(핸들러 안) 오류 · 가짜 디스패처로 인자(초기값 · 함수 · 의존성 생략 포함)와 반환값 · 참조 그대로 · 호출 순서 · `setHookDispatcher(null)`로 되돌림 · 디스패처 교체 · `expectTypeOf`로 `useState<number>(0)` · `useMemo` 추론(`any` 없음, tsc가 검사) · `document` · `window`를 `undefined`로 덮어도 동작. (Dev-9에서 `setHookDispatcher`가 바꾸기 전 디스패처를 돌려주도록 확장하며 1건 추가 → 이 파일 13건)
+    - `npx vitest run` 전체 528 passed (516 + 12, 22 files), `npx tsc --noEmit` 오류 0건
+    - `npx playwright test e2e/phase1-*.spec.ts` 96 passed (11.6s). 커밋 a602903
 
-- [ ] **Dev-9** (`react-reconciler`): 자식 컴포넌트 풀기 `resolveComponents` — 컴포넌트 VNode를 그 자리에서 실행해 요소 · 글자로 바꾼다 (안쪽까지), 실행 중 Hook 호출은 오류, 풀리지 않은 컴포넌트 VNode가 diff에 오면 오류 [P2-02 · P2-09 · P2-10 · P2-18 · T-16]
+- [x] **Dev-9** (`react-reconciler`): 자식 컴포넌트 풀기 `resolveComponents` — 컴포넌트 VNode를 그 자리에서 실행해 요소 · 글자로 바꾼다 (안쪽까지), 실행 중 Hook 호출은 오류, 풀리지 않은 컴포넌트 VNode가 diff에 오면 오류 [P2-02 · P2-09 · P2-10 · P2-18 · T-16]
   - 의존: Dev-8
   - 만들 · 고칠 파일: `packages/react-reconciler/src/resolveComponents.ts`(컴포넌트 VNode `type(props)`를 실행해 결과를 다시 푼다 — 결과가 또 컴포넌트면 재귀, 요소의 `children`도 재귀. **자식 실행 동안 `setHookDispatcher`를 "Hook은 루트 컴포넌트에서만 부를 수 있습니다" 오류를 던지는 디스패처로 바꾸고 끝나면 원래대로 되돌림(예외가 나도 `finally`)**. 컴포넌트 VNode의 `key`는 결과 요소에 물려줌(결과가 key를 안 가질 때) — 초안 ④-1, 테스트 케이스 확인 1 확정. 컴포넌트 `children`은 풀 때 props로 넘기지 않음 — 작은 정책, 확정. 글자 · 주석 · 요소는 새 객체로 만들되 입력 VNode는 고치지 않음), `packages/react-reconciler/src/diff.ts`(`diffNode` 맨 앞에 컴포넌트 VNode(`typeof type === 'function'`)가 오면 Error — 현재 diff에는 이 가드가 없다, 초안 ④-6 작은 정책, 확정), `packages/react-reconciler/src/index.ts`, `packages/react-reconciler/src/__tests__/resolveComponents.test.ts`
   - 테스트(먼저 실패 확인): 컴포넌트가 요소로 풀림, 안쪽 중첩 컴포넌트까지 풂, props가 그대로 전달되어 값이 UI에 반영(P2-10), 같은 컴포넌트를 다른 props로 풀면 결과가 달라짐, 자식이 `useState`를 부르면 오류 · 오류가 난 뒤에도 디스패처가 복구됨, 풀린 트리에는 함수 type이 없음, key 물려주기(`h(Row, { key: 'a' })` → 결과 요소 `key: 'a'`), 이미 key가 있는 결과는 덮지 않음, 입력 VNode를 안 고침(깊게 얼린 입력), diff가 컴포넌트 VNode를 받으면 오류, `children`이 컴포넌트 props에 들어가지 않음. Phase 1 diff 테스트 그대로 통과
   - 알고리즘: 정책 「자식 컴포넌트 풀기」「§4.2 허용하지 않는 호출」
   - 완료 근거로 남길 것: 통과 개수, 전체 vitest · tsc, 커밋 해시
-  - **완료 근거 (Evidence)**:
+  - **완료 근거 (Evidence)**: `packages/react-reconciler/src/resolveComponents.ts` 신규: `resolveComponents(vnode)` — 컴포넌트 VNode를 `type(props)`로 실행해 결과를 다시 풀고(결과가 컴포넌트여도 재귀), 요소의 `children`도 안쪽까지, 글자 · 주석 · 요소는 새 객체로(입력 안 고침). 실행 동안 `setHookDispatcher`를 "Hook은 루트 컴포넌트에서만 부를 수 있습니다" 오류 디스패처로 바꾸고 `finally`로 원래 것을 되돌림. 컴포넌트 VNode의 `key`를 결과 요소에 물려줌(결과가 이미 key를 가지면 안 덮음, 글자 · 주석은 못 가짐), 컴포넌트 `children`은 props로 안 넘김. `diff.ts`의 `diffNode` 맨 앞에 컴포넌트 VNode 오류 가드(`diff는 풀리지 않은 컴포넌트 VNode를 비교할 수 없습니다. resolveComponents로 먼저 풀어야 합니다.`). `index.ts` 내보내기
+    - **공개 API 보정 (초안 표 대비)**: 원래 디스패처로 되돌리려면 이전 값을 알아야 해서 `react`의 `setHookDispatcher`가 **바꾸기 전 디스패처를 돌려주게** 했다(`HookDispatcher | null` 반환). 호출 쪽 호환(반환값 무시 가능)이라 Dev-8 테스트는 그대로 통과하고, 이 반환값 테스트 1건을 `hooks.test.ts`에 추가. 이 문서 「공개 API 이름」 표의 `setHookDispatcher(d)`는 이전 디스패처를 돌려준다고 읽으면 됨 (`types.ts` 변경 없음)
+    - 새 테스트 `packages/react-reconciler/src/__tests__/resolveComponents.test.ts` 21건 (구현 전 모듈 없음 → 21 passed): 요소로 풀림 · 안쪽 중첩 · props 반영과 다른 props 다른 결과(P2-10) · `children`이 props에 안 들어감 · 요소 / 글자 / 주석 새 객체 · 깊게 얼린 입력 · 풀 때마다 새 객체 · key 물려주기 3종 + 목록이 풀리면 diff가 MOVE만 냄 · 자식 `useState` / `useEffect` / `useMemo` 각각 오류 · 깊이 중첩 오류 · 오류 뒤 원래(루트) 디스패처 복구 · 성공 뒤 `null` 복구 · 일반 예외 뒤 복구 · diff가 이전 / 새 / 안쪽 컴포넌트 VNode에서 오류 · 풀린 뒤 diff 정상. Phase 1 `diff.test.ts` · `diffKeyed.test.ts` 그대로 통과
+    - `npx vitest run` 전체 550 passed (528 + 22 = resolveComponents 21 + hooks 1, 23 files), `npx tsc --noEmit` 오류 0건
+    - `npx playwright test e2e/phase1-*.spec.ts` 96 passed (11.1s). 커밋 38eafbf
 
-- [ ] **Dev-10** (`react-reconciler`): `FunctionComponent` 뼈대 — `hooks` 배열 · `mount()` · `update()` : 렌더 → 풀기 → (처음) 그리기 / (다시) diff → patch 적용, 이전 VNode 보관 [P2-01 · P2-03 ~ P2-06 · P2-18 · P2-19 · T-09 · T-15]
+- [x] **Dev-10** (`react-reconciler`): `FunctionComponent` 뼈대 — `hooks` 배열 · `mount()` · `update()` : 렌더 → 풀기 → (처음) 그리기 / (다시) diff → patch 적용, 이전 VNode 보관 [P2-01 · P2-03 ~ P2-06 · P2-18 · P2-19 · T-09 · T-15]
   - 의존: Dev-2, Dev-3, Dev-7, Dev-8, Dev-9
   - 만들 · 고칠 파일: `packages/react-reconciler/src/FunctionComponent.ts`(`class FunctionComponent`: 생성자 `(component, props, host)`, 공개 `hooks: HookSlot[]` · 읽기 전용 `lastPatches`(테스트 케이스 확인 2 확정), `mount()` = 렌더(루트 디스패처를 꽂고 컴포넌트 실행) → `resolveComponents` → `[결과]`(`App()` 결과 VNode 하나 = 영역 자식 목록 `[결과]`, 작은 정책 확정)를 `host.mount`로 → 풀린 VNode 저장, `update()` = 렌더 → 풀기 → `diff(저장해 둔 이전, 새)` → patch가 1줄 이상이면 `host.apply` → 저장 → `lastPatches` 갱신. **`host`는 DOM을 모르는 인터페이스 `FunctionComponentHost { mount(children): void; apply(patches): void }`**), `packages/react-reconciler/src/index.ts`, `packages/react-reconciler/src/__tests__/functionComponent.test.ts`(가짜 host로 DOM 없이)
   - 테스트(먼저 실패 확인): `mount()`가 컴포넌트를 1번 실행하고 host.mount에 `[VNode]`를 넘김, `update()`가 다시 실행하고 **diff 결과(Patch 목록)를 host.apply에 넘김**, 바뀐 게 없으면(T-04) `host.apply`가 호출되지 않고 `lastPatches`가 빈 목록, 이전 VNode는 저장한 것을 쓰며 host(DOM)에서 읽지 않음(host에 읽기 메서드가 없음), 컴포넌트를 `h(Child, props)`로 쓴 트리가 풀려 patch에 컴포넌트 VNode가 없음, 새 VNode가 매번 만들어짐(P2-18, 직전과 `!==`), `hooks`가 배열이고 Hook 호출이 없으면 빈 배열, `FunctionComponent`(래퍼 클래스)와 `App`(함수형 UI 컴포넌트)이 구분됨(P2-01), `document` · `window`를 쓰지 않음
   - 알고리즘: 정책 「이전 VNode 보관」「자식 컴포넌트 풀기」, 결정 3 A, 결정 4 A (Phase 1 diff 재사용)
   - 완료 근거로 남길 것: 통과 개수, 전체 vitest · tsc, 커밋 해시
-  - **완료 근거 (Evidence)**:
+  - **완료 근거 (Evidence)**: `packages/react-reconciler/src/FunctionComponent.ts` 신규: `class FunctionComponent`(생성자 `(component, props, host)`, 공개 `hooks: HookSlot[]`, 읽기 전용 getter `lastPatches`, `mount()` = 렌더(루트 디스패처 꽂음) → `resolveComponents` → `host.mount([결과])` → 풀린 VNode 저장, `update()` = 렌더 → 풀기 → `diff([저장해 둔 이전], [새])` → 1줄 이상이면 `host.apply` → 저장 → `lastPatches` 갱신). `FunctionComponentHost { mount(children); apply(patches) }`(읽기 메서드 없음). `mount()` 전 `update()` · `mount()` 두 번은 오류 (**명세에 없어 이 Dev에서 정한 작은 정책 — 마스터 확인용**). `index.ts` 내보내기. Hook 구현(dispatcher)은 이 Dev에서는 "아직 구현되지 않았습니다" 오류 자리 — Dev-11 ~ 13에서 채움
+    - 새 테스트 `packages/react-reconciler/src/__tests__/functionComponent.test.ts` 13건 (구현 전 모듈 없음 → 13 passed, 가짜 host로 DOM 없이): `mount()` 1번 실행 + `host.mount([VNode])` · props 전달 · `update()`가 diff 결과를 `host.apply`에 · 변경 없으면(T-04) `host.apply` 없고 `lastPatches` 빈 목록 · `lastPatches` 읽기 전용(대입 시 오류) · 이전 VNode = 저장한 것(REPLACE.before === mount 때 넘긴 VNode, host에서 안 읽음) · update마다 새 VNode(`!==`) · 변경 없는 update 뒤에도 다음 diff 정상 · `h(Child, props)`가 풀려 patch에 컴포넌트 VNode 없음 + 자식 props 변경이 UI에 반영(P2-10) · 래퍼 클래스와 `App` 구분(P2-01) · `hooks` 배열이고 빈 상태 · `document` · `window` 없이 동작
+    - `npx vitest run` 전체 563 passed (550 + 13, 24 files), `npx tsc --noEmit` 오류 0건
+    - `npx playwright test e2e/phase1-*.spec.ts` 96 passed (11.0s). 커밋 722134f
 
-- [ ] **Dev-11** (`react-reconciler`): `useState` — 슬롯 · 초기값 · 지연 초기화 · 상태 유지 · 여러 상태 구분 · setter(같은 값 무시 · 함수형 · 즉시 갱신) · 호출 순서 [P2-11 ~ P2-15 · T-10 · T-11 · §4.2 · §6.2 함수형 setter · 동일 값 · 연속 setter]
+- [x] **Dev-11** (`react-reconciler`): `useState` — 슬롯 · 초기값 · 지연 초기화 · 상태 유지 · 여러 상태 구분 · setter(같은 값 무시 · 함수형 · 즉시 갱신) · 호출 순서 [P2-11 ~ P2-15 · T-10 · T-11 · §4.2 · §6.2 함수형 setter · 동일 값 · 연속 setter]
   - 의존: Dev-10
   - 만들 · 고칠 파일: `packages/react-reconciler/src/FunctionComponent.ts`(렌더 중 디스패처의 `useState`: `hooks[번호]`가 없으면 `{ kind: 'state', value, setter }`를 만듦(초기값이 함수면 **처음 한 번만** 실행), 있으면 그 슬롯을 돌려줌 — setter는 렌더 사이에 **같은 함수**. 번호는 렌더마다 0번부터. setter(`next`): 함수면 `next(현재 값)`, 아니면 값 → `Object.is`로 현재 값과 같으면 아무 일 없음, 다르면 슬롯 값을 바꾸고 `scheduleRender(() => this.update())`(P2-15 자동 갱신). 같은 번호의 종류가 `state`가 아니면 오류), `packages/react-reconciler/src/__tests__/useState.test.ts`
   - 테스트(먼저 실패 확인): 초기값 사용(P2-11), 지연 초기화 함수는 처음 한 번만 실행되고 다시 렌더해도 안 부름, 렌더가 또 돌아도 값 유지(P2-12 · T-10), 여러 `useState`가 안 섞임(T-11), setter 함수가 렌더 사이에 같은 참조, setter 한 번에 렌더 1번 + `host.apply` 반영(별도 렌더 호출 없음, P2-15), **같은 값 setter는 렌더 0번**(`Object.is`: `NaN`도 같음, `{}`는 다른 값), 함수형 setter(`c => c + 1`), **한 핸들러에서 함수형 setter를 3번 부르면 +3이고 렌더 3번**, 값 setter 3번은 마지막 값(옛 값을 읽는 클로저는 +1만 됨 — 정책 기록용 테스트), 함수형 setter가 이전 값을 돌려주면(같은 값) 렌더 0번, 상태가 렌더 사이에 객체 참조를 유지
   - 알고리즘: 결정 9 A (즉시 동기), 정책 「§4.2 Hook 구분 · useState 동일 값 · 함수형 setter · 지연 초기화」
   - 완료 근거로 남길 것: 통과 개수, 전체 vitest · tsc, 커밋 해시
-  - **완료 근거 (Evidence)**:
+  - **완료 근거 (Evidence)**: `FunctionComponent.ts`의 `useState`(디스패처 연결) + `setState`: `hooks[번호]`(렌더마다 0번부터 `hookIndex`)가 없으면 `{ kind: 'state', value, setter }` 생성(초기값이 함수면 그 슬롯을 처음 만들 때만 실행), 있으면 그 슬롯 반환(setter는 렌더 사이에 같은 함수), 종류가 `state`가 아니면 오류. setter: 함수면 `next(현재 값)`, 아니면 값 → `Object.is`로 같으면 아무 일 없음, 다르면 슬롯 값 변경 + `scheduleRender(() => this.update())`(P2-15 자동 갱신, `@mini-react/scheduler`에서 import)
+    - 새 테스트 `packages/react-reconciler/src/__tests__/useState.test.ts` 19건 (구현 전 19 failed → 19 passed): 초기값 · 지연 초기화 1번 · 상태 유지(P2-12 · T-10) · `hooks` 슬롯 · 객체 참조 유지 · 여러 상태 안 섞임(T-11) · 같은 값을 가진 다른 상태 독립 · setter 같은 참조 · setter 1번 = 렌더 1번 + `host.apply`(별도 렌더 호출 없음, P2-15) · 같은 값 렌더 0번 · `NaN` 같은 값 · `{}` 다른 값 · `+0` / `-0` 다른 값 · 함수형 setter · **함수형 3번 = +3, 렌더 3번(`host.apply` 3번)** · 값 setter 3번 = 마지막 값 · 옛 값 클로저 3번 = +1만(렌더 1번 추가, 정책 기록용) · 함수형이 이전 값을 돌려주면 렌더 0번 · 함수형 setter는 최신 값을 받음 · 슬롯 종류 불일치 오류
+    - `npx vitest run` 전체 582 passed (563 + 19, 25 files), `npx tsc --noEmit` 오류 0건
+    - `npx playwright test e2e/phase1-*.spec.ts` 96 passed (11.4s). 커밋 a33a42b
 
-- [ ] **Dev-12** (`react-reconciler`): `useMemo` + 의존성 비교 `depsChanged` — 처음 계산 · 같은 의존성 재사용 · 바뀌면 재계산 · 생략하면 매 렌더 [P2-17 · T-13 · §6.2 Memo 의존성 생략 · 경계]
+- [x] **Dev-12** (`react-reconciler`): `useMemo` + 의존성 비교 `depsChanged` — 처음 계산 · 같은 의존성 재사용 · 바뀌면 재계산 · 생략하면 매 렌더 [P2-17 · T-13 · §6.2 Memo 의존성 생략 · 경계]
   - 의존: Dev-10
   - 만들 · 고칠 파일: `packages/react-reconciler/src/deps.ts`(`depsChanged(prev, next)`: `null`(생략)이면 항상 바뀜, 항목마다 `Object.is`, 길이가 다르면 바뀜, `[]` vs `[]`는 안 바뀜), `FunctionComponent.ts`(디스패처의 `useMemo`: 슬롯 `{ kind: 'memo', value, deps }`, 바뀌면 `factory()`를 다시 실행해 저장), `packages/react-reconciler/src/__tests__/deps.test.ts` · `useMemo.test.ts`
   - 테스트(먼저 실패 확인): `depsChanged` 경계(`null` · `[]` · 길이 다름 · `NaN` · `+0`/`-0` · 객체 참조), `useMemo` 처음 계산 1번, 같은 의존성이면 factory 호출 0번(재사용, 같은 값 참조), 의존성이 바뀌면 다시 계산, 생략하면 매 렌더 다시 계산, `[]`는 처음 한 번, 다른 상태가 바뀌어도(의존성 그대로) 재사용(T-13), 결과가 객체여도 참조 유지, 슬롯 번호 불일치 시 오류
   - 알고리즘: 정책 「§4.2 useMemo · 의존성 비교」
   - 완료 근거로 남길 것: 통과 개수, 전체 vitest · tsc, 커밋 해시
-  - **완료 근거 (Evidence)**:
+  - **완료 근거 (Evidence)**: `packages/react-reconciler/src/deps.ts` 신규: `depsChanged(prev, next)` (`null`이면 항상 바뀜, 길이 다르면 바뀜, 항목마다 `Object.is`, `[]` vs `[]`는 안 바뀜), `index.ts` 내보내기. `FunctionComponent.ts`의 `useMemo`: 슬롯 `{ kind: 'memo', value, deps }`, 처음 계산 · 의존성이 바뀌면 `factory()` 다시 실행해 저장 · 아니면 저장값(같은 참조) 반환 · 슬롯 종류 불일치 오류
+    - 새 테스트 `deps.test.ts` 10건(경계: `null` 4가지 · `[]` · 모두 같음 · 하나 다름 · 길이 다름 · `NaN` · `+0` / `-0` · 객체 참조 · `undefined` / `null` · 얼린 입력) + `useMemo.test.ts` 11건(처음 1번 계산 · 같은 의존성 재사용(참조 유지) · 바뀌면 재계산 · 생략하면 매 렌더 · `[]` 한 번 · 길이 달라지면 재계산 · **다른 상태가 바뀌어도 재사용(T-13)** · 슬롯 모양 · `useState`와 섞인 슬롯 순서 · 종류 불일치 오류 · factory 예외 시 슬롯 안 남음). 구현 전: `deps` 모듈 없음 + `useMemo` 11건 failed(구현 안 됨 오류) → 21 passed
+    - `npx vitest run` 전체 603 passed (582 + 21, 27 files), `npx tsc --noEmit` 오류 0건
+    - `npx playwright test e2e/phase1-*.spec.ts` 96 passed (11.1s). 커밋 122bba1
 
-- [ ] **Dev-13** (`react-reconciler`): `useEffect` — patch 직후 실행 · 의존성(생략 / `[]` / 변경) · cleanup(재실행 직전) · `unmount()` [P2-16 · T-12 · §4.2 · §6.2 Effect 의존성 · cleanup · unmount]
+- [x] **Dev-13** (`react-reconciler`): `useEffect` — patch 직후 실행 · 의존성(생략 / `[]` / 변경) · cleanup(재실행 직전) · `unmount()` [P2-16 · T-12 · §4.2 · §6.2 Effect 의존성 · cleanup · unmount]
   - 의존: Dev-11, Dev-12
   - 만들 · 고칠 파일: `packages/react-reconciler/src/FunctionComponent.ts`(디스패처의 `useEffect`: 슬롯 `{ kind: 'effect', deps, cleanup }`와 이번 렌더에서 실행할 effect 목록. **`mount()` · `update()`가 `host.mount` · `host.apply`를 끝낸 직후** 목록을 순서대로: `depsChanged`면 이전 `cleanup` 실행 → 본문 실행 → 돌려준 함수를 `cleanup`에 저장. `unmount()`: 남은 모든 cleanup을 실행하고 이후 setter는 아무 일 없음 — 초안 ④-6 작은 정책, 확정), `packages/react-reconciler/src/__tests__/useEffect.test.ts`
   - 테스트(먼저 실패 확인): effect가 **DOM(host) 반영 뒤에** 실행됨(host 가짜가 호출 순서를 기록: `mount` → effect), 의존성 생략 = 매 렌더 뒤, `[]` = mount 한 번만, `[a]` = 값이 바뀔 때만(다른 상태가 바뀌어도 안 돎), 여러 effect는 선언 순서대로, cleanup은 **다시 실행하기 직전**에 1번(마운트 직후엔 없음), 의존성이 안 바뀌면 cleanup도 안 부름, `unmount()`가 마지막 cleanup을 부르고 두 번 부르면 두 번째는 아무 일 없음, `unmount()` 뒤 setter 무시, effect가 아무것도 안 돌려줘도 정상, **effect 안에서 setter**를 부르면 렌더가 한 번 더 중첩되고 최종 상태 · 이전 VNode가 맞음, 실행 순서 `cleanup(이전) → 본문(새)`
   - 알고리즘: 결정 9 A (같은 setter 호출 안에서 바로), 정책 「§4.2 useEffect 실행 시점 · 의존성 · cleanup · 해제」
   - 완료 근거로 남길 것: 통과 개수, 전체 vitest · tsc, 커밋 해시
-  - **완료 근거 (Evidence)**:
+  - **완료 근거 (Evidence)**: `FunctionComponent.ts`: `useEffect`(렌더 중에는 슬롯 `{ kind: 'effect', deps, cleanup }`을 만들고 처음이거나 `depsChanged`면 "실행 예약"만) · `runEffects`(`mount()` · `update()`가 `host.mount` · `host.apply`와 `previous` 저장을 끝낸 **직후** 선언 순서대로: 이전 cleanup → `slot.deps` 저장 → 본문 → 돌려준 함수를 cleanup에 저장) · `unmount()`(남은 cleanup을 선언 순서대로 실행, 두 번째 호출 무시, 이후 `setState` · `update()` 무시). 작은 정책(초안 ④-6 확정)대로
+    - **설계 메모 (중첩 렌더 안전)**: ① `slot.deps`는 본문 실행 **전**에 저장 — effect 본문의 setter가 일으킨 안쪽 렌더가 같은 effect를 또 돌리지 않게 함(`[]` effect가 setter를 불러도 1번만). ② 슬롯마다 "가장 최근 예약"만 유효(`latestPending`) — 같은 목록 뒤쪽 effect를 안쪽 렌더가 먼저 처리하면 바깥은 옛 클로저로 다시 돌지 않음. ③ 같은 effect를 안쪽 렌더가 이미 다시 돌렸는데 바깥 본문이 늦게 cleanup을 돌려주면(run 번호가 바뀜) 그 cleanup을 바로 부른다(잃어버리지 않기 위해). 세 가지 다 이 Dev 테스트에 있음. effect를 큐로 미루지 않고 중첩으로 둔 이유: 큐로 미루면 "effect → setter → effect …" 반복이 중첩 깊이를 올리지 않아 무한 렌더 안전장치(Dev-14)가 못 잡음
+    - 새 테스트 `packages/react-reconciler/src/__tests__/useEffect.test.ts` 22건 (구현 전 21 failed + 구현 없이도 통과하는 1건(효과 없는 컴포넌트) → 22 passed): **mount / update 모두 host 반영 뒤에 실행**(log 순서 `mount → effect`, `apply → effect`) · 변경 0건이어도 생략 effect는 돎 · 생략 = 매 렌더 · `[]` = 한 번 · `[a]` = a 변경 때만(다른 상태 변경에 안 돎) · 길이 달라지면 변경 · 선언 순서 · 슬롯 모양 · 종류 불일치 오류 · cleanup 마운트 직후엔 없고 재실행 직전 1번(`cleanup:0 → run:1`) · 의존성 안 바뀌면 cleanup도 안 부름 · `unmount()`가 cleanup 호출 · 두 번 불러도 1번 · 선언 순서대로 모든 cleanup · `unmount()` 뒤 setter 무시 · 아무것도 안 돌려줘도 정상 · 함수가 아닌 반환값은 cleanup 아님 · **effect 안 setter: 렌더 4번(0→3), patch 3건, 마지막 이전 VNode가 `'3'`** · `[]` effect setter 무한 루프 없음 · 중첩 렌더 cleanup 누락 없음 · 뒤쪽 effect 옛 클로저로 재실행 안 됨
+    - `npx vitest run` 전체 625 passed (603 + 22, 28 files), `npx tsc --noEmit` 오류 0건
+    - `npx playwright test e2e/phase1-*.spec.ts` 96 passed (11.3s). 커밋 2986f5c
 
-- [ ] **Dev-14** (`react-reconciler`): Hook 호출 오류 정책 · 무한 렌더 안전장치 · 렌더 중 예외 뒤 복구 [P2-08 · §4.2 허용하지 않는 호출 · 무한 렌더 · T-16 · §6.2 오류 복구]
+- [x] **Dev-14** (`react-reconciler`): Hook 호출 오류 정책 · 무한 렌더 안전장치 · 렌더 중 예외 뒤 복구 [P2-08 · §4.2 허용하지 않는 호출 · 무한 렌더 · T-16 · §6.2 오류 복구]
   - 의존: Dev-11, Dev-12, Dev-13
   - 만들 · 고칠 파일: `packages/react-reconciler/src/FunctionComponent.ts`(렌더가 끝났을 때 `hooks.length`가 지난번(첫 렌더 이후)과 다르거나, 같은 번호의 `kind`가 바뀌면 "Hook 호출 순서 · 개수가 달라졌습니다" 오류 — 오류가 나면 이번 렌더는 **적용하지 않음**: 이전 VNode · DOM · 슬롯 값 그대로. 렌더 중 컴포넌트가 던진 예외도 같은 방식(상태 그대로, 예외는 위로)), `packages/react-reconciler/src/__tests__/hookErrors.test.ts`
   - 테스트(먼저 실패 확인): 조건부 `if (flag) useState(...)`로 개수가 달라지면 오류, 순서가 바뀌어 `kind`가 달라지면 오류, 오류 뒤 DOM(host.apply 호출 없음) · 이전 VNode 보존, 오류 뒤 다음 `update()`가 정상(깊이 카운터 · 디스패처 복구), 자식 컴포넌트에서 `useState` · `useEffect` · `useMemo` 호출은 각각 오류(T-16), 렌더 밖에서 Hook 호출 오류(Dev-8과 통합 확인), **effect 안에서 매번 setter를 부르는 컴포넌트**는 중첩 50번째를 넘으면 오류가 나고 그 뒤에도 앱이 죽지 않음(깊이 복구), 중첩이 50 이하로 끝나는 연쇄(예: 카운터를 10까지 올리는 effect)는 정상
   - 알고리즘: 정책 「§4.2 허용하지 않는 호출 · 무한 렌더 안전장치」
   - 완료 근거로 남길 것: 통과 개수, 오류 문구, 전체 vitest · tsc, 커밋 해시
-  - **완료 근거 (Evidence)**:
+  - **완료 근거 (Evidence)**: `FunctionComponent.ts`: `renderChecked()` — 첫 렌더가 끝난 Hook 수(`expectedHookCount`)를 기억하고 이후 렌더의 부른 Hook 수가 다르면 `Error('Hook 호출 순서 · 개수가 달라졌습니다: 첫 렌더 N개, 이번 M개')`(`useState` · `useMemo` · `useEffect`의 같은 번호 종류 불일치 오류도 같은 문구로 시작하게 통일: `Hook 호출 순서 · 개수가 달라졌습니다: <번호>번 Hook이 지난번에는 <kind>, 이번에는 <kind>입니다`). **렌더가 실패하면(순서 · 개수 오류 · 자식 Hook 호출 · 컴포넌트 예외) 이번 렌더는 적용 안 함**: `host`는 아직 안 불렸고, 이번 렌더가 만든 슬롯은 `hooks.length`를 되돌려 버리고 바꾼 슬롯 값(memo 재계산 등)은 렌더 전 복사본으로 되돌림, 예약된 effect 버림, 예외는 위로. (setter가 렌더 전에 바꿔 둔 state 값은 렌더의 일이 아니라 그대로.) 깊이 카운터 · 디스패처는 Dev-7 · Dev-8 · Dev-9의 `finally`로 이미 복구됨 — 테스트로 확인. 무한 렌더는 새 코드 없이 `scheduleRender`(Dev-7)가 잡음 — effect를 중첩으로 돌리는 Dev-13 설계 덕분
+    - 새 테스트 `packages/react-reconciler/src/__tests__/hookErrors.test.ts` 18건 (구현 전 6 failed — 개수 늘 때 · 줄 때 · 오류 뒤 hooks 되돌림 / memo 복구 / 오류 뒤 update / mount 실패 슬롯 → 18 passed; 나머지 12건은 Dev-7 ~ 9 구현이 이미 덮는 것의 통합 확인): 조건부 Hook으로 개수 늘 때 · 줄 때 · kind가 바뀔 때 각각 오류 · 오류 뒤 `host.apply` 0건 · `hooks` 개수 · `lastPatches` · 이전 VNode 보존(다음 정상 update의 `before: 'a'`) · memo 슬롯 값 복구 · 오류 뒤 디스패처 복구 + 다음 `update()` 정상 · mount 실패 시 슬롯 없음 · 렌더 중 예외 뒤 상태 그대로(setter가 바꾼 값 유지, 렌더만 미적용)와 다음 update 정상 · 예외 100번 반복 뒤에도 깊이 카운터 정상 · 자식 `useState` / `useEffect` / `useMemo` 각각 오류(T-16) · update 도중 자식 Hook 오류 + 루트 상태 그대로 · 렌더 밖(이벤트 핸들러) Hook 오류(Dev-8 통합) · **effect 연쇄: 10까지 정상, 한도 50까지 정상, 51번째에서 오류(문구 "무한 렌더" + 숫자 50)** · 매번 setter를 부르는 effect는 오류 뒤에도 앱이 살아 있음(이후 setter 정상 렌더)
+    - 오류 문구: 순서 · 개수 `Hook 호출 순서 · 개수가 달라졌습니다: 첫 렌더 1개, 이번 2개` · 자식 Hook `Hook은 루트 컴포넌트에서만 부를 수 있습니다` · 렌더 밖 `Hook은 함수형 컴포넌트 렌더 중에만 부를 수 있습니다` · 무한 렌더 `무한 렌더: 렌더가 연달아(중첩) 50번을 넘었습니다. effect 안에서 매번 상태를 바꾸고 있지 않은지 확인하세요.`
+    - `npx vitest run` 전체 643 passed (625 + 18, 29 files), `npx tsc --noEmit` 오류 0건. `react` · `react-reconciler` · `scheduler` · `shared` 소스에 `document` · `window` 사용 없음(grep)
+    - `npx playwright test e2e/phase1-*.spec.ts` 96 passed (11.3s), 끝난 뒤 5199 포트 LISTENING 없음. 커밋 3da73ec
 
 - [ ] **Dev-15** (`react-dom`): `render(component, container)` 진입점 — 바인딩을 host로 연결해 `FunctionComponent`를 만들고 `mount()` + 엔진 연결 확인(제외한 Dev-16에서 옮긴 검사 포함) [P2-05 · P2-06 · P2-20 · P2-21 · T-09 · T-10 · T-12 · T-14 · T-15 · §4.3 · §5 Key · §6.2 핸들러 교체]
   - 의존: Dev-6, Dev-10, Dev-11, Dev-13 (렌더 테스트가 `useState` · `useEffect`를 씀. Dev-16 제외 뒤 이 Dev가 엔진을 처음 실제 DOM(jsdom)에 이어 붙여 보는 곳)
