@@ -87,7 +87,9 @@ for (const area of [realArea, testArea]) {
   area.addEventListener(
     'click',
     (event) => {
-      if (event.target instanceof Element && event.target.closest('a[href]') !== null) event.preventDefault();
+      // [AI Note]: `a[href]`만 보면 이미지 맵 `<area>`와 SVG `<a xlink:href>`(이름공간 속성이라 `[href]`에 안 걸림)가 빠진다.
+      // href 종류와 상관없이 링크 요소 자체(`a` 타입 선택자는 SVG `<a>`도 맞춘다 · `area`)를 잡는다 (검수 1회차 B-2).
+      if (event.target instanceof Element && event.target.closest('a, area') !== null) event.preventDefault();
     },
     true,
   );

@@ -174,17 +174,24 @@ test('QA-32 <style> · <link rel="stylesheet">는 미리보기에서 빠져 모�
   expect(requested, '스타일 시트를 요청하지 않았다').toEqual([]);
 });
 
-test('QA-31 두 영역 안의 링크 클릭 · 폼 버튼 클릭에도 페이지가 이동하거나 새로고침되지 않는다', async ({ page }) => {
+test('QA-31 두 영역 안의 링크(<a> · <area> · SVG <a>) 클릭 · 폼 버튼 클릭에도 페이지가 이동하거나 새로고침되지 않는다', async ({ page }) => {
   await open(page);
   const initialReal = await structureOf(page, 'real-area');
-  const typed = await edit(page, (t) => t + '<a href="https://example.com">링크</a><form><button>보내기</button></form>');
+  // 검수 1회차 B-2: <a href> · 폼 버튼 말고도 이미지 맵의 <area href> 두 영역을 함께 넣는다
+  const imageMap =
+    '<img src="data:," width="100" height="100" usemap="#m"><map name="m">' +
+    '<area shape="rect" coords="0,0,50,100" href="https://example.com/left">' +
+    '<area shape="rect" coords="50,0,100,100" href="https://example.com/right"></map>';
+  const typed = await edit(page, (t) => t + '<a href="https://example.com">링크</a>' + imageMap + '<form><button>보내기</button></form>');
   await page.getByTestId('btn-patch').click(); // 두 영역에 모두 있고 기록이 한 칸 있다 (alert가 뜨면 헬퍼가 실패시킨다)
   const real = page.getByTestId('real-area');
   const testArea = page.getByTestId('test-area');
   await expect(real.locator('a[href]')).toHaveCount(1);
   await expect(real.locator('form button')).toHaveCount(1);
+  await expect(real.locator('area[href]')).toHaveCount(2);
   await expect(testArea.locator('a[href]')).toHaveCount(1);
   await expect(testArea.locator('form button')).toHaveCount(1);
+  await expect(testArea.locator('area[href]')).toHaveCount(2);
 
   // 페이지가 살아 있다는 표시와 문서 이동 요청 감시
   const urlBefore = page.url();
@@ -201,6 +208,11 @@ test('QA-31 두 영역 안의 링크 클릭 · 폼 버튼 클릭에도 페이지
   await testArea.locator('form button').click();
   await real.locator('a').click();
   await real.locator('form button').click();
+  // 이미지 맵: 클릭 대상은 <area>다. 이미지 위 두 영역 자리를 눌러 <area> 두 개를 모두 누른다 (양쪽 영역)
+  for (const box of [testArea, real]) {
+    await box.locator('img[usemap]').click({ position: { x: 25, y: 50 } });
+    await box.locator('img[usemap]').click({ position: { x: 75, y: 50 } });
+  }
   await page.waitForTimeout(300); // 이동이 일어난다면 이 사이에 일어난다
 
   expect(page.url()).toBe(urlBefore);
@@ -210,6 +222,16 @@ test('QA-31 두 영역 안의 링크 클릭 · 폼 버튼 클릭에도 페이지
   // 클릭 뒤에도 Patch한 상태가 그대로다 (새로고침됐다면 초기 샘플로 돌아갔을 것). 편집창 글도 그대로
   expect(await structureOf(page, 'real-area')).toEqual(structBefore);
   expect(await editorValue(page)).toBe(typed);
+
+  // 검수 1회차 B-2: SVG <a xlink:href>는 Patch는 못 하지만(SVG 미지원) 미리보기(테스트 영역)에는 그려진다. 클릭해도 이동하지 않는다
+  await edit(page, (t) => t + '<svg width="200" height="40"><a xlink:href="https://example.com/svg"><text x="5" y="25">svg 링크</text></a></svg>');
+  await expect(testArea.locator('svg a')).toHaveCount(1);
+  await testArea.locator('svg a text').click();
+  await page.waitForTimeout(300);
+  expect(page.url()).toBe(urlBefore);
+  expect(await page.evaluate(() => (window as unknown as { __stay?: boolean }).__stay)).toBe(true);
+  expect(navigations, 'SVG 링크 클릭에도 프레임 이동이 없어야 한다').toBe(0);
+  expect(documentRequests, 'SVG 링크 클릭에도 문서 이동 요청이 없어야 한다').toEqual([]);
   // 기록이 살아 있다: 뒤로를 누르면 Patch 전(초기 샘플) 상태로 돌아가고 세 칸이 일치한다
   await page.getByTestId('btn-back').click();
   expect(await structureOf(page, 'real-area')).toEqual(initialReal);
