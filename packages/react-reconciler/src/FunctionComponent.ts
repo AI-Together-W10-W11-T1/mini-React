@@ -1,6 +1,6 @@
 import { setHookDispatcher } from '@mini-react/react';
 import type { HookDispatcher, SetStateAction } from '@mini-react/react';
-import type { AreaChildren, Component, Deps, HookSlot, MemoHook, Patch, Props, StateHook, VNode } from '@mini-react/shared';
+import type { AreaChildren, Component, Deps, EffectCallback, EffectHook, HookSlot, MemoHook, Patch, Props, StateHook, VNode } from '@mini-react/shared';
 import { scheduleRender } from '@mini-react/scheduler';
 import { depsChanged } from './deps';
 import { diff } from './diff';
@@ -15,6 +15,12 @@ export interface FunctionComponentHost {
   mount(children: AreaChildren): void;
   /** 고치기: Phase 1 patch 목록을 순서대로 적용한다 */
   apply(patches: readonly Patch[]): void;
+}
+
+interface PendingEffect {
+  readonly slot: EffectHook;
+  readonly effect: EffectCallback;
+  readonly deps: Deps;
 }
 
 // [AI Note]: FunctionComponent = 함수형 UI 컴포넌트(App)를 감싸는 래퍼 클래스 (P2-01 · P2-03).
@@ -32,6 +38,12 @@ export class FunctionComponent {
   private previous: VNode | null = null;
   private patches: readonly Patch[] = [];
   private mounted = false;
+  private unmounted = false;
+  // [AI Note]: effect는 렌더 중에 "실행할 목록"에만 올리고, host 반영이 끝난 뒤에 돌린다 (patch 직후 실행).
+  // 슬롯마다 가장 최근에 예약된 것(latest)만 유효하다 — 같은 목록의 뒤쪽 effect가 안쪽(중첩) 렌더로 먼저 처리되면 옛 클로저로 다시 돌지 않게 한다.
+  private pendingEffects: PendingEffect[] = [];
+  private readonly latestPending = new WeakMap<EffectHook, PendingEffect>();
+  private readonly runCount = new WeakMap<EffectHook, number>();
   // 이번 렌더에서 지금까지 부른 Hook 수 = 다음 Hook이 쓸 hooks 배열 번호 (렌더마다 0번부터)
   private hookIndex = 0;
 
@@ -50,25 +62,44 @@ export class FunctionComponent {
   mount(): void {
     if (this.mounted) throw new Error('mount()는 한 번만 부를 수 있습니다');
     const next = this.render();
+    const effects = this.takePendingEffects();
     this.host.mount([next]);
     this.previous = next;
     this.mounted = true;
+    this.runEffects(effects);
   }
 
   /** 상태 변경 뒤: 다시 실행해 새 VNode를 만들고, 이전과 diff해 바뀐 곳만 반영한다 (P2-06 · P2-18 ~ P2-21) */
   update(): void {
     if (!this.mounted || this.previous === null) throw new Error('mount()를 먼저 불러야 update()를 쓸 수 있습니다');
+    if (this.unmounted) return;
     const next = this.render();
+    const effects = this.takePendingEffects();
     // [AI Note]: Phase 1 diff를 그대로 재사용한다 (P2-19). App() 결과 하나 = 영역 자식 목록 [결과] (Phase 1 규칙)
     const patches = diff([this.previous], [next]);
     this.patches = patches;
     if (patches.length > 0) this.host.apply(patches);
     this.previous = next;
+    this.runEffects(effects);
+  }
+
+  /** 정리: 남은 모든 effect의 cleanup을 실행한다. 이후 setter는 아무 일 없다. 두 번 불러도 두 번째는 아무 일 없다 */
+  unmount(): void {
+    if (this.unmounted) return;
+    this.unmounted = true;
+    for (const slot of this.hooks) {
+      if (slot.kind === 'effect' && slot.cleanup !== null) {
+        const cleanup = slot.cleanup;
+        slot.cleanup = null;
+        cleanup();
+      }
+    }
   }
 
   // 컴포넌트를 실행해 새 VNode를 만들고 자식 컴포넌트를 풀어 요소 · 글자만 남긴다
   private render(): VNode {
     this.hookIndex = 0;
+    this.pendingEffects = [];
     const previousDispatcher = setHookDispatcher(this.dispatcher);
     let result: VNode;
     try {
@@ -79,12 +110,10 @@ export class FunctionComponent {
     return resolveComponents(result);
   }
 
-  // [AI Note]: 루트 컴포넌트가 렌더 중에 부르는 Hook 구현. useEffect는 Dev-13에서 채운다.
+  // [AI Note]: 루트 컴포넌트가 렌더 중에 부르는 Hook 구현 (useState · useEffect · useMemo).
   private readonly dispatcher: HookDispatcher = {
     useState: <S>(initial: S | (() => S)) => this.useState(initial),
-    useEffect: () => {
-      throw new Error('useEffect는 아직 구현되지 않았습니다');
-    },
+    useEffect: (effect: EffectCallback, deps?: Deps) => this.useEffect(effect, deps ?? null),
     useMemo: <T>(factory: () => T, deps?: Deps) => this.useMemo(factory, deps ?? null),
   };
 
@@ -107,6 +136,61 @@ export class FunctionComponent {
       throw new Error(`Hook 호출 순서가 달라졌습니다: ${index}번 Hook이 지난번에는 ${slot.kind}, 이번에는 state입니다`);
     }
     return [slot.value as S, slot.setter as (next: SetStateAction<S>) => void];
+  }
+
+  // [AI Note]: useEffect = 렌더 중에는 슬롯만 만들고 "이번에 돌릴지"만 정한다 (의존성이 처음이거나 바뀌었으면 예약).
+  // 실제 실행은 mount() · update()가 host 반영을 끝낸 뒤 runEffects에서 한다 (T-12: DOM 반영 뒤 실행).
+  private useEffect(effect: EffectCallback, deps: Deps): void {
+    const index = this.hookIndex++;
+    let slot = this.hooks[index];
+    let changed: boolean;
+    if (slot === undefined) {
+      slot = { kind: 'effect', deps: null, cleanup: null };
+      this.hooks[index] = slot;
+      changed = true; // 처음 렌더는 의존성이 [] 여도 한 번 돈다
+    } else if (slot.kind !== 'effect') {
+      throw new Error(`Hook 호출 순서가 달라졌습니다: ${index}번 Hook이 지난번에는 ${slot.kind}, 이번에는 effect입니다`);
+    } else {
+      changed = depsChanged(slot.deps, deps);
+    }
+    if (changed) {
+      const pending: PendingEffect = { slot, effect, deps };
+      this.pendingEffects.push(pending);
+      this.latestPending.set(slot, pending);
+    } else {
+      this.latestPending.delete(slot); // 이번 렌더는 안 돌린다 → 앞 렌더가 남긴 예약이 있으면 취소
+    }
+  }
+
+  private takePendingEffects(): PendingEffect[] {
+    const list = this.pendingEffects;
+    this.pendingEffects = [];
+    return list;
+  }
+
+  // [AI Note]: effect 실행 순서 = 이전 cleanup → 본문 → 돌려준 함수를 cleanup에 저장. 선언 순서대로.
+  // 본문 안에서 setter를 부르면 렌더가 이 호출 안에서 중첩된다 (결정 9 A) — 그래서 deps를 본문 실행 "전에" 저장해야
+  // 안쪽 렌더가 자기 자신을 또 실행하지 않는다. 안쪽 렌더가 같은 effect를 이미 다시 돌렸다면(run 번호가 바뀜)
+  // 이 본문이 늦게 돌려준 cleanup은 대신 바로 부른다 (잃어버리지 않기 위해).
+  private runEffects(list: readonly PendingEffect[]): void {
+    for (const pending of list) {
+      if (this.unmounted) return;
+      const { slot, effect, deps } = pending;
+      if (this.latestPending.get(slot) !== pending) continue; // 더 최근 렌더가 대신 처리했거나 취소함
+      this.latestPending.delete(slot);
+      if (slot.cleanup !== null) {
+        const cleanup = slot.cleanup;
+        slot.cleanup = null;
+        cleanup();
+      }
+      slot.deps = deps;
+      const run = (this.runCount.get(slot) ?? 0) + 1;
+      this.runCount.set(slot, run);
+      const result = effect();
+      const cleanup = typeof result === 'function' ? result : null;
+      if (this.runCount.get(slot) === run) slot.cleanup = cleanup;
+      else cleanup?.();
+    }
   }
 
   // [AI Note]: useMemo = 슬롯에 { 계산값, 의존성 }을 저장. 의존성이 안 바뀌면 factory를 부르지 않고 저장값(같은 참조)을 돌려준다.
@@ -132,6 +216,7 @@ export class FunctionComponent {
   // [AI Note]: setter = 값을 바꾸고 즉시 동기 렌더 (알고리즘 결정 9 A). 같은 값(Object.is)이면 아무 일 없음.
   // 한 핸들러에서 여러 번 부르면 그 수만큼 렌더한다. 함수형 setter는 가장 최근 값을 받는다.
   private setState(slot: StateHook, next: unknown): void {
+    if (this.unmounted) return; // unmount() 뒤 setter는 무시 (함수형 setter의 함수도 부르지 않는다)
     const value = typeof next === 'function' ? (next as (prev: unknown) => unknown)(slot.value) : next;
     if (Object.is(value, slot.value)) return;
     slot.value = value;
