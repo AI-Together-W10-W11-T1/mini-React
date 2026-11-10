@@ -337,12 +337,19 @@ script:` · `" JAVA	script:"`), `<iframe> 제거 — srcdoc 안에 <script>paren
     - 고친 결함: 없음
     - 전체 실행: Dev-19 시점 `npx vitest run` 13 files · 334 passed · `npx tsc --noEmit` 오류 0 (아래 Dev-20 기록에 최종 전체 실행 포함), 커밋 (아래 docs 커밋에서 기록)
 
-- [ ] **Dev-20** (`e2e`): 공격적 시나리오 모음 + 전체 확인 — 발견된 결함이 있으면 앱 코드를 고친다 (결함마다 별도 커밋은 `fix(...)`로) [P1-32 · §6.2 경계 조건 · A4 · A5]
+- [x] **Dev-20** (`e2e`): 공격적 시나리오 모음 + 전체 확인 — 발견된 결함이 있으면 앱 코드를 고친다 (결함마다 별도 커밋은 `fix(...)`로) [P1-32 · §6.2 경계 조건 · A4 · A5]
   - 의존: Dev-14 ~ Dev-19
   - 만들 · 고칠 파일: `e2e/phase1-attack.spec.ts`
   - 테스트(바깥 루프): `e2e/phase1-attack.spec.ts` — QA-A1 ~ QA-A3 · QA-A5 ~ QA-A11 (특수문자를 Patch까지 · 연타 · 빈 입력 · 들여쓰기만 변경 · 주석 · 복수 루트 · boolean 속성 · style 항목(속성 글 항목 집합 비교, A4) · 검사 알림 후 복구 · 경계에서 편집창 글 유지). QA-A4(새로고침)는 Dev-14의 `phase1-render.spec.ts`에, QA-A12(Patch 도중 예외 복구)는 Dev-17의 `phase1-guard.spec.ts`에 있음
   - 알고리즘: 해당 없음 (결정 5 · §5 정책 확인)
   - 완료 근거로 남길 것: `npx vitest run`(전체 통과 개수) · `npx playwright test`(desktop · mobile 전체 통과 개수, **dialog 감시 · 콘솔 error 0건 공통 장치 아래에서**) · `npx tsc --noEmit` 0, 고친 결함이 있으면 그 목록
+  - **완료 근거 (Evidence)**:
+    - 만든 · 고친 파일: `e2e/phase1-attack.spec.ts`(새로). 앱 코드 · 헬퍼는 고치지 않음
+    - 실행: `npx playwright test e2e/phase1-attack.spec.ts` **20 passed**(desktop 10 · mobile 10). 이미 구현된 동작을 공격적으로 확인하는 Dev라 첫 실행에서 모두 통과했고, 통과했다는 것은 앱 결함이 발견되지 않았다는 뜻이다
+    - 테스트 이름: `QA-A1 특수문자(&lt; &amp; 이모지)를 Patch하면 글자 그대로 실제 영역에 들어가고 뒤로 → 앞으로 해도 같다` · `QA-A2 Patch 5회 · 뒤로 10회 · 앞으로 10회를 연타해도 오류 없이 뒤로를 누른 만큼만 이동하고 경계에서 멈춘다` · `QA-A3 편집창을 비우고 Patch하면 영역이 비고 오류가 없으며, 뒤로 하면 이전 샘플 상태로 돌아오고 편집창에 글이 다시 채워진다` · `QA-A5 들여쓰기만 바꾸고 Patch하면 공백 글자가 실제 영역에 반영되고 요소는 같은 참조다` · `QA-A6 주석 글을 고치고 지우고 새로 넣어도 실제 영역의 주석이 편집창과 같다` · `QA-A7 최상위가 두 개인 상태(<p>a</p><p>b</p>)도 반영되고 뒤로 하면 <section> 하나로 돌아온다` · `QA-A8 boolean 속성: disabled를 지우면 사라지고 다시 넣으면 ""로 생기며 <button>은 같은 참조다` · `QA-A9 style 항목: 바뀐 항목만 바뀌고 <p>는 같은 참조이며 마지막 항목을 지우면 style이 없어진다 (모르는 항목도 속성 글 기준으로 같다)` · `QA-A10 검사 알림으로 막힌 뒤 글을 고치고 다시 Patch하면 정상 반영되고 기록이 한 칸만 늘어난다` · `QA-A11 처음 상태에서 편집창에 글을 치고 뒤로를 누르면 이동이 없어 친 글 · 미리보기가 그대로 남는다`. QA-A4(새로고침)는 `phase1-render.spec.ts`, QA-A12(Patch 도중 예외)는 `phase1-guard.spec.ts`에 이미 있음
+    - 확인한 숫자: QA-A2 연타 한 번에(`el.click()` 5회) = `characterData` 1 · total 1(첫 Patch만 반영, 나머지 4회 무변경), 뒤로 10회 → 초기에서 멈춤 · 앞으로 10회 → 끝에서 멈춤 · 뒤로 2 · 앞으로 1은 정확히 그만큼만 이동. QA-A5 `characterData` 1 · total 1(공백 노드가 같은 참조). QA-A8 `attributes` 1 · total 1(지울 때 · 넣을 때 각각). QA-A9 별도 판에서 `foo: bar`는 `style` 속성 글에는 남고 `el.style.cssText`에는 없으며, `structureOf`의 항목 집합에서 실제 · 테스트 영역이 같고 `["foo","bar"]`가 들어 있음(A4)
+    - 고친 결함: 없음
+    - **전체 확인(Dev-14 ~ 20 끝)**: `npx vitest run` 13 files · **334 passed**, `npx tsc --noEmit` 오류 **0**, `npx playwright test` **94 passed**(render 10 · patch 18 · guard 22 · history 12 · roundtrip 12 · attack 20, desktop 47 · mobile 47, dialog 감시 · 콘솔 error 0건 공통 장치 아래), 끝난 뒤 5199 대기 중인 프로세스 없음. 미룬 테스트 케이스 없음(B1 ~ B13 · C1 ~ C5 모두 수행 — Dev-19도 미루지 않음), 커밋 (아래 docs 커밋에서 기록)
 
 ## Dev 항목 — 선택 확장 (필수 뒤, 이 순서)
 
