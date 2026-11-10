@@ -20,9 +20,14 @@ let currentDispatcher: HookDispatcher | null = null;
 
 const OUTSIDE_RENDER_ERROR = 'Hook은 함수형 컴포넌트 렌더 중에만 부를 수 있습니다';
 
-/** 엔진용: 렌더 시작 때 꽂고 끝나면 `null`로 되돌린다 */
-export function setHookDispatcher(dispatcher: HookDispatcher | null): void {
+/**
+ * 엔진용: 렌더 시작 때 꽂고 끝나면 `null`로 되돌린다.
+ * 바꾸기 전 디스패처를 돌려준다 — 렌더 안에서 잠깐 바꿨다가(자식 컴포넌트 실행) 원래대로 되돌릴 때 쓴다.
+ */
+export function setHookDispatcher(dispatcher: HookDispatcher | null): HookDispatcher | null {
+  const previous = currentDispatcher;
   currentDispatcher = dispatcher;
+  return previous;
 }
 
 function resolveDispatcher(): HookDispatcher {

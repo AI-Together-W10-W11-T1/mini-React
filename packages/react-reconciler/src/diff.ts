@@ -86,6 +86,10 @@ function diffKeyedChildren(oldChildren: readonly VNode[], newChildren: readonly 
 }
 
 function diffNode(oldNode: VNode, newNode: VNode, path: Path, out: Patch[]): void {
+  // [AI Note]: diff는 요소 · 글자만 안다. 컴포넌트 VNode는 FunctionComponent가 resolveComponents로 먼저 풀어서 넘겨야 한다.
+  if (typeof oldNode.type === 'function' || typeof newNode.type === 'function') {
+    throw new Error('diff는 풀리지 않은 컴포넌트 VNode를 비교할 수 없습니다. resolveComponents로 먼저 풀어야 합니다.');
+  }
   if (oldNode.type !== newNode.type) {
     out.push({ kind: 'REPLACE', path, before: oldNode, after: newNode });
     return;

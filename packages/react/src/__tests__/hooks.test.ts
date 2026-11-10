@@ -95,6 +95,14 @@ describe('Hook 공개 API — 디스패처로 위임', () => {
     expect(() => useState(0)).toThrow();
   });
 
+  it('setHookDispatcher는 바꾸기 전 디스패처를 돌려준다 (자식 실행 중 잠깐 바꿨다 되돌릴 때)', () => {
+    const a = makeFake();
+    const b = makeFake();
+    expect(setHookDispatcher(a.dispatcher)).toBeNull();
+    expect(setHookDispatcher(b.dispatcher)).toBe(a.dispatcher);
+    expect(setHookDispatcher(a.dispatcher)).toBe(b.dispatcher);
+  });
+
   it('디스패처를 바꿔 꽂으면 새 디스패처로 간다', () => {
     const a = makeFake();
     const b = makeFake();
