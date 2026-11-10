@@ -103,7 +103,7 @@ export function applyPatches(list: AreaChildren, patches: readonly Patch[]): Are
   return patches.reduce<AreaChildren>((current, patch) => applyPatch(current, patch), list);
 }
 
-/** 비교용: 속성 값을 diff와 같은 규칙으로 정규화한 VNode 목록 (true → "", 숫자 → 문자열, false · null · undefined 제거) */
+/** 비교용: 속성 값을 diff와 같은 규칙으로 정규화한 VNode 목록 (true → "", 숫자 → 문자열, false · null · undefined 제거, `on`+대문자 함수는 남김) */
 export function normalizeTree(list: AreaChildren): AreaChildren {
   return list.map((node) => {
     if (node.type === TEXT_NODE || node.type === COMMENT_NODE) return node;
@@ -114,6 +114,8 @@ export function normalizeTree(list: AreaChildren): AreaChildren {
       else if (typeof value === 'string') entries.push([name, value]);
       else if (typeof value === 'number') entries.push([name, String(value)]);
       else if (value === true) entries.push([name, '']);
+      // 이벤트 props(on + 대문자 · 함수 값)는 SET_EVENT가 다루므로 남긴다 (Phase 2)
+      else if (typeof value === 'function' && /^on[A-Z]/.test(name)) entries.push([name, value]);
     }
     const props = Object.fromEntries(entries);
     return { ...(node as ElementVNode), props, children: normalizeTree(node.children) } as VNode;

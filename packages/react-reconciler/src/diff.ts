@@ -1,5 +1,5 @@
 import { COMMENT_NODE, TEXT_NODE } from '@mini-react/shared';
-import type { AreaChildren, Key, Patch, Path, StyleMap, VNode } from '@mini-react/shared';
+import type { AreaChildren, EventHandler, Key, Patch, Path, StyleMap, VNode } from '@mini-react/shared';
 
 // [AI Note]: 이전 · 새 VNode 두 개만 비교해 "고칠 일 목록"을 만든다 (P1-33 — 실제 DOM을 다시 읽지 않는다).
 // DOM을 전혀 모른다. 한 줄 = 종류 · 경로 · 전 · 후 (알고리즘 결정 3 A). 경로는 영역 상자 안 자식부터 (결정 4 A).
@@ -98,11 +98,12 @@ function diffNode(oldNode: VNode, newNode: VNode, path: Path, out: Patch[]): voi
   }
   diffAttrs(oldNode, newNode, path, out);
   diffStyle(oldNode, newNode, path, out);
+  diffEvents(oldNode, newNode, path, out);
   diffChildren(oldNode.children, newNode.children, path, out);
 }
 
 // [AI Note]: 속성 값 정규화 — 문자열 · 숫자 → 문자열, true → "" (boolean 속성), false · null · undefined → 속성 없음.
-// 함수 · style이 아닌 객체는 Phase 1에서 속성으로 다루지 않는다 (이벤트는 phase2). style은 항목별 비교(StyleMap)라 여기서 뺀다.
+// 함수 · style이 아닌 객체는 속성으로 다루지 않는다 (함수 이벤트는 diffEvents가 따로 비교). style은 항목별 비교(StyleMap)라 여기서 뺀다.
 function readAttrs(node: VNode): Map<string, string> {
   const attrs = new Map<string, string>();
   for (const [name, value] of Object.entries(node.props)) {
@@ -148,5 +149,30 @@ function diffStyle(oldNode: VNode, newNode: VNode, path: Path, out: Patch[]): vo
   }
   for (const [property, newValue] of Object.entries(after)) {
     if (!Object.hasOwn(before, property)) out.push({ kind: 'SET_STYLE', path, property, before: null, after: newValue });
+  }
+}
+
+// [AI Note]: 이벤트 props (Phase 2, 알고리즘 결정 8 B). 이름이 `on` + 대문자이고 값이 함수면 이벤트 (`onClick` → `click`).
+// 속성(SET_ATTR)이 아니라 SET_EVENT로 따로 비교한다. 같은 함수 참조면 줄이 없어 무변경 렌더(T-04)에 작업이 생기지 않고,
+// 다르면 전 · 후 함수 한 줄 — patch가 DOM 리스너를 다시 달지 않고 요소에 저장된 핸들러만 바꾼다.
+// 요소 종류가 달라 REPLACE · INSERT되는 새 요소는 통째로 새로 그려지므로(renderVNode) 여기서 비교하지 않는다.
+function readEvents(node: VNode): Map<string, EventHandler> {
+  const events = new Map<string, EventHandler>();
+  for (const [name, value] of Object.entries(node.props)) {
+    if (/^on[A-Z]/.test(name) && typeof value === 'function') events.set(name.slice(2).toLowerCase(), value as EventHandler);
+  }
+  return events;
+}
+
+function diffEvents(oldNode: VNode, newNode: VNode, path: Path, out: Patch[]): void {
+  const before = readEvents(oldNode);
+  const after = readEvents(newNode);
+  for (const [event, oldHandler] of before) {
+    const newHandler = after.get(event);
+    if (newHandler === undefined) out.push({ kind: 'SET_EVENT', path, event, before: oldHandler, after: null });
+    else if (newHandler !== oldHandler) out.push({ kind: 'SET_EVENT', path, event, before: oldHandler, after: newHandler });
+  }
+  for (const [event, newHandler] of after) {
+    if (!before.has(event)) out.push({ kind: 'SET_EVENT', path, event, before: null, after: newHandler });
   }
 }

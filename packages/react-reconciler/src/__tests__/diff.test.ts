@@ -126,8 +126,8 @@ describe('diff 기본 — 속성', () => {
     });
   });
 
-  it('함수 · style이 아닌 객체 props는 속성으로 다루지 않는다 (이벤트는 phase2)', () => {
-    const patches = diff([el('button', { onClick: () => {}, data: { a: 1 } })], [el('button', { onClick: () => {} })]);
+  it('이벤트가 아닌 함수 · style이 아닌 객체 props는 속성으로 다루지 않는다 (on + 대문자 함수는 SET_EVENT, diffEvents.test.ts)', () => {
+    const patches = diff([el('button', { render: () => {}, data: { a: 1 } })], [el('button', { render: () => {} })]);
     expect(patches).toEqual([]);
   });
 
