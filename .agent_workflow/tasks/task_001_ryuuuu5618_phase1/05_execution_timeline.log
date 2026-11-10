@@ -51,3 +51,6 @@
 2026-11-11T04:09 | stage=2.5 | agent=master | round=- | signal=CHECKPOINT | CP1 Diff · Patch (예측 → 실제 diff 실행 → 한 줄 요약)
 2026-11-11T04:13 | stage=2.5 | agent=master | round=- | signal=CHECKPOINT | CP2 State History 갈림길 (예측 → 실제 History 실행, 이유 채움)
 2026-11-11T04:17 | stage=2.5 | agent=master | round=- | signal=CHECKPOINT | CP3 실제 React와 차이 → 2.5단계 끝, 3단계 QA로
+2026-11-11T04:20 | stage=3 | agent=mr-qa | round=- | signal=UNKNOWN | - | by=hook
+2026-11-11T04:20 | stage=3 | agent=master | round=- | signal=PASS_PENDING_HUMAN | QA 96 passed (desktop 48 · mobile 48, 시나리오 45개), 캡처 12장 사용자에게 보냄, 서버 남음 5199 PID 46868(vite) 종료 승인 대기
+2026-11-11T04:27 | stage=3 | agent=master | round=- | signal=PASS | 사용자 캡처 확인 완료, 5199 서버 승인 후 종료 → 3단계 통과
