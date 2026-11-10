@@ -140,12 +140,20 @@
     - B20: `깊이 300 중첩의 맨 아래 글자 바꾸기가 스택 넘침 없이 끝나고 결과가 목표와 같다 (B20)`, `형제 2,000개에서 끝에 추가 · 전부 삭제가 끝나고 결과가 목표와 같다 (B20)` 통과
     - 실행: `npx vitest run` 7 files · 159 passed, `npx tsc --noEmit` 오류 0, 커밋 0dc2b24
 
-- [ ] **Dev-7** (`react-dom-bindings`): `vnodesToHtml` — 저장한 VNode를 편집창에 채울 HTML 글로 [P1-22 · P1-30 · §5 공백 · 주석 · B18 · B19]
+- [x] **Dev-7** (`react-dom-bindings`): `vnodesToHtml` — 저장한 VNode를 편집창에 채울 HTML 글로 [P1-22 · P1-30 · §5 공백 · 주석 · B18 · B19]
   - 의존: Dev-1 (`styleMapToText`), Dev-2 (왕복 검증)
   - 만들 · 고칠 파일: `packages/react-dom-bindings/src/client/vnodesToHtml.ts`, `packages/react-dom-bindings/src/index.ts`
   - 테스트: `packages/react-dom-bindings/src/client/__tests__/vnodesToHtml.test.ts` — 공백 텍스트 · 줄바꿈 그대로, 주석 `<!--…-->`, 값 있는 속성 `name="value"`(값의 `&` · `"` 이스케이프), boolean `name=""`, style 속성 글, 빈 태그(`br` `hr` `img` `input` …)는 닫는 태그 없음, 텍스트의 `<` `>` `&` 이스케이프(특수문자 `<b>굵게 아님</b> & &amp; 😀`), `pre` · `textarea` 첫 줄바꿈 보존, 0개 · 여러 개 최상위, 왕복(`HTML 글 → 파싱 → domToVNode`가 원래 VNode와 같음: 샘플 · 중첩 · 주석 · 특수문자) / **원문 글 요소(B18, 변환기 견고성 단위 테스트 — 페이지에서는 `<style>`이 C5로 막힘): `<style>` 안의 `a > b` · `&`는 이스케이프하지 않고 그대로 쓰며 왕복해도 같다. `<textarea>` 안은 이스케이프(`&gt;` → 글자 `>`로 읽힘)하는 것과 대비** / **나란히 붙은 글자 노드 두 개(B19): `"a"`, `"b"`는 글 `ab`로 합쳐지므로, 왕복 비교는 인접한 글자 노드를 합친 뒤 비교한다(`mergeAdjacentText` 테스트용 도우미). 무작위 왕복 생성기는 인접 글자 노드를 만들지 않는다. 참고: DOM에서 읽은 VNode에는 인접 글자 노드가 생기지 않는다**
   - 알고리즘: 결정 5 B · 편집창 글 = 스냅샷을 HTML 글로 (명세 4절)
   - 완료 근거로 남길 것: `vnodesToHtml.test.ts` 통과 개수, 샘플 왕복 통과, `<style>` 원문 · 인접 글자 노드 테스트 이름
+  - **완료 근거 (Evidence)**:
+    - 만든 · 고친 파일: `packages/react-dom-bindings/src/client/vnodesToHtml.ts`(`vnodesToHtml(children)` — 글자 `& < >` 이스케이프, 속성 값 `& "` 이스케이프, 주석, boolean `name=""`, style StyleMap → 속성 글, 빈 태그 닫는 태그 없음, `style` · `script` 등 원문 글 요소 안은 이스케이프 안 함, `pre` · `textarea` 첫 줄바꿈 보존, 컴포넌트 VNode는 오류), `packages/react-dom-bindings/src/index.ts`(내보내기)
+    - 테스트: `packages/react-dom-bindings/src/client/__tests__/vnodesToHtml.test.ts` 27건 통과 (`npx vitest run packages/react-dom-bindings/src/client/__tests__/vnodesToHtml.test.ts`). 모듈이 없는 상태(`Failed to resolve import "../vnodesToHtml"`)에서 실패하는 것을 먼저 확인한 뒤 구현
+    - 샘플 왕복: `샘플을 읽은 VNode를 글로 쓰고 다시 읽으면 같다`, `샘플은 글로도 원문과 같다 (style 항목 사이 구분자 형식까지)`, `중첩 · 주석 · 최상위 여러 개 · 특수문자가 섞인 입력`, `표 · 목록 · 폼 요소` 통과
+    - B18: `<style> 안의 a > b · &는 이스케이프하지 않고 그대로 쓴다`, `<script> 안도 이스케이프하지 않는다`, `<textarea> 안은 이스케이프한다 (&gt; → 글자 > 로 읽힘) — 원문 글 요소와 대비`
+    - B19: `글자 노드 "a" · "b"는 글 ab로 합쳐진다`, `왕복 비교는 인접 글자 노드를 합친 뒤 한다 (mergeAdjacentText)`(테스트 파일 안 도우미, 빈 글자 ""도 버림), `DOM에서 읽은 VNode에는 인접 글자 노드가 생기지 않는다`
+    - 무작위 왕복 생성기는 이 Dev에서 쓰지 않음(손으로 쓴 왕복 케이스로 대신, 따라서 "생성기가 인접 글자 노드를 만들지 않는다"는 해당 없음)
+    - 실행: `npx vitest run` 8 files · 186 passed, `npx tsc --noEmit` 오류 0, 커밋: 아래 마지막 docs 커밋에서 기록
 
 - [ ] **Dev-8** (`react-dom-bindings`): `setAreaHtml` — 편집창 글을 위험한 것을 빼고 미리보기(테스트 영역)에 그린다 [P1-21 · P1-22 · §5 실행 가능한 HTML · C3 · C5 · B11 · B12]
   - 의존: Dev-1 (`renderAreaChildren`), Dev-2 (결과를 `readAreaChildren`으로 확인)
