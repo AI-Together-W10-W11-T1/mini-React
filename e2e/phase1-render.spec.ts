@@ -75,12 +75,16 @@ test('새로고침', async ({ page }) => {
   expectNoConsoleWarnings(page);
 });
 
-test('QA-A4 새로고침: 편집한 글은 사라지고 초기 샘플로 다시 뜨며 뒤로가 무시된다', async ({ page }) => {
+test('QA-A4 새로고침: Patch한 뒤 새로고침하면 편집한 글 · 기록은 사라지고 초기 샘플로 다시 뜨며 뒤로가 무시된다', async ({ page }) => {
   await page.goto(URL);
   const initialEditor = await editorValue(page);
-  // [AI Note]: Patch 단계(Dev-15)가 생기면 같은 테스트에 "Patch 한 뒤"를 덧붙인다
+  // Patch한 뒤 새로고침 (기록이 하나 쌓인 상태에서도 새로고침하면 사라진다)
   await page.getByTestId('html-editor').fill(initialEditor.replace('안녕', '반가워'));
   await expect(page.getByTestId('test-area').locator('p.note')).toHaveText('반가워');
+  await page.getByTestId('btn-patch').click();
+  await expect(page.getByTestId('real-area').locator('p.note')).toHaveText('반가워');
+  // 한 번 더 편집만 하고(Patch 안 함) 새로고침
+  await page.getByTestId('html-editor').fill(initialEditor.replace('안녕', '또 바뀜'));
 
   await page.reload();
   await expect(page.getByTestId('real-area').locator('p.note')).toHaveText('안녕');

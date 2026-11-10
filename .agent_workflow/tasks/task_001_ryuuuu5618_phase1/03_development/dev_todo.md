@@ -266,12 +266,19 @@ script:` · `" JAVA	script:"`), `<iframe> 제거 — srcdoc 안에 <script>paren
     - QA-A4는 Patch 단계(Dev-15) 전이라 "편집창에 친 글(Patch 안 함) → 새로고침 → 초기 샘플 · 뒤로 무시"로 두었고, Dev-15가 같은 테스트에 "Patch 한 뒤"를 덧붙임
     - 실행: `npx vitest run` 13 files · 334 passed (영향 없음), `npx tsc --noEmit` 오류 0
 
-- [ ] **Dev-15** (`fixture` + `e2e`): Patch 버튼 흐름 — 편집창 글 → 테스트 영역 DOM 읽기 → diff → 실제 영역 반영 → 기록 [P1-23 ~ P1-25 · P1-32 · T-03 · T-04 · T-06 · T-07 · B1 · B2 · B7 · A2 · A3]
+- [x] **Dev-15** (`fixture` + `e2e`): Patch 버튼 흐름 — 편집창 글 → 테스트 영역 DOM 읽기 → diff → 실제 영역 반영 → 기록 [P1-23 ~ P1-25 · P1-32 · T-03 · T-04 · T-06 · T-07 · B1 · B2 · B7 · A2 · A3]
   - 의존: Dev-14
   - 만들 · 고칠 파일: `fixtures/phase1-vdom-playground/main.ts`(`btn-patch` 클릭 → **편집창 글로 미리보기를 한 번 더 그린 뒤**(입력 처리가 늦어도 옛 글로 Patch되지 않게, B6) `readAreaChildren(testArea)` → `root.update(next)`, 무변경이면 아무 일 없음. **Patch 성공 뒤 편집창 글은 친 그대로 둔다**(B7)), `e2e/phase1-patch.spec.ts`
   - 테스트(바깥 루프): `e2e/phase1-patch.spec.ts` — QA-2 ~ QA-10 (D-01 ~ D-05 · 중첩 · 복합 · 무변경 · 부분 갱신 · 연속 Patch). 숫자로 증명하는 덧붙임: **QA-2(B1 · B7)** 글자 하나 Patch가 `MutationObserver` 기록 `characterData` 정확히 1건 · `childList` 0건이고 편집창 글이 친 그대로, **QA-9(B2)** 글자 + `class` 변경이 `characterData` 1건 + `attributes` 1건 · `childList` 0건. **QA-5(a)(A2)** · **QA-6(A3)** Then는 위치 비교 결과(남는 노드 · 새 노드 참조)를 구체적으로 확인
   - 알고리즘: 결정 3 · 4 · 7 · 정책 무변경 Patch 무시
   - 완료 근거로 남길 것: `npx playwright test e2e/phase1-patch.spec.ts` desktop · mobile 통과 개수, QA-2 ~ QA-10 각각의 테스트 이름, QA-2 · QA-9의 `MutationObserver` 기록 개수
+  - **완료 근거 (Evidence)**:
+    - 만든 · 고친 파일: `fixtures/phase1-vdom-playground/main.ts`(`btn-patch` 클릭 → `setAreaHtml(testArea, editor.value)`로 미리보기를 한 번 더 그림(B6) → `readAreaChildren(testArea)` → `root.update(next)`. 무변경이면 `update`가 `false`라 아무 일 없음. Patch 성공 뒤 편집창 글은 건드리지 않음(B7)), `e2e/phase1-patch.spec.ts`(새로), `e2e/phase1-render.spec.ts`(QA-A4에 "Patch한 뒤 새로고침" 단계 덧붙임), `e2e/phase1-helpers.ts`(`edit`가 글이 안 바뀌면 오류를 냄 — `replace`가 대상을 못 찾아 조용히 지나가는 것 방지. 예: boolean 속성은 편집창에서 `disabled=""`로 보임)
+    - 테스트(바깥 루프): 스펙만 먼저 쓰고 Patch 미연결 상태에서 `npx playwright test e2e/phase1-patch.spec.ts` 16 failed(`toHaveText` · `toHaveAttribute` · `toHaveCount` 기대 불일치, 무변경 QA-8 2건만 통과) 확인 뒤 연결. 연결 후 `npx playwright test e2e/phase1-patch.spec.ts e2e/phase1-render.spec.ts` 28 passed (patch 18 = desktop 9 · mobile 9, render 10 = desktop 5 · mobile 5)
+    - 테스트 이름: `QA-2 글자 하나를 고치고 Patch하면 그 글자만 바뀌고 MutationObserver 기록은 characterData 1건뿐이다` · `QA-3 속성 추가 · 수정 · 삭제를 Patch하면 실제 영역 속성이 같아지고 요소는 같은 참조다 (속성 순서는 비교하지 않는다)` · `QA-4 <ul> 끝에 <li>를 추가하고 Patch하면 <li>가 4개가 되고 앞 세 <li>는 같은 참조다` · `QA-5 가운데 <li>를 지우면 위치 비교라서 둘째 노드는 남고 셋째 노드가 지워진다 / 여러 개를 한꺼번에 지워도 맞다`(A2: 둘째 `<li>` `===` 유지 · 셋째 `isConnected` 거짓) · `QA-6 <ul>을 <ol>로 바꾸고 Patch하면 <ol>과 그 안의 <li>는 새 노드이고 주변 요소는 같은 참조다`(A3: `<li>` 세 개 `!==`) · `QA-7 글자 · 속성 · 삭제 · 추가 · 교체를 한꺼번에 Patch해도 실제 영역이 테스트 영역과 같다` · `QA-8 편집 없이 Patch를 누르면 실제 영역 DOM 변경이 0건이고 뒤로를 눌러도 아무 일 없다` · `QA-9 글자 하나와 class만 바꾸고 Patch하면 characterData 1건 + attributes 1건뿐이고 부모 · 형제는 같은 참조다` · `QA-10 편집 → Patch → 같은 편집창에서 다른 편집 → Patch해도 직전 반영 상태 기준으로 맞다`
+    - `MutationObserver` 기록 개수: QA-2 = `characterData` 1 · `childList` 0 · `attributes` 0 · total 1, targets `['characterData:#text']`, 편집창 글이 Patch 직전 값 그대로(B1 · B7). QA-9 = `characterData` 1 · `attributes` 1 · `childList` 0 · total 2, targets `['attributes:p', 'characterData:#text']`(B2). QA-3에서 실제 영역 `<p>` 속성 순서 `['class','style','title']` vs 테스트 영역 `['title','class','style']`로 달라도 `structureOf`가 같다고 판정(A4)
+    - QA-8의 "뒤로를 눌러도 아무 일 없다"는 뒤로 버튼이 Dev-18에서 연결되기 전에는 단순히 아무 일 없는 버튼이라 자명하게 통과한다. Dev-18 이후에도 같은 시나리오가 통과해야 "기록이 안 생김"의 증거가 된다(Dev-18 완료 때 재실행 필요)
+    - 실행: `npx tsc --noEmit` 오류 0
 
 - [ ] **Dev-16** (`fixture` + `e2e`): Patch 때 검사 — `checkHtml`에 걸리면 alert로 "다시 작성해 주세요"를 알리고 Patch를 안 한다. 위험 코드 우회 · 삽입 요소 · 스타일 요소 포함 [§5 HTML 편집 · 오류 · 실행 가능한 HTML · §6.2 · P1-32 · B11 · B12 · C3 · C5]
   - 의존: Dev-10, Dev-15

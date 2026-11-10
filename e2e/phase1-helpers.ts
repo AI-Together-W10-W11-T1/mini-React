@@ -315,9 +315,12 @@ export async function editorValue(page: Page): Promise<string> {
 }
 
 /** 편집창 글을 읽어 `fn`으로 일부만 바꾼 글로 다시 채운다 (샘플 들여쓰기에 기대지 않기 위해). 채운 글을 돌려준다 */
-export async function edit(page: Page, fn: (current: string) => string): Promise<string> {
+export async function edit(page: Page, fn: (current: string) => string, options: { allowSame?: boolean } = {}): Promise<string> {
   const editor = page.getByTestId('html-editor');
-  const next = fn(await editor.inputValue());
+  const current = await editor.inputValue();
+  const next = fn(current);
+  // 글이 그대로면 `replace`가 아무것도 못 찾은 것일 수 있다 (예: boolean 속성은 편집창에서 `disabled=""`로 보인다). 조용히 넘어가지 않는다
+  if (next === current && options.allowSame !== true) throw new Error('edit: 편집창 글이 바뀌지 않았다 (replace 대상을 못 찾았나?)');
   await editor.fill(next);
   return next;
 }
