@@ -67,6 +67,16 @@ describe('domToVNode', () => {
     });
   });
 
+  // 검수 2회차 B-1: 속성 이름이 `__proto__`여도 보통 항목으로 담는다 (대입하면 프로토타입 설정이라 속성이 사라진다)
+  it('속성 이름이 __proto__여도 보통 항목으로 담는다 (검수 2회차 B-1)', () => {
+    const box = area('<p __proto__="x" id="a">a</p>');
+    const props = domToVNode(box.firstChild!).props as { [name: string]: unknown };
+    expect(Object.hasOwn(props, '__proto__')).toBe(true);
+    expect(Object.getOwnPropertyDescriptor(props, '__proto__')?.value).toBe('x');
+    expect(Object.keys(props)).toEqual(['__proto__', 'id']);
+    expect(Object.getPrototypeOf(props)).toBe(Object.prototype); // 프로토타입은 건드리지 않는다
+  });
+
   it('빈 style · 항목이 하나도 없는 style은 props에 두지 않는다 (B21)', () => {
     const box = area('<p style=""></p><p style=";;"></p><p style="color:"></p>');
     for (const child of Array.from(box.childNodes)) {

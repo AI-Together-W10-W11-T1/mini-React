@@ -97,6 +97,35 @@ describe('diff 기본 — 속성', () => {
     ]);
   });
 
+  describe('속성 이름 __proto__ (검수 2회차 B-1)', () => {
+    // [AI Note]: `{ __proto__: 'x' }` 리터럴은 프로토타입 설정이라 속성이 되지 않는다. fromEntries로 자기 속성을 만든다.
+    const attrs = (entries: Array<[string, string]>) => Object.fromEntries(entries);
+    // run()은 검산기가 양쪽을 같은 방식으로 정규화해 `__proto__`가 사라져도 같아 보일 수 있다 — 적용 결과에 자기 속성이 남았는지 따로 본다.
+    const own = (list: AreaChildren) => Object.hasOwn(list[0].props, '__proto__');
+
+    it('__proto__ 속성 추가는 SET_ATTR before null', () => {
+      const oldTree = [el('p', attrs([['id', 'a']]))];
+      const patches = run(oldTree, [el('p', attrs([['id', 'a'], ['__proto__', 'x']]))]);
+      expect(patches).toEqual([{ kind: 'SET_ATTR', path: [0], name: '__proto__', before: null, after: 'x' }]);
+      expect(own(applyPatches(oldTree, patches))).toBe(true);
+    });
+
+    it('__proto__ 속성 삭제는 SET_ATTR after null', () => {
+      const oldTree = [el('p', attrs([['id', 'a'], ['__proto__', 'x']]))];
+      const patches = run(oldTree, [el('p', attrs([['id', 'a']]))]);
+      expect(patches).toEqual([{ kind: 'SET_ATTR', path: [0], name: '__proto__', before: 'x', after: null }]);
+      expect(own(applyPatches(oldTree, patches))).toBe(false);
+      expect(own(normalizeTree(oldTree))).toBe(true); // 비교용 정규화도 __proto__ 항목을 지우지 않는다
+    });
+
+    it('__proto__ 속성 값 수정은 SET_ATTR 전 · 후 값', () => {
+      const oldTree = [el('p', attrs([['__proto__', 'x']]))];
+      const patches = run(oldTree, [el('p', attrs([['__proto__', 'y']]))]);
+      expect(patches).toEqual([{ kind: 'SET_ATTR', path: [0], name: '__proto__', before: 'x', after: 'y' }]);
+      expect(Object.getOwnPropertyDescriptor(applyPatches(oldTree, patches)[0].props, '__proto__')?.value).toBe('y');
+    });
+  });
+
   it('함수 · style이 아닌 객체 props는 속성으로 다루지 않는다 (이벤트는 phase2)', () => {
     const patches = diff([el('button', { onClick: () => {}, data: { a: 1 } })], [el('button', { onClick: () => {} })]);
     expect(patches).toEqual([]);

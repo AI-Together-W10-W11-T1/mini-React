@@ -29,15 +29,17 @@ export function readAreaChildren(area: Element): AreaChildren {
 }
 
 function readProps(element: Element): Props {
-  const props: { [name: string]: string | StyleMap } = {};
+  // [AI Note]: `props[이름] = 값` 대입 대신 [이름, 값] 쌍을 모아 Object.fromEntries로 만든다.
+  // 속성 이름이 `__proto__`이면 대입은 항목이 아니라 프로토타입 setter를 불러 속성이 사라진다 — fromEntries는 보통 항목으로 담는다 (검수 2회차 B-1).
+  const entries: Array<[string, string | StyleMap]> = [];
   for (const attr of Array.from(element.attributes)) {
     if (attr.name === 'style') {
       // 항목이 하나도 없으면 style props를 두지 않는다 (B21)
       const map = parseStyleText(attr.value);
-      if (Object.keys(map).length > 0) props.style = map;
+      if (Object.keys(map).length > 0) entries.push(['style', map]);
     } else {
-      props[attr.name] = attr.value;
+      entries.push([attr.name, attr.value]);
     }
   }
-  return props;
+  return Object.fromEntries(entries);
 }

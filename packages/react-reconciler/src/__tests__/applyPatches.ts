@@ -38,10 +38,11 @@ export function applyPatch(list: AreaChildren, patch: Patch): AreaChildren {
       });
     case 'SET_ATTR':
       return mapNode(list, patch.path, (node) => {
-        const props: { [name: string]: unknown } = { ...node.props };
-        if (patch.after === null) delete props[patch.name];
-        else props[patch.name] = patch.after;
-        return withProps(node, props);
+        // [AI Note]: `props[이름] = 값` 대신 Map을 거쳐 fromEntries로 만든다. 이름이 `__proto__`면 대입은 프로토타입 설정이라 속성이 사라진다 (검수 2회차 B-1).
+        const attrs = new Map(Object.entries(node.props));
+        if (patch.after === null) attrs.delete(patch.name);
+        else attrs.set(patch.name, patch.after);
+        return withProps(node, Object.fromEntries(attrs));
       });
     case 'SET_STYLE':
       return mapNode(list, patch.path, (node) => {
@@ -89,13 +90,15 @@ export function applyPatches(list: AreaChildren, patches: readonly Patch[]): Are
 export function normalizeTree(list: AreaChildren): AreaChildren {
   return list.map((node) => {
     if (node.type === TEXT_NODE || node.type === COMMENT_NODE) return node;
-    const props: { [name: string]: unknown } = {};
+    // [AI Note]: 쌍을 모아 fromEntries로 만든다 — `__proto__` 속성 이름도 보통 항목으로 남긴다 (검수 2회차 B-1).
+    const entries: Array<[string, unknown]> = [];
     for (const [name, value] of Object.entries(node.props)) {
-      if (name === 'style' && typeof value === 'object' && value !== null) props[name] = value;
-      else if (typeof value === 'string') props[name] = value;
-      else if (typeof value === 'number') props[name] = String(value);
-      else if (value === true) props[name] = '';
+      if (name === 'style' && typeof value === 'object' && value !== null) entries.push([name, value]);
+      else if (typeof value === 'string') entries.push([name, value]);
+      else if (typeof value === 'number') entries.push([name, String(value)]);
+      else if (value === true) entries.push([name, '']);
     }
+    const props = Object.fromEntries(entries);
     return { ...(node as ElementVNode), props, children: normalizeTree(node.children) } as VNode;
   });
 }

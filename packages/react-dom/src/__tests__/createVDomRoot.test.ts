@@ -71,6 +71,18 @@ describe('createVDomRoot.update — diff → patch → 기록 (D-01 ~ D-05)', ()
     updateTo('<p class="a" id="x">글</p>', '<p id="x">글</p>');
   });
 
+  it('D-02 속성 이름이 __proto__여도 두 영역이 같아진다: 추가 · 수정 · 삭제 (검수 2회차 B-1)', () => {
+    // 테스트 영역 = 편집창 글을 브라우저가 그린 것. 실제 영역 요소에 같은 속성이 생겨 속성 글이 같아야 한다.
+    const attr = (area: HTMLElement) => (area.firstElementChild as Element).getAttribute('__proto__');
+    // updateTo가 실제 영역 글 = 테스트 영역 글(nextHtml)임을 확인한다. 새 속성은 기존 속성 뒤에 붙으므로 id를 앞에 둔다.
+    const added = updateTo('<p id="a">글</p>', '<p id="a" __proto__="x">글</p>');
+    expect(attr(added.area)).toBe('x');
+    const edited = updateTo('<p __proto__="x">글</p>', '<p __proto__="y">글</p>');
+    expect(attr(edited.area)).toBe('y');
+    const removed = updateTo('<p __proto__="x" id="a">글</p>', '<p id="a">글</p>');
+    expect(removed.area.firstElementChild!.hasAttribute('__proto__')).toBe(false);
+  });
+
   it('D-03 노드 추가 (P1-10)', () => {
     updateTo('<ul><li>1</li></ul>', '<ul><li>1</li><li>2</li></ul>');
   });
