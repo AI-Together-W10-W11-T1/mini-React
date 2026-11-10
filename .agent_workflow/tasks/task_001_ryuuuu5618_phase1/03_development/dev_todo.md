@@ -264,7 +264,7 @@ script:` · `" JAVA	script:"`), `<iframe> 제거 — srcdoc 안에 <script>paren
     - 옛 4건 이동: `main#app` · `h1` 문구 → QA-1(샘플 `section#card` · `h2` 구조 비교), `hidden:false` li · `disabled` → QA-1(`<button disabled>` 확인) + QA-A8(boolean 속성, Dev-20), 특수문자 `<p>` → QA-1(편집창에 `<p>&lt;b&gt; 😀</p>`를 쳐 미리보기에 글자로 보임, `<b>` 요소 없음) + QA-A1(Patch까지, Dev-20). 유지 3건(페이지를 연다 · 새로고침 · mobile 가로 스크롤)은 검사 대상만 새 화면으로 고침
     - 헬퍼 감시 확인: 임시 스펙으로 선언 없는 `alert('몰래')` → `선언하지 않은 dialog가 떴다`로 실패, `console.error('몰래 오류')` → `콘솔 error · pageerror가 있다`로 실패, 던진 `Error('boom')` → `pageerror: boom`으로 실패하는 것을 확인한 뒤 임시 스펙을 지움
     - QA-A4는 Patch 단계(Dev-15) 전이라 "편집창에 친 글(Patch 안 함) → 새로고침 → 초기 샘플 · 뒤로 무시"로 두었고, Dev-15가 같은 테스트에 "Patch 한 뒤"를 덧붙임
-    - 실행: `npx vitest run` 13 files · 334 passed (영향 없음), `npx tsc --noEmit` 오류 0
+    - 실행: `npx vitest run` 13 files · 334 passed (영향 없음), `npx tsc --noEmit` 오류 0, 커밋 9024c56
 
 - [x] **Dev-15** (`fixture` + `e2e`): Patch 버튼 흐름 — 편집창 글 → 테스트 영역 DOM 읽기 → diff → 실제 영역 반영 → 기록 [P1-23 ~ P1-25 · P1-32 · T-03 · T-04 · T-06 · T-07 · B1 · B2 · B7 · A2 · A3]
   - 의존: Dev-14
@@ -278,7 +278,7 @@ script:` · `" JAVA	script:"`), `<iframe> 제거 — srcdoc 안에 <script>paren
     - 테스트 이름: `QA-2 글자 하나를 고치고 Patch하면 그 글자만 바뀌고 MutationObserver 기록은 characterData 1건뿐이다` · `QA-3 속성 추가 · 수정 · 삭제를 Patch하면 실제 영역 속성이 같아지고 요소는 같은 참조다 (속성 순서는 비교하지 않는다)` · `QA-4 <ul> 끝에 <li>를 추가하고 Patch하면 <li>가 4개가 되고 앞 세 <li>는 같은 참조다` · `QA-5 가운데 <li>를 지우면 위치 비교라서 둘째 노드는 남고 셋째 노드가 지워진다 / 여러 개를 한꺼번에 지워도 맞다`(A2: 둘째 `<li>` `===` 유지 · 셋째 `isConnected` 거짓) · `QA-6 <ul>을 <ol>로 바꾸고 Patch하면 <ol>과 그 안의 <li>는 새 노드이고 주변 요소는 같은 참조다`(A3: `<li>` 세 개 `!==`) · `QA-7 글자 · 속성 · 삭제 · 추가 · 교체를 한꺼번에 Patch해도 실제 영역이 테스트 영역과 같다` · `QA-8 편집 없이 Patch를 누르면 실제 영역 DOM 변경이 0건이고 뒤로를 눌러도 아무 일 없다` · `QA-9 글자 하나와 class만 바꾸고 Patch하면 characterData 1건 + attributes 1건뿐이고 부모 · 형제는 같은 참조다` · `QA-10 편집 → Patch → 같은 편집창에서 다른 편집 → Patch해도 직전 반영 상태 기준으로 맞다`
     - `MutationObserver` 기록 개수: QA-2 = `characterData` 1 · `childList` 0 · `attributes` 0 · total 1, targets `['characterData:#text']`, 편집창 글이 Patch 직전 값 그대로(B1 · B7). QA-9 = `characterData` 1 · `attributes` 1 · `childList` 0 · total 2, targets `['attributes:p', 'characterData:#text']`(B2). QA-3에서 실제 영역 `<p>` 속성 순서 `['class','style','title']` vs 테스트 영역 `['title','class','style']`로 달라도 `structureOf`가 같다고 판정(A4)
     - QA-8의 "뒤로를 눌러도 아무 일 없다"는 뒤로 버튼이 Dev-18에서 연결되기 전에는 단순히 아무 일 없는 버튼이라 자명하게 통과한다. Dev-18 이후에도 같은 시나리오가 통과해야 "기록이 안 생김"의 증거가 된다(Dev-18 완료 때 재실행 필요)
-    - 실행: `npx tsc --noEmit` 오류 0
+    - 실행: `npx tsc --noEmit` 오류 0, 커밋 4cb6a8b
 
 - [x] **Dev-16** (`fixture` + `e2e`): Patch 때 검사 — `checkHtml`에 걸리면 alert로 "다시 작성해 주세요"를 알리고 Patch를 안 한다. 위험 코드 우회 · 삽입 요소 · 스타일 요소 포함 [§5 HTML 편집 · 오류 · 실행 가능한 HTML · §6.2 · P1-32 · B11 · B12 · C3 · C5]
   - 의존: Dev-10, Dev-15
@@ -293,7 +293,7 @@ script:` · `" JAVA	script:"`), `<iframe> 제거 — srcdoc 안에 <script>paren
     - 막힌 Patch 공통 확인(`patchBlocked`): 실제 영역 `MutationObserver` 기록 0건, 구조 그대로, 뒤로를 눌러도 그대로(기록이 안 늘어남 — 뒤로 연결(Dev-18) 이후 의미가 생김), 편집창 글 그대로. 요소 이름 확인: QA-29 `<iframe>` · `<object>` · `<embed>`, QA-32 `<style>` · `<link rel="stylesheet">`, QA-30 `javascript:`, QA-16 `onerror` · `script`
     - 테스트 이름: `QA-16 위험한 코드(on… 속성 · script · javascript:)를 넣고 Patch하면 [위험한 코드] alert로 막힌다` · `QA-17 </ul>을 지우고 Patch하면 [태그 짝] alert로 막힌다` · `QA-18 짝은 맞지만 브라우저가 고쳐 읽는 <p><div>x</div></p>를 Patch하면 [구조 불일치] alert로 막힌다` · `QA-19 <svg>를 넣고 Patch하면 [SVG 미지원] alert로 막힌다` · `QA-20 구조도 틀리고 닫는 태그도 빠진 글은 alert 한 번에 [태그 짝]과 [구조 불일치]가 함께 담긴다` · `QA-21 편집창에 위험한 코드를 쳐도(Patch 안 함) 코드가 실행되지 않고 미리보기에서는 빠진다` · `QA-29 <iframe srcdoc> · <object> · <embed>는 미리보기에서 빠지고 Patch는 [위험한 코드]로 막힌다` · `QA-30 javascript:를 문자 참조 · 앞 공백 · 대문자 · 탭으로 숨겨도 미리보기에서 빠지고 Patch는 막힌다`(`jav&#x61;script:` · `" JAVA	script:"`) · `QA-32 <style> · <link rel="stylesheet">는 미리보기에서 빠져 모양이 안 바뀌고 Patch는 [위험한 코드]로 막힌다`(`x.css` 요청 0건, 파랑 `rgb(0, 0, 255)` 안 됨)
     - 명세에 없어 판단한 세부: QA-16 · QA-21의 `<img src="x" …>`를 `<img src="data:," onerror=…>`로 썼다. `src="x"`는 미리보기가 이미지를 실제로 요청해 404가 되고 크로미움이 `console.error: Failed to load resource … 404`를 남겨 공통 콘솔 감시(A5)에 걸리기 때문이다(실제로 QA-21이 그 한 건으로 실패하는 것을 확인). 깨진 이미지라 `onerror`가 노리는 모양은 같고 네트워크 요청이 없다. 공통 감시는 약하게 만들지 않았다
-    - 실행: `npx tsc --noEmit` 오류 0
+    - 실행: `npx tsc --noEmit` 오류 0, 커밋 e04da24
 
 - [x] **Dev-17** (`fixture` + `e2e`): 페이지 보호 · 오류 복구 — 두 영역 안 링크 클릭 · 폼 제출은 기본 동작을 막고, Patch 도중 예외는 복구 뒤 `[Patch 오류]` alert [§5 · P1-19 · P1-32 · C2 · C4 · B13]
   - 의존: Dev-12, Dev-15, Dev-16 (`captureAlert` · alert 흐름)
@@ -306,7 +306,7 @@ script:` · `" JAVA	script:"`), `<iframe> 제거 — srcdoc 안에 <script>paren
     - 테스트(바깥 루프): 먼저 쓰고 미연결 상태에서 `npx playwright test e2e/phase1-guard.spec.ts -g "QA-31|QA-A12"` 4 failed 확인(QA-31: 링크 클릭이 막히지 않아 30s 시간 초과 — 페이지 이동 시도, QA-A12: `선언한 alert가 뜨지 않았다` + 콘솔 `Unhandled error: patch: 경로 [1,7,1,0]에 해당하는 노드가 DOM에 없습니다`) 뒤 구현. 구현 후 `npx playwright test e2e/phase1-guard.spec.ts` 22 passed (desktop 11 · mobile 11, QA-16~21 · 29 · 30 · 32 + QA-31 · QA-A12)
     - 테스트 이름: `QA-31 두 영역 안의 링크 클릭 · 폼 버튼 클릭에도 페이지가 이동하거나 새로고침되지 않는다`(테스트 영역 링크 · 폼 버튼, 실제 영역 링크 · 폼 버튼 4회 클릭 뒤 주소 그대로 · `window.__stay` 살아 있음 · `framenavigated` 0건 · 문서 이동 요청 0건 · 실제 영역 구조 그대로 · 편집창 글 그대로 · 콘솔 오류 없음) · `QA-A12 Patch 도중 예외가 나면 [Patch 오류] alert 뒤 실제 영역이 마지막 기록 상태로 복구되고 다시 Patch하면 성공한다`(실제 영역 `<ul>`을 `remove()`한 뒤 `<li>` · `<p>` 글자를 고쳐 Patch → alert `[Patch 오류]` · `되돌렸습니다`, `<p>` 글자 · `<ul>`이 마지막 기록(초기 샘플) 구조로 복구, 편집창 글 · 테스트 영역 그대로, 다시 Patch하면 성공 — 첫 실패가 기록을 앞으로 보냈다면 두 번째 diff가 비어 실패했을 것이라 "기록 그대로"의 간접 증거)
     - 미룬 것(이유): QA-31의 "클릭 뒤에도 뒤로가 동작해 기록이 살아 있다", QA-A12의 "뒤로 무시 · 다시 Patch 뒤 기록이 정확히 한 칸"은 뒤로 버튼이 Dev-18에서 연결되므로 **Dev-18이 같은 두 테스트에 덧붙여야 한다**(테스트 안 `// [AI Note]`에 표시해 둠). 그 외 C 항목(C2 · C4)은 미루지 않았다
-    - 전체 실행(Dev-14 ~ 17 끝): `npx vitest run` 13 files · 334 passed, `npx tsc --noEmit` 오류 0, `npx playwright test` 50 passed (render 10 · patch 18 · guard 22, desktop 25 · mobile 25), 끝난 뒤 5199 대기 중인 프로세스 없음
+    - 전체 실행(Dev-14 ~ 17 끝): `npx vitest run` 13 files · 334 passed, `npx tsc --noEmit` 오류 0, `npx playwright test` 50 passed (render 10 · patch 18 · guard 22, desktop 25 · mobile 25), 끝난 뒤 5199 대기 중인 프로세스 없음, 커밋 846a80a
 
 - [ ] **Dev-18** (`fixture` + `e2e`): 뒤로 · 앞으로 버튼 — 세 칸(편집창 · 테스트 영역 · 실제 영역)이 그 기록 상태로 [P1-26 ~ P1-30 · P1-32 · T-08 · B3]
   - 의존: Dev-13, Dev-15, Dev-17 (오류 알림 함수)
