@@ -153,7 +153,7 @@
     - B18: `<style> 안의 a > b · &는 이스케이프하지 않고 그대로 쓴다`, `<script> 안도 이스케이프하지 않는다`, `<textarea> 안은 이스케이프한다 (&gt; → 글자 > 로 읽힘) — 원문 글 요소와 대비`
     - B19: `글자 노드 "a" · "b"는 글 ab로 합쳐진다`, `왕복 비교는 인접 글자 노드를 합친 뒤 한다 (mergeAdjacentText)`(테스트 파일 안 도우미, 빈 글자 ""도 버림), `DOM에서 읽은 VNode에는 인접 글자 노드가 생기지 않는다`
     - 무작위 왕복 생성기는 이 Dev에서 쓰지 않음(손으로 쓴 왕복 케이스로 대신, 따라서 "생성기가 인접 글자 노드를 만들지 않는다"는 해당 없음)
-    - 실행: `npx vitest run` 8 files · 186 passed, `npx tsc --noEmit` 오류 0, 커밋: 아래 마지막 docs 커밋에서 기록
+    - 실행: `npx vitest run` 8 files · 186 passed, `npx tsc --noEmit` 오류 0, 커밋 f7858c2
 
 - [x] **Dev-8** (`react-dom-bindings`): `setAreaHtml` — 편집창 글을 위험한 것을 빼고 미리보기(테스트 영역)에 그린다 [P1-21 · P1-22 · §5 실행 가능한 HTML · C3 · C5 · B11 · B12]
   - 의존: Dev-1 (`renderAreaChildren`), Dev-2 (결과를 `readAreaChildren`으로 확인)
@@ -167,7 +167,7 @@
     - 테스트 이름: `javascript:를 숨긴 것(B12): 문자 참조 · 탭 · 줄바꿈 · 앞 공백 + 대문자 모두 href가 빠진다`(`jav&#x61;script:` · `&#106;avascript:` · `java	script:` · `java
 script:` · `" JAVA	script:"`), `<iframe> 제거 — srcdoc 안에 <script>parent.__pwned=1</script>가 있어도 영역에 안 남고 실행되지 않는다 (B11 · C3)`, `<iframe src> · <object> · <embed> 제거 (C3)`, `<style> 제거 (C5)`, `<link rel="stylesheet"> 제거 — rel="Stylesheet" · "alternate stylesheet" 포함 (C5)`, `<link rel="icon"> 등 다른 rel은 그대로 둔다 (C5)`, `글을 <template>로 파싱한 뒤 옮기므로 파싱 중에 코드가 실행되지 않는다 (<img onerror>)`, `javascript: 주소 제거 — %s on <%s>`(href · src · action · formaction, 앞 공백 · 제어문자 포함 6건), on… 속성(대소문자 섞어도) · `<script>` 제거 · 나머지 속성 · 구조 · 공백 · 주석 · 인라인 style 보존 · 빈 글 · 영역 상자 그대로 · 다시 호출 · 특수문자
     - 한계(숨기지 않고 기록): 이 jsdom 설정은 인라인 핸들러 · 스크립트를 실제로 실행하지 않는다(처음에 "innerHTML로 바로 넣으면 `onclick`이 돈다"는 대조 테스트를 넣었더니 실행이 안 돼 실패 → 그 대조 테스트와 `click()` 호출은 뺌). 그래서 `window.__pwned` 미정의 확인은 보조이고, 핵심 확인은 "영역에 그 요소 · 속성이 남지 않았다"이다. 실제 브라우저에서 코드가 안 도는지는 e2e(Dev-16 QA-29 · QA-30)가 본다
-    - 실행: `npx vitest run` 10 files · 220 passed, `npx tsc --noEmit` 오류 0, 커밋: 아래 마지막 docs 커밋에서 기록
+    - 실행: `npx vitest run` 10 files · 220 passed, `npx tsc --noEmit` 오류 0, 커밋 090b2b6
 
 - [x] **Dev-9** (`react-dom-bindings`): `checkHtml` 1 — 위험 코드 · SVG · 알림 글 만들기 [§5 실행 가능한 HTML · §5 HTML 범위(SVG 미지원) · §6.2 지원하지 않는 입력 · C3 · C5 · B11 · B12]
   - 의존: Dev-8 (`scanDangerous`)
@@ -183,7 +183,7 @@ script:` · `" JAVA	script:"`), `<iframe> 제거 — srcdoc 안에 <script>paren
 다시 작성해 주세요."`. `[위험한 코드]` · `[SVG 미지원]` 조합 예: `[위험한 코드] <iframe> 요소` / `[SVG 미지원] <svg> 요소는 지원하지 않습니다.` / `다시 작성해 주세요.`
     - 말머리 5종(`[위험한 코드]` · `[태그 짝]` · `[구조 불일치]` · `[SVG 미지원]` · `[Patch 오류]`)은 `PROBLEM_LABELS`로 테스트(`말머리 5종: …`). `[Patch 오류]`(`PATCH_ERROR`)만 있으면 "다시 작성해 주세요." 줄을 붙이지 않는다(Dev-17이 자체 안내 "실제 영역을 마지막 기록 상태로 되돌렸습니다"를 message에 담는 전제)
     - 짝(`UNPAIRED`) · 구조(`STRUCTURE`) 검사는 Dev-10 몫이라 이 Dev의 `checkHtml`은 아직 내지 않는다(타입 · 말머리만 준비)
-    - 실행: `npx vitest run` 11 files · 239 passed, `npx tsc --noEmit` 오류 0, 커밋: 아래 마지막 docs 커밋에서 기록
+    - 실행: `npx vitest run` 11 files · 239 passed, `npx tsc --noEmit` 오류 0, 커밋 443ca67
 
 - [x] **Dev-10** (`react-dom-bindings`): `checkHtml` 2 — 태그 짝 검사 + 구조 비교(`tbody` 자동 추가만 예외) [§5 HTML 편집 · 오류 · §6.2 지원하지 않는 입력과 오류 복구 · C1 · B14 · B15 · B16]
   - 의존: Dev-9, Dev-7 (`vnodesToHtml` 결과가 항상 통과하는지 확인)
@@ -199,7 +199,7 @@ script:` · `" JAVA	script:"`), `<iframe> 제거 — srcdoc 안에 <script>paren
     - B14: `B14: 글자 안의 `<`(`1 < 2` · `x <= y`)는 태그로 세지 않아 []` (`a <> b, a<3, x<=y, 끝 <` · `<p>1 < 2 && 3 > 2</p>` 포함) / B15: `B15: 대소문자 섞인 짝 …` (`<DIV>글</div>` · `<Ul><LI>가</li></uL>`) / B16: `B16: <textarea> 안의 `</div>` 같은 글은 짝 검사에서 무시 → []`, `B16: <title> 안의 `</div>`도 무시 (RCDATA)`, `B16: <style> · <script> 안의 `</div>`는 UNPAIRED 오탐 없이 DANGEROUS만 나온다 (페이지에서는 C5 · 위험 코드로 막힘)`, `htmlScan (분석기 견고성)` 안의 `B16 (분석기 견고성): <style> 안의 `</div>`는 짝으로 세지 않고 요소는 잎으로 남는다 — 페이지에서는 <style>이 C5로 막혀 이 테스트로만 확인`
     - 알림 글 예시 (실제 출력): `<div><p>글</div>` → `[태그 짝] <p> 태그가 닫히지 않았습니다 (</div>를 먼저 만났습니다).` / `다시 작성해 주세요.`; `<p><div>x</div></p><b>` → `[태그 짝] <b> 태그가 닫히지 않았습니다.` / `[구조 불일치] 최상위에서 입력한 구조(<p><div></div></p><b></b>)와 브라우저가 읽은 구조(<p></p><div></div><p></p><b></b>)가 다릅니다.` / `다시 작성해 주세요.`; `<table><td>1</td></table>` → `[구조 불일치] <table> 안에서 입력한 구조(<td></td>)와 브라우저가 읽은 구조(<tr><td></td></tr>)가 다릅니다.`
     - 명세에 없어 판단한 세부(검수 확인 요청): ① 선택적 닫는 태그(`<li>` · `<p>` · `<td>` 생략)도 엄격히 짝 문제로 본다(명세 예 `<div><p>글</div>` 따름) ② `a<b`처럼 `<` 바로 뒤가 글자면 HTML 표준대로 태그로 본다(dev_todo의 "`a<b` 뒤에 공백"은 `a < b`로 읽고 테스트 — 글자 바로 붙은 `a<b`는 태그가 맞아 `>`가 없으면 UNPAIRED로 알림) ③ `>`로 닫히지 않은 태그는 브라우저가 글째 버려 글이 사라지므로 UNPAIRED로 알림 ④ 짝 문제 줄은 5줄까지 + "그 밖에 N건" ⑤ 구조 문제는 처음 다른 곳 한 줄만 ⑥ SVG 안 `/>`는 자기 닫는 태그로 봐서 짝 오탐을 막음 ⑦ `<meta http-equiv=refresh>` · `<base>` 등 위험 목록(C3 · C5)에 없는 요소는 막지 않음
-    - 실행: `npx vitest run` 11 files · 279 passed, `npx tsc --noEmit` 오류 0, 커밋: 아래 마지막 docs 커밋에서 기록
+    - 실행: `npx vitest run` 11 files · 279 passed, `npx tsc --noEmit` 오류 0, 커밋 4a0e885
 
 - [ ] **Dev-11** (`react-dom`): `History` — 양방향 연결 리스트 (초기 0번 · 갈림길 끊기 · 경계 무시 · 한도 50) [P1-26 · P1-27 · T-08 · §3.3 · B17]
   - 의존: 없음 (타입만. 데이터 구조라 DOM 없음)
