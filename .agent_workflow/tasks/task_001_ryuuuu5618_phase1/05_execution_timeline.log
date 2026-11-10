@@ -55,3 +55,4 @@
 2026-11-11T04:20 | stage=3 | agent=master | round=- | signal=PASS_PENDING_HUMAN | QA 96 passed (desktop 48 · mobile 48, 시나리오 45개), 캡처 12장 사용자에게 보냄, 서버 남음 5199 PID 46868(vite) 종료 승인 대기
 2026-11-11T04:27 | stage=3 | agent=master | round=- | signal=PASS | 사용자 캡처 확인 완료, 5199 서버 승인 후 종료 → 3단계 통과
 2026-11-11T04:27 | stage=마무리 | agent=master | round=- | signal=PR_DRAFT | 4단계 위키는 가벼운 모드라 발표 전으로 미룸, 07_pr_body.md 초안, main 병합 승인 대기
+2026-11-11T04:28 | stage=마무리 | agent=master | round=- | signal=MERGED | 사용자 승인 후 main에 --no-ff 병합 74c82c5 (로컬, push 없음), main에서 vitest 432 · tsc 0 확인. task_001 끝

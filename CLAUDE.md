@@ -56,7 +56,7 @@
 ## 내 설계 결정 (PRD §2.2 개인 선택, 정해지면 채운다)
 > `/mini-react-kit:agent-workflow` 0단계에서 후보와 장단점을 보고 고른다. 여기 적힌 결정은 다시 묻지 않는다. 발표 README의 §9 「설계 선택」 · 「정책 차이」 재료가 된다.
 
-> 확정한 task와 이유(내 말 그대로)는 `.agent_workflow/tasks/task_001_ryuuuu5618_phase1/01_request_spec.md` 「알고리즘 결정」에 있다.
+> 확정한 task와 이유(내 말 그대로)는 `.agent_workflow/tasks/task_001_ryuuuu5618_phase1/01_request_spec.md` · `task_002_ryuuuu5618_phase2/01_request_spec.md` 「알고리즘 결정」에 있다.
 
 **알고리즘 · 내부 표현** (task_001, 2026-11-11)
 - 텍스트 노드 표현: TEXT 노드 객체 `{ type: '#text', props: { nodeValue }, children: [] }` (알고리즘 결정 1 B)
@@ -66,15 +66,17 @@
 - 공백 텍스트 노드: 공백 · 주석 모두 VNode로 남김 → VNode 번호 = DOM childNodes 번호 (알고리즘 결정 5 B + 주석 유지)
 - 테스트 영역 수정 방식 (편집 UI): HTML 편집창 + 미리보기(테스트 영역) (알고리즘 결정 6 A)
 - State History 저장: 기록마다 VNode 스냅샷 · patch · 역패치 (알고리즘 결정 7 B + VNode). 양방향 연결 리스트. 뒤로 · 앞으로 = 실제 영역은 역패치(이미 역순) 적용, 테스트 영역 · 편집창은 스냅샷으로
-- Key 출처: Phase 1 검증 페이지는 key 없음. Key 엔진은 단위 테스트로 검증, 화면 시연은 Phase 2 앱의 데이터 id
+- Key 출처: Phase 1 검증 페이지는 key 없음. Key 엔진은 단위 테스트로 검증, 화면 시연은 Phase 2 검증 페이지 목록의 항목 id (`todo-1` …, 지운 번호 재사용 안 함)
 - Diff 시각화 (확장): 스위치(기본 꺼짐), 켜면 Patch · 뒤로 · 앞으로 때 바뀐 노드만 실제 영역 위 오버레이에서 깜빡임 (실제 DOM은 건드리지 않음)
-- 이벤트 props 처리: (phase2에서 정함)
-- 재렌더 시점 (동기 / 비동기, Batching 여부): (phase2에서 정함. Batching은 phase2 확장)
+**알고리즘 · 내부 표현** (task_002, 2026-11-11)
+- 이벤트 props 처리: 리스너 하나 + 핸들러 교체 (알고리즘 결정 8 B). 요소마다 이벤트 이름당 리스너를 처음 한 번만 등록, 핸들러는 요소 자신에 저장하고 다시 렌더할 때는 핸들러만 바꿈. 이름이 `on` + 대문자이고 값이 함수면 이벤트 (`onClick` → `click`)
+- 재렌더 시점: 즉시 동기 (알고리즘 결정 9 A) — setter를 부르면 바로 렌더 + diff + patch. Batching은 시간이 남으면 확장으로 B(`queueMicrotask`) 승격
+- 자식 컴포넌트: diff 전에 그 자리에서 실행해 결과 요소로 풀어 둠. diff · patch는 요소 · 글자만 봄. 이전 VNode는 `mount()` · `update()` 때 만든 VNode 자체를 저장 (DOM에서 다시 읽지 않음)
 
 **정책 (PRD §3.3 · §4.2 · §4.3 · §5)**
 - 이력: 초기 모습 = 0번 기록(뒤로가기의 바닥) · 무변경 Patch는 기록 안 함 · 뒤로 간 뒤 새 Patch면 앞쪽 기록 버림 · 처음 · 끝에서 누르면 무시 · 이동 때 미저장 편집은 버림(편집창 · 테스트 영역 · 실제 영역 모두 그 기록으로) · 보관 한도 50, 넘으면 가장 오래된 기록부터 뺌
-- Hook: (phase2에서 정함)
-- 지원 범위: 영역 상자 = 보이지 않는 감싸개(최상위 여러 개 · 0개 허용) · 공백 · 주석 유지 · **SVG 미지원**(Patch 때 막음) · boolean 속성 = 보통 속성(값 `""`, 추가 · 삭제) · style = 항목별 비교 · VNode 입력은 `h()` 기존 동작(phase2에서 확인) · 이벤트 · DOM 프로퍼티는 phase2 · 실행 가능한 HTML = 미리보기에서 `on…` · `<script>` · `javascript:` · `<iframe>` · `<object>` · `<embed>` · `<style>` · `<link rel="stylesheet">` · `<meta http-equiv="refresh">` · `<base>` 제거 + Patch 때 검사해서 막음 · 오류 = Patch 때 태그 짝 검사 + 구조 비교(`tbody` 자동 추가만 허용), 문제면 alert로 막고 실제 영역 · 기록은 그대로. Patch 도중 예외면 기록은 그대로, 실제 영역을 마지막 기록 VNode로 다시 그린 뒤 alert · 검증 페이지: 두 영역 안 링크 클릭 · 폼 제출은 기본 동작을 막음
+- Hook: `hooks` 배열에 부른 순서대로(렌더마다 0번부터) · `if` · `for` 안 Hook 금지 + Hook 개수가 달라지면 오류 · 자식 실행 중 Hook 호출은 오류 · 같은 값 setter(`Object.is`)는 다시 그리지 않음 · 함수형 setter · 지연 초기화 지원 · effect는 patch 직후 실행, 의존성 생략 = 매 렌더 · `[]` = 처음 한 번 · 변경 시(항목별 `Object.is`, 길이가 다르면 변경) · cleanup은 다시 실행 직전과 `unmount()` 때 · 렌더가 연달아 50번 넘으면 오류 · memo는 같은 의존성이면 재사용, 생략하면 매 렌더 재계산
+- 지원 범위: 영역 상자 = 보이지 않는 감싸개(최상위 여러 개 · 0개 허용) · 공백 · 주석 유지 · **SVG 미지원**(Patch 때 막음) · boolean 속성 = 보통 속성(값 `""`, 추가 · 삭제) · style = 항목별 비교 · VNode 입력: 숫자 · 문자열 → 글자 노드, `null` · `undefined` · boolean 무시, 배열 펼침, `key`는 props에서 꺼냄 · 이벤트 = `click` · `input`, 핸들러가 빠지면 핸들러만 비우고 리스너는 남김(눌러도 아무 일 없음) · DOM 프로퍼티 = `value` · `checked`만, 프로퍼티로 넣고 실제 값과 다를 때만(커서 유지) · 입력창은 다시 만들지 않고 그 자리에서 고침(포커스 유지) · 숫자 칸 빈칸 · 글자면 상태 그대로 · 실행 가능한 HTML = 미리보기에서 `on…` · `<script>` · `javascript:` · `<iframe>` · `<object>` · `<embed>` · `<style>` · `<link rel="stylesheet">` · `<meta http-equiv="refresh">` · `<base>` 제거 + Patch 때 검사해서 막음 · 오류 = Patch 때 태그 짝 검사 + 구조 비교(`tbody` 자동 추가만 허용), 문제면 alert로 막고 실제 영역 · 기록은 그대로. Patch 도중 예외면 기록은 그대로, 실제 영역을 마지막 기록 VNode로 다시 그린 뒤 alert · 검증 페이지: 두 영역 안 링크 클릭 · 폼 제출은 기본 동작을 막음
 
 ## 에이전트 워크플로
 - 시작: `/mini-react-kit:agent-workflow`. 메인 세션이 마스터, `mr-worker`(Sonnet)가 기획 · 개발, `mr-reviewer`(Opus, 읽기 전용)가 검수하고, `mr-qa`(Sonnet)가 `e2e/`를 실행해 캡처를 남기고, `mr-wiki`(Haiku)가 `wiki/` · `README.md` 발표 섹션을 정리한다.
