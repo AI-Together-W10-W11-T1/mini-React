@@ -1,7 +1,17 @@
 import { diff, invertPatches } from '@mini-react/react-reconciler';
 import { patch, readAreaChildren, renderAreaChildren } from '@mini-react/react-dom-bindings';
+import type { PatchObserver } from '@mini-react/react-dom-bindings';
 import type { AreaChildren, Patch } from '@mini-react/shared';
 import { History } from './history';
+
+export interface CreateVDomRootOptions {
+  /**
+   * Diff 시각화(확장)용 관찰 콜백. `update` · `back` · `forward`가 실제 영역에 patch를 하나 적용할 때마다
+   * `{ patch, node, stage }`로 불린다 (REMOVE는 지우기 직전 `before`, 나머지는 적용 직후 `after`).
+   * 무변경 `update` · 경계 이동처럼 patch가 없으면 불리지 않고, 예외 복구(C2)의 다시 그리기도 알리지 않는다.
+   */
+  onPatch?: PatchObserver;
+}
 
 export interface VDomRoot {
   /** 지금(current) 기록의 VNode. 테스트 영역 · 편집창 · 다음 Patch의 기준 */
@@ -25,7 +35,8 @@ export interface VDomRoot {
 // [AI Note]: react-dom은 DOM을 직접 만지지 않는다. DOM 접근은 전부 react-dom-bindings(readAreaChildren · patch · renderAreaChildren)를 거친다.
 // 만들 때 실제 영역을 딱 한 번 읽어 0번 기록으로 삼고(P1-20), 그 뒤 diff 기준은 항상 History에 저장한 VNode다.
 // 실제 영역 DOM을 다시 읽어 비교하면 P1-33("두 VNode를 비교")을 어기고, 바깥에서 고친 DOM에 기준이 흔들린다.
-export function createVDomRoot(realArea: Element): VDomRoot {
+export function createVDomRoot(realArea: Element, options: CreateVDomRootOptions = {}): VDomRoot {
+  const { onPatch } = options;
   const history = new History({ snapshot: readAreaChildren(realArea), patches: [], inverse: [] });
 
   // [AI Note]: C2 복구 경로 한 개. 영역을 통째로 다시 그리는 것은 정상 갱신에서는 금지(P1-24 · P1-34)이고,
@@ -34,7 +45,8 @@ export function createVDomRoot(realArea: Element): VDomRoot {
   // update · back · forward가 모두 이 함수를 지나므로, 기록(current)은 patch가 성공한 뒤에만 움직이고 실패하면 건드리지 않는다.
   function applyOrRecover(patches: readonly Patch[]): void {
     try {
-      patch(realArea, patches);
+      // [AI Note]: 세 동작(update · back · forward)이 모두 이 함수를 지나므로 관찰 콜백도 여기 한 곳에서 전달한다 (Diff 시각화).
+      patch(realArea, patches, onPatch);
     } catch (error) {
       renderAreaChildren(realArea, history.current.entry.snapshot);
       throw error;

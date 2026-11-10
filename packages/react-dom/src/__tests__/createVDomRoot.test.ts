@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { createVDomRoot } from '../createVDomRoot';
+import { diff } from '@mini-react/react-reconciler';
 import { readAreaChildren } from '@mini-react/react-dom-bindings';
 import type { AreaChildren } from '@mini-react/shared';
 
@@ -472,5 +473,103 @@ describe('createVDomRoot.back · forward — 이동 도중 예외 복구 (C2)', 
     expect(root.forward()).toBe(snaps[2]);
     expect(area.innerHTML).toBe(states[2]);
     expect(root.forward()).toBeNull();
+  });
+});
+
+// Diff 시각화 확장: options.onPatch가 update · back · forward의 patch마다 불린다
+describe('createVDomRoot — onPatch 관찰 콜백 (Diff 시각화)', () => {
+  type Seen = { kind: string; stage: 'before' | 'after' };
+
+  function watched(startHtml: string) {
+    const area = box(startHtml);
+    document.body.appendChild(area);
+    const seen: Seen[] = [];
+    const root = createVDomRoot(area, { onPatch: (e) => seen.push({ kind: e.patch.kind, stage: e.stage }) });
+    return { area, root, seen };
+  }
+
+  it('update: diff가 만든 patch 수만큼 콜백이 불리고, 불리는 patch가 기록의 patches와 같다', () => {
+    const { area, root, seen } = watched('<p>안녕</p><ul><li>1</li></ul>');
+    const next = parse('<p>잘가</p><ul><li>1</li><li>2</li></ul>');
+    const patches = diff(root.snapshot(), next);
+    expect(root.update(next)).toBe(true);
+    expect(seen).toHaveLength(patches.length);
+    expect(seen.map((s) => s.kind)).toEqual(patches.map((p) => p.kind));
+    area.remove();
+  });
+
+  it('back · forward: 각각 저장해 둔 inverse · patches 개수만큼 불린다', () => {
+    const { area, root, seen } = watched('<p>a</p>');
+    const s1 = parse('<p>b</p><ul><li>1</li></ul>');
+    root.update(s1);
+    const patchCount = seen.length;
+    expect(patchCount).toBeGreaterThan(0);
+
+    seen.length = 0;
+    root.back();
+    expect(seen).toHaveLength(patchCount); // 역패치 개수 = 패치 개수 (전후 뒤집기)
+    expect(area.innerHTML).toBe('<p>a</p>');
+
+    seen.length = 0;
+    root.forward();
+    expect(seen).toHaveLength(patchCount);
+    expect(area.innerHTML).toBe('<p>b</p><ul><li>1</li></ul>');
+    area.remove();
+  });
+
+  it('REMOVE는 before, 나머지는 after로 불린다 (update · back · forward 모두)', () => {
+    const { area, root, seen } = watched('<ul><li>1</li><li>2</li></ul>');
+    root.update(parse('<ul><li>1</li></ul>')); // REMOVE
+    expect(seen).toEqual([{ kind: 'REMOVE', stage: 'before' }]);
+    seen.length = 0;
+    root.back(); // 역패치 = INSERT
+    expect(seen).toEqual([{ kind: 'INSERT', stage: 'after' }]);
+    seen.length = 0;
+    root.forward(); // REMOVE
+    expect(seen).toEqual([{ kind: 'REMOVE', stage: 'before' }]);
+    area.remove();
+  });
+
+  it('무변경 update · 경계 이동(처음에서 뒤로 · 끝에서 앞으로)에서는 콜백이 불리지 않는다', () => {
+    const { area, root, seen } = watched('<p>a</p>');
+    expect(root.update(parse('<p>a</p>'))).toBe(false);
+    expect(root.back()).toBeNull();
+    expect(root.forward()).toBeNull();
+    expect(seen).toHaveLength(0);
+    area.remove();
+  });
+
+  it('콜백을 넘겨도 실제 영역 DOM 변경(MutationObserver 기록)은 콜백 없을 때와 같다', () => {
+    const run = (withCallback: boolean): string[] => {
+      const area = box('<p class="a">안녕</p><ul><li>1</li><li>2</li></ul>');
+      const root = withCallback ? createVDomRoot(area, { onPatch: () => {} }) : createVDomRoot(area);
+      const mo = observe(area);
+      root.update(parse('<p class="b">잘가</p><ul><li>1</li></ul>'));
+      root.back();
+      root.forward();
+      return mo.takeRecords().map((r) => `${r.type}:${r.target.nodeName}:${r.attributeName ?? ''}:${r.addedNodes.length}:${r.removedNodes.length}`);
+    };
+    expect(run(true)).toEqual(run(false));
+    expect(run(false).length).toBeGreaterThan(0);
+  });
+
+  it('options 없이 · onPatch 없이 만들어도 기존처럼 동작한다', () => {
+    const area = box('<p>a</p>');
+    const root = createVDomRoot(area, {});
+    root.update(parse('<p>b</p>'));
+    expect(area.innerHTML).toBe('<p>b</p>');
+    expect(root.back()).not.toBeNull();
+    expect(area.innerHTML).toBe('<p>a</p>');
+  });
+
+  it('patch 도중 예외로 복구할 때는 콜백을 부르지 않는다 (복구 다시 그리기는 깜빡일 변경이 아님)', () => {
+    const { area, root, seen } = watched('<p>a</p>');
+    root.update(parse('<p>b</p>'));
+    seen.length = 0;
+    area.replaceChildren();
+    expect(() => root.back()).toThrow(/patch: 경로/);
+    expect(seen).toHaveLength(0);
+    expect(area.innerHTML).toBe('<p>b</p>');
+    area.remove();
   });
 });

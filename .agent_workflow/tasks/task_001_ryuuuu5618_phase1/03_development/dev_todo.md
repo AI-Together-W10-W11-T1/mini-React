@@ -411,12 +411,17 @@ script:` · `" JAVA	script:"`), `<iframe> 제거 — srcdoc 안에 <script>paren
     - 실행: `npx vitest run packages/react-dom-bindings` 8 files · 233 passed(`patch.test.ts` 50건 전부 통과), `npx tsc --noEmit` 오류 0
     - 커밋: (아래 docs 커밋에서 기록)
 
-- [ ] **Dev-25** (`react-dom`): `createVDomRoot`가 `update` · `back` · `forward`의 patch에 같은 콜백을 전달한다 [Diff 시각화 확장]
+- [x] **Dev-25** (`react-dom`): `createVDomRoot`가 `update` · `back` · `forward`의 patch에 같은 콜백을 전달한다 [Diff 시각화 확장]
   - 의존: Dev-24, Dev-13
   - 만들 · 고칠 파일: `packages/react-dom/src/createVDomRoot.ts`(`options.onPatch`를 `patch(…, observer)`에 그대로 전달)
   - 테스트: `packages/react-dom/src/__tests__/createVDomRoot.test.ts`(추가) — `update` · `back` · `forward` 각각에서 콜백이 해당 patch 수만큼 불림(역패치는 `inverse` 개수), 무변경 `update` · 경계 이동에서는 불리지 않음, 콜백을 안 줘도 기존 테스트 통과
   - 알고리즘: 해당 없음
   - 완료 근거로 남길 것: `createVDomRoot.test.ts` 통과 개수
+  - **완료 근거 (Evidence)**:
+    - 만든 · 고친 파일: `packages/react-dom/src/createVDomRoot.ts`(`CreateVDomRootOptions { onPatch?: PatchObserver }`, `createVDomRoot(realArea, options = {})`, `applyOrRecover`가 `patch(realArea, patches, onPatch)`로 전달 — `update` · `back` · `forward`가 모두 이 한 곳을 지남), `packages/react-dom/src/index.ts`(`CreateVDomRootOptions` 타입 내보내기)
+    - 테스트: `packages/react-dom/src/__tests__/createVDomRoot.test.ts`에 `createVDomRoot — onPatch 관찰 콜백 (Diff 시각화)` 7건 추가 — `update: diff가 만든 patch 수만큼…`, `back · forward: 각각 저장해 둔 inverse · patches 개수만큼 불린다`, `REMOVE는 before, 나머지는 after로 불린다 (update · back · forward 모두)`, `무변경 update · 경계 이동…에서는 콜백이 불리지 않는다`, `콜백을 넘겨도 실제 영역 DOM 변경(MutationObserver 기록)은 콜백 없을 때와 같다`, `options 없이 · onPatch 없이 만들어도 기존처럼 동작한다`, `patch 도중 예외로 복구할 때는 콜백을 부르지 않는다`. 구현 전 3건 실패(나머지는 옵션 무시로 우연히 통과)를 확인한 뒤 구현
+    - 실행: `npx vitest run packages/react-dom/src/__tests__/createVDomRoot.test.ts` 44 passed(기존 37 + 7), `npx tsc --noEmit` 오류 0
+    - 커밋: (아래 docs 커밋에서 기록)
 
 - [ ] **Dev-26** (`fixture` + `e2e`): [시각화 켜기] 스위치(기본 꺼짐) + 오버레이 깜빡임 — Patch · 뒤로 · 앞으로 [Diff 시각화 확장 · A1]
   - 의존: Dev-25, Dev-18
