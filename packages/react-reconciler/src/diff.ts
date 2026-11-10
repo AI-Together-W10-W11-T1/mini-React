@@ -1,5 +1,5 @@
 import { COMMENT_NODE, TEXT_NODE } from '@mini-react/shared';
-import type { AreaChildren, EventHandler, Key, Patch, Path, StyleMap, VNode } from '@mini-react/shared';
+import type { AreaChildren, DomPropName, DomPropValue, EventHandler, Key, Patch, Path, StyleMap, VNode } from '@mini-react/shared';
 
 // [AI Note]: 이전 · 새 VNode 두 개만 비교해 "고칠 일 목록"을 만든다 (P1-33 — 실제 DOM을 다시 읽지 않는다).
 // DOM을 전혀 모른다. 한 줄 = 종류 · 경로 · 전 · 후 (알고리즘 결정 3 A). 경로는 영역 상자 안 자식부터 (결정 4 A).
@@ -98,6 +98,7 @@ function diffNode(oldNode: VNode, newNode: VNode, path: Path, out: Patch[]): voi
   }
   diffAttrs(oldNode, newNode, path, out);
   diffStyle(oldNode, newNode, path, out);
+  diffProps(oldNode, newNode, path, out);
   diffEvents(oldNode, newNode, path, out);
   diffChildren(oldNode.children, newNode.children, path, out);
 }
@@ -108,6 +109,7 @@ function readAttrs(node: VNode): Map<string, string> {
   const attrs = new Map<string, string>();
   for (const [name, value] of Object.entries(node.props)) {
     if (name === 'style' && isStyleMap(value)) continue;
+    if (isDomPropName(name)) continue; // value · checked는 속성이 아니라 DOM 프로퍼티 (diffProps)
     if (typeof value === 'string') attrs.set(name, value);
     else if (typeof value === 'number') attrs.set(name, String(value));
     else if (value === true) attrs.set(name, '');
@@ -174,5 +176,32 @@ function diffEvents(oldNode: VNode, newNode: VNode, path: Path, out: Patch[]): v
   }
   for (const [event, newHandler] of after) {
     if (!before.has(event)) out.push({ kind: 'SET_EVENT', path, event, before: null, after: newHandler });
+  }
+}
+
+// [AI Note]: DOM 프로퍼티 (Phase 2, 정책 「§4.3 DOM 프로퍼티」). `value` · `checked`는 속성(SET_ATTR)이 아니라 SET_PROP 한 줄로 비교한다.
+// 입력창은 사용자가 타이핑하면 속성이 아니라 프로퍼티가 바뀌므로, patch가 프로퍼티로 넣는다 (실제 값과 다를 때만 — 커서 유지, Dev-5 · 6).
+// 정규화: value = 문자열 · 숫자(→ 문자열), checked = true · "" → true / false → false, 나머지는 props에 없는 것. null = props에 없음.
+function isDomPropName(name: string): name is DomPropName {
+  return name === 'value' || name === 'checked';
+}
+
+function readDomProps(node: VNode): Map<DomPropName, DomPropValue> {
+  const props = new Map<DomPropName, DomPropValue>();
+  const { value, checked } = node.props as { value?: unknown; checked?: unknown };
+  if (typeof value === 'string') props.set('value', value);
+  else if (typeof value === 'number') props.set('value', String(value));
+  if (checked === true || checked === '') props.set('checked', true);
+  else if (checked === false) props.set('checked', false);
+  return props;
+}
+
+function diffProps(oldNode: VNode, newNode: VNode, path: Path, out: Patch[]): void {
+  const before = readDomProps(oldNode);
+  const after = readDomProps(newNode);
+  for (const name of ['value', 'checked'] as const) {
+    const oldValue = before.get(name) ?? null;
+    const newValue = after.get(name) ?? null;
+    if (oldValue !== newValue) out.push({ kind: 'SET_PROP', path, name, before: oldValue, after: newValue });
   }
 }

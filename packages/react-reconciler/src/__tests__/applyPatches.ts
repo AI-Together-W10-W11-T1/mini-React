@@ -110,7 +110,14 @@ export function normalizeTree(list: AreaChildren): AreaChildren {
     // [AI Note]: 쌍을 모아 fromEntries로 만든다 — `__proto__` 속성 이름도 보통 항목으로 남긴다 (검수 2회차 B-1).
     const entries: Array<[string, unknown]> = [];
     for (const [name, value] of Object.entries(node.props)) {
-      if (name === 'style' && typeof value === 'object' && value !== null) entries.push([name, value]);
+      // value · checked는 diff의 diffProps와 같은 규칙: value = 문자열 · 숫자(→ 문자열), checked = true · "" → true, false → false, 나머지는 없음
+      if (name === 'value') {
+        if (typeof value === 'string') entries.push([name, value]);
+        else if (typeof value === 'number') entries.push([name, String(value)]);
+      } else if (name === 'checked') {
+        if (value === true || value === '') entries.push([name, true]);
+        else if (value === false) entries.push([name, false]);
+      } else if (name === 'style' && typeof value === 'object' && value !== null) entries.push([name, value]);
       else if (typeof value === 'string') entries.push([name, value]);
       else if (typeof value === 'number') entries.push([name, String(value)]);
       else if (value === true) entries.push([name, '']);
