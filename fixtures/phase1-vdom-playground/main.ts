@@ -1,6 +1,7 @@
 import { createVDomRoot } from '@mini-react/react-dom';
 import type { AreaChildren } from '@mini-react/shared';
 import { createOverlay } from './overlay';
+import { patchErrorMessage } from './patchErrorMessage';
 import { checkHtml, formatProblems, readAreaChildren, renderAreaChildren, setAreaHtml, vnodesToHtml } from '@mini-react/react-dom-bindings';
 
 // [AI Note]: 엔진 로직 없음. 패키지 공개 API만 이어 붙이는 연결 코드다.
@@ -53,15 +54,7 @@ byTestId<HTMLButtonElement>('btn-patch').addEventListener('click', () => {
 // [AI Note]: Patch · 뒤로 · 앞으로 도중 예외(C2). react-dom이 이미 기록을 그대로 두고 실제 영역을 마지막 기록 모습으로 다시 그린 뒤
 // 원래 예외를 던져 준다. 페이지는 그 예외를 잡아 alert로만 알린다 — 편집창 글 · 테스트 영역은 그대로 둬서 다시 해 볼 수 있다.
 function reportPatchError(error: unknown, doing = 'Patch를 적용하는 중'): void {
-  const detail = error instanceof Error ? error.message : String(error);
-  alert(
-    formatProblems([
-      {
-        kind: 'PATCH_ERROR',
-        message: `${doing} 오류가 났습니다 (${detail}). 실제 영역을 마지막 기록 상태로 되돌렸습니다. 다시 작성해 주세요.`,
-      },
-    ]),
-  );
+  alert(formatProblems([{ kind: 'PATCH_ERROR', message: patchErrorMessage(error, doing) }]));
 }
 
 // [AI Note]: 뒤로 · 앞으로 (P1-28 ~ P1-30). 실제 영역은 root가 역패치 · patch로 바꾸고, 돌려받은 스냅샷(VNode)으로
