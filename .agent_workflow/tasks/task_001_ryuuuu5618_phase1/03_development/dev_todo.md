@@ -366,7 +366,7 @@ script:` · `" JAVA	script:"`), `<iframe> 제거 — srcdoc 안에 <script>paren
     - 무작위 200쌍: `고정 씨앗 200쌍: applyPatches(old, diff) = new, 역패치로 old 복원, key 순서 일치`(씨앗 20261111, 12개 key 풀에서 부분집합 · 섞기, 같은 key의 내용 · 속성 · 태그 변경 섞임, MOVE가 합계 200개 넘게 나왔는지도 확인)
     - 기존 테스트 변경 1건: `diff.test.ts`의 `key는 props가 아니라 비교하지 않는다`는 "모든 자식에 key가 있는 목록"이 이제 key 비교로 가서(key 1 → 2는 REMOVE + INSERT) 그대로는 성립하지 않아, 같은 의도(key는 props가 아님)를 key 없는 자식이 섞인 목록(위치 비교)에서 확인하도록 고침
     - 결정한 세부: 이동 수 최소 보장 안 함(`[a,b,c] → [b,c,a]`는 2번), 숫자 `1`과 문자열 `"1"`은 다른 key, 글자 · 주석 노드는 key가 없어 섞이면 위치 비교, 빈 목록은 key 목록으로 취급(결과는 위치 비교와 같음), 위치 비교로 돌아간 목록에서 key는 patch로 옮기지 않음(key는 props가 아님)
-    - 커밋: (해시는 이 Dev 묶음의 마지막 docs 커밋에 기록)
+    - 커밋: ea5764c
 
 - [x] **Dev-22** (`react-dom-bindings`): `patch`의 MOVE — 같은 DOM 노드를 옮긴다 [Key 확장]
   - 의존: Dev-6, Dev-21
@@ -379,7 +379,7 @@ script:` · `" JAVA	script:"`), `<iframe> 제거 — srcdoc 안에 <script>paren
     - 실행: `npx vitest run packages/react-dom-bindings` 8 files · **224 passed**(patch.test.ts 41건). 전체 `npx vitest run` · `npx tsc --noEmit` 결과는 이 묶음 마지막 커밋의 확인에 기록
     - 참조 유지 테스트 이름: `이동한 노드의 참조가 그대로다 (===): 새로 만들지 않고 같은 DOM 노드를 옮긴다`(이동하지 않은 형제 · 부모도 `toBe`), `이동 중에 다른 형제를 새로 만들거나 지우지 않는다 (childList 기록은 옮긴 노드 하나의 제거 + 삽입뿐)`(`MutationObserver`), `MOVE의 역(from ↔ to)이 원래 순서와 같은 참조로 되돌린다`, `MOVE 뒤에 이어지는 INSERT · REMOVE · SET_TEXT의 경로는 그 순간의 트리 기준이다 (결정 4 A)`, `diff(Key) 결과를 그대로 적용하면 같은 key 노드의 참조가 유지되고 결과가 목표와 같다`
     - 결정한 세부: `from === to`는 DOM을 건드리지 않음(기록 0건 확인), `from` · `to`가 목록 밖이면 `from N` · `to N`이 적힌 오류(C2 복구 재료), `parent: []`는 영역 상자 자신의 자식 목록
-    - 커밋: (해시는 이 Dev 묶음의 마지막 docs 커밋에 기록)
+    - 커밋: d8f37b3
 
 - [x] **Dev-23** (`react-dom`): Key 통합 테스트 — 삽입 · 삭제 · 재정렬 뒤에도 같은 key 노드가 유지되고, 역패치(MOVE 포함)로 되돌아온다 [Key 확장 · PRD §5 · §6.2]
   - 의존: Dev-21, Dev-22
@@ -395,7 +395,8 @@ script:` · `" JAVA	script:"`), `<iframe> 제거 — srcdoc 안에 <script>paren
     - History: `key가 snapshot에 담긴 뒤부터 MOVE · INSERT · REMOVE로 움직이고, back · forward가 기록과 일치하며 참조가 유지된다`, `저장한 VNode(snapshot)는 이동 · 갱신으로 바뀌지 않고…`, `같은 key 목록을 다시 update하면(무변경) 기록하지 않고 DOM도 건드리지 않는다`
     - 알게 된 점: `createVDomRoot`의 0번 기록은 DOM에서 읽은 VNode라 key가 없다 → key VNode가 처음 들어오는 update는 위치 비교, 그 기록에 key가 담긴 뒤의 update부터 key 비교 · MOVE. 무변경 update는 기록하지 않으므로 key가 담기려면 모양이 바뀌는 update여야 한다. Phase 2 앱이 처음부터 key VNode를 그리면 해당 없음(phase2 task에서 확인)
     - 전체: `npx vitest run` 15 files · **381 passed**(334 + Dev-21 25 + Dev-22 순증 10 + Dev-23 12), `npx tsc --noEmit` 0
-    - 커밋: (해시는 이 Dev 묶음의 마지막 docs 커밋에 기록)
+    - **전체 확인(Dev-21 ~ 23 끝)**: `npx vitest run` 15 files · **381 passed**, `npx tsc --noEmit` 오류 **0**, `npx playwright test` **94 passed**(회귀 확인, 포트 5199 사용 중이 아니었고 끝난 뒤 서버 남음 없음)
+    - 커밋: c242817
 
 - [ ] **Dev-24** (`react-dom-bindings`): `patch`가 적용하는 노드를 바깥에 알리는 콜백 (`PatchObserver`) — Diff 시각화 재료 [Diff 시각화 확장]
   - 의존: Dev-6 (MOVE까지 알리려면 Dev-22)
