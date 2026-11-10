@@ -43,61 +43,81 @@
 
 ## Dev 항목 — 필수 (Dev-1 ~ Dev-22, Dev-16 제외 = 21개)
 
-- [ ] **Dev-1** (`react-reconciler`): tsc 복구 — `invertPatches` · 테스트 도우미 `applyPatches`의 `switch`가 새 kind(`SET_EVENT` · `SET_PROP`)를 다룬다 (역패치 = 전후 뒤집기) [P2-19 준비 · T-08 회귀]
+- [x] **Dev-1** (`react-reconciler`): tsc 복구 — `invertPatches` · 테스트 도우미 `applyPatches`의 `switch`가 새 kind(`SET_EVENT` · `SET_PROP`)를 다룬다 (역패치 = 전후 뒤집기) [P2-19 준비 · T-08 회귀]
   - 의존: -
   - 만들 · 고칠 파일: `packages/react-reconciler/src/invertPatches.ts`(`SET_EVENT` · `SET_PROP` 케이스: `before` ↔ `after`, `event` · `name` · `path` 그대로), `packages/react-reconciler/src/__tests__/applyPatches.ts`(검산기: `SET_EVENT`는 `on` + 이벤트 이름 첫 글자 대문자 prop(`click` → `onClick`)을 `after` 함수로 두거나 `null`이면 뺌, `SET_PROP`은 `name` prop을 `after`로 두거나 `null`이면 뺌)
   - 테스트(먼저 실패 확인): 시작 때 `npx tsc --noEmit` **TS2366 2건**(`invertPatches.ts` · `applyPatches.ts`)을 출력 그대로 확인. `packages/react-reconciler/src/__tests__/invertPatches.test.ts`에 종류별 뒤집기 `SET_EVENT`(`null` 포함) · `SET_PROP`(`null` 포함) · 두 번 뒤집으면 원래 · 순서 뒤집기 안에 섞여 있어도 동작 · 입력을 안 고침 — 구현 전에는 `undefined`를 돌려줘 실패
   - 알고리즘: 결정 7 세부(역패치 = 전후 뒤집기 + 역순), 기존 규칙 그대로
   - 완료 근거로 남길 것: 고치기 전 tsc 오류 2건 · 고친 뒤 `npx tsc --noEmit` 0건, `invertPatches.test.ts` 새 케이스 개수, `npx vitest run` 전체 통과 개수(기존 432 + 새 케이스), 커밋 해시
-  - **완료 근거 (Evidence)**:
+  - **완료 근거 (Evidence)**: `packages/react-reconciler/src/invertPatches.ts`의 `invertPatch()`에 `SET_EVENT` · `SET_PROP` 케이스 추가(전 · 후 뒤집기, 함수는 같은 참조 유지), `packages/react-reconciler/src/__tests__/applyPatches.ts`의 `applyPatch()`에 두 케이스 추가(`SET_EVENT` = `on` + 이름 첫 글자 대문자 prop을 after 함수로 두거나 null이면 뺌, `SET_PROP` = name prop)
+    - 고치기 전 `npx tsc --noEmit` 출력 그대로: `applyPatches.ts(32,63): error TS2366 ...` · `invertPatches.ts(10,37): error TS2366 ...` (2건). 고친 뒤 `npx tsc --noEmit` 오류 0건
+    - 먼저 쓴 실패 확인: `npx vitest run packages/react-reconciler/src/__tests__/invertPatches.test.ts` 4 failed (구현 전, `undefined`를 돌려줘 TypeError). 구현 뒤 15 passed. 새 케이스 2개(`SET_EVENT` 뒤집기 null 포함 · `SET_PROP` 뒤집기 null 포함) + 기존 "순서 · 두 번 뒤집기" 목록에 두 종류를 섞어 넣음(기존 케이스 수정)
+    - `npx vitest run` 전체 434 passed (기존 432 + 2), 16 files passed. 커밋 9b85c77
 
-- [ ] **Dev-2** (`react-reconciler`): `diff`가 이벤트 props를 따로 비교한다 — 추가 · 교체 · 삭제를 `SET_EVENT`로, 속성(SET_ATTR)에는 넣지 않는다 [P2-19 · §4.3 이벤트 등록 · 변경 · 제거 · §6.2 핸들러 교체]
+- [x] **Dev-2** (`react-reconciler`): `diff`가 이벤트 props를 따로 비교한다 — 추가 · 교체 · 삭제를 `SET_EVENT`로, 속성(SET_ATTR)에는 넣지 않는다 [P2-19 · §4.3 이벤트 등록 · 변경 · 제거 · §6.2 핸들러 교체]
   - 의존: Dev-1
   - 만들 · 고칠 파일: `packages/react-reconciler/src/diff.ts`(이름이 `on` + 대문자이고 값이 함수인 props를 `readAttrs`에서 빼고 `diffEvents` 추가: 이벤트 이름 = `on` 뒤를 소문자로 `onClick` → `click`. 이전 · 새에 같은 함수 참조면 줄 없음, 다르면 `before` · `after` 함수, 이전에 없으면 `before: null`, 새에 없으면 `after: null`. 호출 순서는 SET_ATTR · SET_STYLE 앞이나 뒤 어느 쪽이든 같은 요소 안에서 고정), `packages/react-reconciler/src/__tests__/applyPatches.ts`의 `normalizeTree`(함수 값 `on…` props를 남기도록 맞춤)
   - 테스트(먼저 실패 확인): `packages/react-reconciler/src/__tests__/diffEvents.test.ts` — 같은 함수 참조는 patch 0건(T-04), 다른 함수는 `SET_EVENT` 1건, 처음 붙음(before null), 빠짐(after null), 이벤트 둘 이상 독립, `on` 뒤 소문자가 아니거나 값이 함수가 아니면(`onclick="x"` 문자열) 이벤트가 아님, 이벤트가 있어도 SET_ATTR가 안 생김, 새로 INSERT되는 요소 안의 이벤트는 SET_EVENT를 내지 않음(요소째 새로 그림), 같은 key 이동(MOVE)과 함께여도 경로가 맞음, Phase 1 `diff.test.ts` · `diffKeyed.test.ts` 그대로 통과, 무작위 200쌍 "applyPatches(old, diff) = new"에 이벤트 props 섞기
   - 알고리즘: 결정 8 B(핸들러만 교체), 결정 3 A(한 줄 = 종류 · 경로 · 전 · 후)
   - 완료 근거로 남길 것: `diffEvents.test.ts` 통과 개수, Phase 1 diff 테스트 회귀 없음, 전체 vitest · tsc, 커밋 해시
-  - **완료 근거 (Evidence)**:
+  - **완료 근거 (Evidence)**: `packages/react-reconciler/src/diff.ts`에 `readEvents()` · `diffEvents()` 추가(`/^on[A-Z]/` + 함수 값만 이벤트, 이름 = `on` 뒤 전부 소문자, 같은 요소 안 순서 SET_ATTR → SET_STYLE → SET_PROP → SET_EVENT), `readAttrs`는 함수를 계속 건너뜀. `__tests__/applyPatches.ts`의 `normalizeTree`가 `on`+대문자 함수 props를 남김
+    - 새 테스트 `packages/react-reconciler/src/__tests__/diffEvents.test.ts` 15건 (구현 전 8 failed → 구현 뒤 15 passed): 같은 참조 0건(T-04) · 교체 · 처음 붙음 · 빠짐 · 이벤트 둘 독립 · 이름 규칙 · 문자열 `onclick` 비이벤트 · SET_ATTR 안 샘 · 같은 요소 순서 고정 · INSERT / REPLACE 요소 안 이벤트는 줄 없음 · 자식 경로 · MOVE와 함께 경로 · 얼린 입력 · 무작위 200쌍 왕복(이벤트 섞기)
+    - **기존 Phase 1 테스트 1건 고침 (설계상 필요)**: `diff.test.ts`의 "함수 · style이 아닌 객체 props는 속성으로 다루지 않는다 (이벤트는 phase2)"가 `onClick: () => {}`(매번 새 함수)를 써서 이제 SET_EVENT 1줄이 생긴다 → 이벤트가 아닌 함수 prop(`render`)으로 바꾸고 제목에 "on + 대문자 함수는 SET_EVENT"를 적음. 나머지 Phase 1 diff 테스트(`diff.test.ts` · `diffKeyed.test.ts`)는 그대로 통과
+    - `npx vitest run` 전체 449 passed (434 + 15), `npx tsc --noEmit` 오류 0건. 커밋 67180b9
 
-- [ ] **Dev-3** (`react-reconciler`): `diff`가 `value` · `checked`를 DOM 프로퍼티 줄(`SET_PROP`)로 비교한다 — SET_ATTR에서 뺀다 [P2-19 · §4.3 DOM 프로퍼티 · T-06]
+- [x] **Dev-3** (`react-reconciler`): `diff`가 `value` · `checked`를 DOM 프로퍼티 줄(`SET_PROP`)로 비교한다 — SET_ATTR에서 뺀다 [P2-19 · §4.3 DOM 프로퍼티 · T-06]
   - 의존: Dev-1
   - 만들 · 고칠 파일: `packages/react-reconciler/src/diff.ts`(`readAttrs`에서 `value` · `checked` 제외, `diffProps` 추가: `before` · `after`가 다를 때만 줄을 내고 `null` = props에 없음. 정규화는 초안 ④-4(테스트 케이스 확인 4 확정): `value`는 문자열 · 숫자 → 문자열, `checked`는 `true` · `""` → `true`, `false` → `false`, 나머지는 없음), `applyPatches.ts`의 `normalizeTree`(같은 정규화)
   - 테스트(먼저 실패 확인): `packages/react-reconciler/src/__tests__/diffProps.test.ts` — `value` 변경 1건 · 같은 값 0건(T-04), 처음 붙음 · 빠짐(`null`), `checked` true ↔ false, 숫자 `value`는 문자열로, `value` · `checked`가 SET_ATTR로 새지 않음, 다른 속성(`type` · `class`)은 기존 그대로, 요소 종류가 다르면 REPLACE(프로퍼티 줄 없음), 무작위 쌍 왕복에 섞기. Phase 1 테스트 중 `value` · `checked`를 속성으로 보던 케이스가 있으면 어느 것을 어떻게 고쳤는지 근거에 적는다 (없으면 "없음"). Phase 1 편집창에서 `value` · `checked` 속성을 고치면 속성 글은 안 바뀌는 한계는 명세 4절에 기록됨(테스트 케이스 확인 4)
   - 알고리즘: 결정 3 A. 정책 「§4.3 DOM 프로퍼티」
   - 완료 근거로 남길 것: 통과 개수, Phase 1 diff 테스트 회귀 없음, 전체 vitest · tsc, 커밋 해시
-  - **완료 근거 (Evidence)**:
+  - **완료 근거 (Evidence)**: `packages/react-reconciler/src/diff.ts`: `readAttrs`가 `value` · `checked`를 건너뜀, `readDomProps()` · `diffProps()` 추가(value = 문자열 · 숫자 → 문자열, checked = `true` · `""` → true / `false` → false / 나머지 없음, 전 · 후가 다를 때만 SET_PROP, null = 없음). `__tests__/applyPatches.ts`의 `normalizeTree`에 같은 정규화
+    - 새 테스트 `packages/react-reconciler/src/__tests__/diffProps.test.ts` 14건 (구현 전 9 failed → 14 passed): value 변경 · 같은 값 0건 · 처음 붙음 / 빠짐 · `""`는 없음이 아님 · 숫자 → 문자열 · 쓸 수 없는 값은 없음 · checked true ↔ false · `""` = true · SET_ATTR로 안 샘 · 다른 속성(`type` · `class`) 그대로 · 요소 종류가 다르면 REPLACE만 · 자식 경로 · 무작위 200쌍 왕복(value · checked 섞기)
+    - Phase 1 테스트 중 `value` · `checked`를 속성으로 보던 케이스: **diff 테스트에는 없음**(이 Dev에서 고친 Phase 1 테스트 없음). `react-dom-bindings`의 `domToVNode.test.ts` 1건은 Dev-5에서 고침(아래 Dev-5 근거)
+    - `npx vitest run` 전체 463 passed (449 + 14), `npx tsc --noEmit` 오류 0건. 커밋 4c0ae5a
 
-- [ ] **Dev-4** (`react-dom-bindings`): 이벤트 핸들러 저장 + 리스너 하나 — `setEventHandler(element, event, handler | null)` [§4.3 이벤트 등록 · 변경 · 제거 · §6.2 핸들러 교체 후 중복 호출 방지]
+- [x] **Dev-4** (`react-dom-bindings`): 이벤트 핸들러 저장 + 리스너 하나 — `setEventHandler(element, event, handler | null)` [§4.3 이벤트 등록 · 변경 · 제거 · §6.2 핸들러 교체 후 중복 호출 방지]
   - 의존: -
   - 만들 · 고칠 파일: `packages/react-dom-bindings/src/client/events.ts`(요소별 핸들러 저장소는 `WeakMap<Element, Map<이벤트 이름, EventHandler | null>>` — 요소가 빠지면 함께 사라지고 엔진이 따로 치우지 않음. 그 요소 · 이벤트에서 처음 `handler`가 올 때만 리스너를 **한 번** 등록하고, 리스너는 저장된 핸들러를 꺼내 부름. 교체 = 저장된 값만 바꿈, `null` = 값만 비움(리스너 남김), 지원 밖 이벤트 이름은 `console.warn` 1회 후 무시 — 초안 ④-6 작은 정책, 확정), `packages/react-dom-bindings/src/index.ts`에 내보내기
   - 테스트(먼저 실패 확인): `packages/react-dom-bindings/src/client/__tests__/events.test.ts` — 등록 뒤 `dispatchEvent` 1번에 핸들러 1번 호출, 핸들러를 여러 번 교체해도 한 번 눌렀을 때 **마지막 핸들러만 1번** 호출(중복 없음), `addEventListener` 호출 횟수가 요소 · 이벤트당 1번(`vi.spyOn`), `null`이면 눌러도 아무 일 없고 오류도 없음, `null` 뒤 다시 핸들러를 붙이면 호출됨(리스너 한 번만 등록됨), `click` · `input`이 서로 독립, 요소 둘이 서로 독립, 핸들러가 던진 예외는 그대로 위로, 지원 밖 이벤트 경고
   - 알고리즘: 결정 8 B (리스너 하나 + 핸들러 교체), 정책 「§4.3 이벤트 · 핸들러 저장 위치 · 핸들러 해제」
   - 완료 근거로 남길 것: 통과 개수, `addEventListener` 호출 횟수 단언, 전체 vitest · tsc, 커밋 해시
-  - **완료 근거 (Evidence)**:
+  - **완료 근거 (Evidence)**: `packages/react-dom-bindings/src/client/events.ts`의 `setEventHandler(element, event, handler | null)` 신규 (`WeakMap<Element, Map<이벤트, 핸들러 | null>>`, 처음 non-null 핸들러가 올 때만 `addEventListener` 1번, 리스너가 저장된 핸들러를 꺼내 부름, null = 값만 비움, 리스너 등록 전 null은 기록하지 않음, 지원 밖 이름은 `console.warn` 1회 후 무시(null은 조용히)), `packages/react-dom-bindings/src/index.ts`에 내보내기
+    - 새 테스트 `packages/react-dom-bindings/src/client/__tests__/events.test.ts` 13건 (구현 전: 모듈 없음으로 실행 불가 → 13 passed): 등록 뒤 1번 호출 · 20번 교체해도 마지막 핸들러만 1번 · **`addEventListener` 호출 횟수 1(`vi.spyOn`), `removeEventListener` 0** · null 뒤 눌러도 오류 없음 · null 뒤 재등록 호출됨(리스너 1번) · 등록 전 null은 리스너 안 만듦 · 다른 이벤트 null 뒤 click 등록 · click / input 독립 · 요소 둘 독립 · 핸들러 예외는 리스너에서 그대로 던짐 · 지원 밖 이벤트 경고 · 요소가 빠져도 다른 곳에 새지 않음
+    - `npx vitest run` 전체 476 passed (463 + 13), `npx tsc --noEmit` 오류 0건. 커밋 036d354
 
-- [ ] **Dev-5** (`react-dom-bindings`): `renderVNode`가 새로 만드는 요소에 이벤트 · `value` · `checked`를 적용한다 (`applyDomProp` 포함) [P2-05 · P2-20 · §4.3 DOM 프로퍼티]
+- [x] **Dev-5** (`react-dom-bindings`): `renderVNode`가 새로 만드는 요소에 이벤트 · `value` · `checked`를 적용한다 (`applyDomProp` 포함) [P2-05 · P2-20 · §4.3 DOM 프로퍼티]
   - 의존: Dev-4
   - 만들 · 고칠 파일: `packages/react-dom-bindings/src/client/domProps.ts`(`applyDomProp(element, name, value)`: `value`는 `element.value`가 **다를 때만** 대입(커서 유지), `checked`는 `element.checked`가 다를 때만, `null` = props에서 빠짐 → `value`는 `''`, `checked`는 `false`로 둠 — 초안 ④-4, 테스트 케이스 확인 4 확정), `packages/react-dom-bindings/src/client/renderVNode.ts`(`applyProps`: `on` + 대문자 + 함수 → `setEventHandler`, `value` · `checked` → 속성이 아니라 `applyDomProp`, 그 밖의 함수 · 객체 props는 지금처럼 경고), `packages/react-dom-bindings/src/index.ts`
   - 테스트(먼저 실패 확인): `packages/react-dom-bindings/src/client/__tests__/renderVNode.test.ts`(고침) · `domProps.test.ts` — 그려진 `<button>`을 `click`하면 핸들러 호출, `<input value="a">` 프로퍼티 `.value === 'a'`이고 `value` **속성은 안 생김**, `checked`, 이벤트가 아닌 함수 props 경고는 그대로, 같은 값이면 대입 안 함(setter 스파이 · `selectionStart` 유지), 숫자 `value`, 기존 Phase 1 `renderVNode` 테스트 그대로 통과
   - 알고리즘: 결정 8 B, 정책 「§4.3 DOM 프로퍼티」
   - 완료 근거로 남길 것: 통과 개수, 전체 vitest · tsc, 커밋 해시
-  - **완료 근거 (Evidence)**:
+  - **완료 근거 (Evidence)**: `packages/react-dom-bindings/src/client/domProps.ts`의 `applyDomProp(element, name, value | null)` 신규(실제 값과 **다를 때만** 대입, null → value `''` · checked `false`), `packages/react-dom-bindings/src/client/renderVNode.ts`의 `applyProps`: `on`+대문자 함수 → `setEventHandler`, `value` · `checked`는 속성이 아니라 `applyDomProp`(속성을 다 쓴 뒤 마지막에 적용 — `type` 뒤), 그 밖의 함수 · 객체는 지금처럼 경고, `index.ts` 내보내기
+    - 새 테스트: `domProps.test.ts` 7건(새 파일, 구현 전 모듈 없음 → passed) · `renderVNode.test.ts` 10건(이벤트 click · input · 자식 · `value` 프로퍼티 `.value === 'a'`이고 `value` 속성 안 생김 · 숫자 value · checked 프로퍼티이고 속성 안 생김 · `type`이 뒤에 적혀도 체크박스 · 문자열 `onClick` 속성 · `onclick` 소문자 함수 경고 · `renderAreaChildren` 이벤트; 구현 전 6 failed). 같은 값이면 대입 안 함: `vi.spyOn(HTMLInputElement.prototype, 'value', 'set')` 0회 · `selectionStart` · `selectionEnd` 유지
+    - **기존 Phase 1 테스트 2건 고침 (설계상 필요, 명세 4절 「알려진 한계」)**: ① `renderVNode.test.ts` UT-RV-P3 "함수 props는 …경고"가 `onClick`을 썼는데 이제 이벤트라서 이벤트가 아닌 함수 prop(`render`)으로 바꿈(경고 · 속성 안 만듦 검증은 그대로) ② `domToVNode.test.ts` "특수문자 · 중첩 · 주석 · boolean 왕복"의 `<input disabled value="1">`를 `<input disabled name="n">`으로 바꿈(value는 이제 프로퍼티라 `innerHTML` 왕복에 속성이 안 남음) + 알려진 한계를 확인하는 테스트 1건 추가(읽으면 `value: '1'`이고 다시 그려도 속성 없이 `.value === '1'`). 나머지 Phase 1 `renderVNode` · `domToVNode` 테스트 그대로 통과
+    - `npx vitest run` 전체 494 passed (476 + 18), `npx tsc --noEmit` 오류 0건. 커밋 9b97360
 
-- [ ] **Dev-6** (`react-dom-bindings`): `patch`가 `SET_EVENT` · `SET_PROP`을 적용한다 (+ 관찰 콜백에 알림) [P2-20 · P2-21 · §4.3 · T-06]
+- [x] **Dev-6** (`react-dom-bindings`): `patch`가 `SET_EVENT` · `SET_PROP`을 적용한다 (+ 관찰 콜백에 알림) [P2-20 · P2-21 · §4.3 · T-06]
   - 의존: Dev-5
   - 만들 · 고칠 파일: `packages/react-dom-bindings/src/client/patch.ts`(`SET_EVENT` → `setEventHandler(요소, event, after)`, `SET_PROP` → `applyDomProp(요소, name, after)`, 둘 다 `elementAt`로 요소만 허용, 관찰 콜백 `stage: 'after'`로 알림)
   - 테스트(먼저 실패 확인): `packages/react-dom-bindings/src/client/__tests__/patch.test.ts`(고침) — `SET_EVENT` 교체 뒤 눌러도 **새 핸들러만 1번**, `after: null`이면 눌러도 아무 일 없음, `SET_PROP` `value`가 DOM 값과 같으면 대입하지 않음(타이핑 중 커서 유지: `selectionStart` · `selectionEnd` 그대로), 다르면 대입, `checked`, 요소가 아닌 경로면 오류, `SET_EVENT` · `SET_PROP`은 DOM 변경(MutationObserver)을 내지 않음, 같은 목록 안에서 MOVE와 섞여도 맞는 요소에 적용, Phase 1 patch 테스트 그대로 통과
   - 알고리즘: 결정 4 A(경로 + 순서대로), 결정 8 B
   - 완료 근거로 남길 것: 통과 개수, 전체 vitest · tsc, **`npx playwright test e2e/phase1-*.spec.ts` 96 passed**(Phase 1 회귀), 커밋 해시
-  - **완료 근거 (Evidence)**:
+  - **완료 근거 (Evidence)**: `packages/react-dom-bindings/src/client/patch.ts`의 `applyPatch()`에 `SET_EVENT`(`elementAt` → `setEventHandler(요소, event, after)`) · `SET_PROP`(`elementAt` → `applyDomProp(요소, name, after)`) 케이스 추가, 둘 다 관찰 콜백 `stage: 'after'`로 알림
+    - `packages/react-dom-bindings/src/client/__tests__/patch.test.ts`에 `describe('patch — SET_EVENT · SET_PROP (Phase 2)')` 11건 추가 (구현 전 9 failed → 66 → 77 passed): 교체 뒤 새 핸들러만 1번 · 20번 교체해도 `addEventListener` 1번 · `after: null`이면 눌러도 아무 일 없음 · `SET_PROP` value가 DOM 값과 같으면 setter 0회 + `selectionStart` · `selectionEnd` 유지 · 다르면 대입(속성 안 생김, null → `''`) · checked · 요소가 아닌 경로면 오류 · **MutationObserver 기록 0건** · MOVE와 섞여도 맞는 요소에 적용 · 관찰 콜백 · diff 결과 적용 시 요소 참조 유지 + 핸들러 교체. Phase 1 patch 테스트 66건 그대로 통과
+    - `npx vitest run` 전체 505 passed (494 + 11), `npx tsc --noEmit` 오류 0건
+    - **`npx playwright test e2e/phase1-*.spec.ts` 96 passed (12.8s)** (Phase 1 회귀 없음), 끝난 뒤 5199 포트 LISTENING 없음. 커밋 01923c9
 
-- [ ] **Dev-7** (`scheduler`): 재렌더 예약 — `scheduleRender(task)`: 지금은 **즉시 동기 실행**, 중첩 깊이가 50을 넘으면 오류 [P2-15 · 결정 9 A · 무한 렌더 안전장치]
+- [x] **Dev-7** (`scheduler`): 재렌더 예약 — `scheduleRender(task)`: 지금은 **즉시 동기 실행**, 중첩 깊이가 50을 넘으면 오류 [P2-15 · 결정 9 A · 무한 렌더 안전장치]
   - 의존: -
   - 만들 · 고칠 파일: `packages/scheduler/src/scheduler.ts`(깊이 카운터를 올리고 `task()` 실행, `finally`로 내림. 깊이가 `NESTED_RENDER_LIMIT`을 넘으면 Error — 문구에 "무한 렌더" · 한도 숫자), `packages/scheduler/src/index.ts`(기존 `.gitkeep` 대신), `packages/scheduler/src/__tests__/scheduler.test.ts`
   - 테스트(먼저 실패 확인): task가 호출한 즉시 한 번 실행됨(동기), 반환 전에 끝남, 중첩 호출(task 안에서 다시 예약)은 즉시 안쪽이 먼저 끝남, 깊이 50은 허용 · 51째에서 오류, task가 예외를 던져도 깊이가 복구됨(다음 예약이 정상), 나란히(연달아 아닌) 호출 1000번은 오류 없음(중첩이 아님), 깊이 카운터가 DOM 전역을 쓰지 않음
   - 알고리즘: 결정 9 A (즉시 동기). Batching은 Dev-27에서 이 파일을 승격
   - 완료 근거로 남길 것: 통과 개수, 전체 vitest · tsc, 커밋 해시
-  - **완료 근거 (Evidence)**:
+  - **완료 근거 (Evidence)**: `packages/scheduler/src/scheduler.ts`의 `scheduleRender(task)` 신규(깊이 카운터가 `NESTED_RENDER_LIMIT`(50) 이상이면 Error "무한 렌더: 렌더가 연달아(중첩) 50번을 넘었습니다…", 아니면 깊이 +1 → `task()` → `finally`로 -1), `packages/scheduler/src/index.ts`(기존 `.gitkeep` 삭제)
+    - 새 테스트 `packages/scheduler/src/__tests__/scheduler.test.ts` 11건 (구현 전 모듈 없음 → 11 passed): 호출 즉시 동기 실행 · task 1번 · 중첩은 안쪽이 먼저 끝남 · `NESTED_RENDER_LIMIT === 50` · 깊이 50 허용 · 51째 오류(문구 "무한 렌더" · "50", 가장 안쪽 task 실행 안 됨) · task 예외 뒤 깊이 복구 · 한도 오류 뒤 깊이 복구 · 나란히 1000번 오류 없음 · 안쪽 예외가 바깥으로 전달되고 깊이 복구 · `document` · `window`를 `undefined`로 덮어도 동작
+    - `npx vitest run` 전체 516 passed (505 + 11, 21 files), `npx tsc --noEmit` 오류 0건
+    - `npx playwright test e2e/phase1-*.spec.ts` 96 passed (11.7s), 끝난 뒤 5199 포트 LISTENING 없음. 커밋 959d7e9
 
 - [ ] **Dev-8** (`react`): Hook 공개 API — `useState` · `useEffect` · `useMemo`가 지금 렌더 중인 컴포넌트의 디스패처에 위임, 디스패처가 없으면 오류 [P2-08 · P2-11 ~ P2-17 · T-16]
   - 의존: -
