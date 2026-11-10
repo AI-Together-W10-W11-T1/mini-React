@@ -280,12 +280,20 @@ script:` · `" JAVA	script:"`), `<iframe> 제거 — srcdoc 안에 <script>paren
     - QA-8의 "뒤로를 눌러도 아무 일 없다"는 뒤로 버튼이 Dev-18에서 연결되기 전에는 단순히 아무 일 없는 버튼이라 자명하게 통과한다. Dev-18 이후에도 같은 시나리오가 통과해야 "기록이 안 생김"의 증거가 된다(Dev-18 완료 때 재실행 필요)
     - 실행: `npx tsc --noEmit` 오류 0
 
-- [ ] **Dev-16** (`fixture` + `e2e`): Patch 때 검사 — `checkHtml`에 걸리면 alert로 "다시 작성해 주세요"를 알리고 Patch를 안 한다. 위험 코드 우회 · 삽입 요소 · 스타일 요소 포함 [§5 HTML 편집 · 오류 · 실행 가능한 HTML · §6.2 · P1-32 · B11 · B12 · C3 · C5]
+- [x] **Dev-16** (`fixture` + `e2e`): Patch 때 검사 — `checkHtml`에 걸리면 alert로 "다시 작성해 주세요"를 알리고 Patch를 안 한다. 위험 코드 우회 · 삽입 요소 · 스타일 요소 포함 [§5 HTML 편집 · 오류 · 실행 가능한 HTML · §6.2 · P1-32 · B11 · B12 · C3 · C5]
   - 의존: Dev-10, Dev-15
   - 만들 · 고칠 파일: `fixtures/phase1-vdom-playground/main.ts`(Patch 클릭 맨 앞에 `checkHtml(편집창 글)` → 문제가 있으면 `alert(formatProblems(문제들))` 후 끝), `e2e/phase1-guard.spec.ts`
   - 테스트(바깥 루프): `e2e/phase1-guard.spec.ts` — QA-16 ~ QA-21 (위험 코드 · 태그 짝 · 구조 · SVG · 둘 다 한 번에 · 미리보기 onerror 미실행) + **QA-29**(srcdoc iframe · object · embed, B11 · C3) + **QA-30**(숨긴 `javascript:`, B12) + **QA-32**(`<style>` · `<link rel="stylesheet">`, C5). alert는 `captureAlert(page, 동작)`으로 선언해 메시지를 확인하고 accept (선언 없는 alert는 실패, A5)
   - 알고리즘: §5 HTML 편집 · 오류 · 실행 가능한 HTML
   - 완료 근거로 남길 것: `npx playwright test e2e/phase1-guard.spec.ts` desktop · mobile 통과 개수, 확인한 알림 말마디 4종, QA-29 · 30 · 32 테스트 이름
+  - **완료 근거 (Evidence)**:
+    - 만든 · 고친 파일: `fixtures/phase1-vdom-playground/main.ts`(Patch 클릭 맨 앞에 `checkHtml(editor.value)` → 문제가 있으면 `alert(formatProblems(problems))` 후 `return`. 편집창 글 · 실제 영역 · 기록 그대로), `e2e/phase1-guard.spec.ts`(새로)
+    - 테스트(바깥 루프): 스펙만 먼저 쓰고 `checkHtml` 미연결 상태에서 `npx playwright test e2e/phase1-guard.spec.ts` 18 failed(`선언한 alert가 뜨지 않았다` 등)를 확인한 뒤 연결. 연결 후 `npx playwright test e2e/phase1-guard.spec.ts` 18 passed (desktop 9 · mobile 9)
+    - 확인한 알림 말마디 4종: `[위험한 코드]`(QA-16 · 29 · 30 · 32) · `[태그 짝]`(QA-17 · 20) · `[구조 불일치]`(QA-18 · 20) · `[SVG 미지원]`(QA-19), 모두 `다시 작성해 주세요` 포함. QA-20은 alert가 정확히 한 번이고 `[태그 짝]` · `[구조 불일치]`가 함께 담김
+    - 막힌 Patch 공통 확인(`patchBlocked`): 실제 영역 `MutationObserver` 기록 0건, 구조 그대로, 뒤로를 눌러도 그대로(기록이 안 늘어남 — 뒤로 연결(Dev-18) 이후 의미가 생김), 편집창 글 그대로. 요소 이름 확인: QA-29 `<iframe>` · `<object>` · `<embed>`, QA-32 `<style>` · `<link rel="stylesheet">`, QA-30 `javascript:`, QA-16 `onerror` · `script`
+    - 테스트 이름: `QA-16 위험한 코드(on… 속성 · script · javascript:)를 넣고 Patch하면 [위험한 코드] alert로 막힌다` · `QA-17 </ul>을 지우고 Patch하면 [태그 짝] alert로 막힌다` · `QA-18 짝은 맞지만 브라우저가 고쳐 읽는 <p><div>x</div></p>를 Patch하면 [구조 불일치] alert로 막힌다` · `QA-19 <svg>를 넣고 Patch하면 [SVG 미지원] alert로 막힌다` · `QA-20 구조도 틀리고 닫는 태그도 빠진 글은 alert 한 번에 [태그 짝]과 [구조 불일치]가 함께 담긴다` · `QA-21 편집창에 위험한 코드를 쳐도(Patch 안 함) 코드가 실행되지 않고 미리보기에서는 빠진다` · `QA-29 <iframe srcdoc> · <object> · <embed>는 미리보기에서 빠지고 Patch는 [위험한 코드]로 막힌다` · `QA-30 javascript:를 문자 참조 · 앞 공백 · 대문자 · 탭으로 숨겨도 미리보기에서 빠지고 Patch는 막힌다`(`jav&#x61;script:` · `" JAVA	script:"`) · `QA-32 <style> · <link rel="stylesheet">는 미리보기에서 빠져 모양이 안 바뀌고 Patch는 [위험한 코드]로 막힌다`(`x.css` 요청 0건, 파랑 `rgb(0, 0, 255)` 안 됨)
+    - 명세에 없어 판단한 세부: QA-16 · QA-21의 `<img src="x" …>`를 `<img src="data:," onerror=…>`로 썼다. `src="x"`는 미리보기가 이미지를 실제로 요청해 404가 되고 크로미움이 `console.error: Failed to load resource … 404`를 남겨 공통 콘솔 감시(A5)에 걸리기 때문이다(실제로 QA-21이 그 한 건으로 실패하는 것을 확인). 깨진 이미지라 `onerror`가 노리는 모양은 같고 네트워크 요청이 없다. 공통 감시는 약하게 만들지 않았다
+    - 실행: `npx tsc --noEmit` 오류 0
 
 - [ ] **Dev-17** (`fixture` + `e2e`): 페이지 보호 · 오류 복구 — 두 영역 안 링크 클릭 · 폼 제출은 기본 동작을 막고, Patch 도중 예외는 복구 뒤 `[Patch 오류]` alert [§5 · P1-19 · P1-32 · C2 · C4 · B13]
   - 의존: Dev-12, Dev-15, Dev-16 (`captureAlert` · alert 흐름)
