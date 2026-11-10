@@ -1,0 +1,223 @@
+diff --git a/fixtures/phase1-vdom-playground/__tests__/patchErrorMessage.test.ts b/fixtures/phase1-vdom-playground/__tests__/patchErrorMessage.test.ts
+new file mode 100644
+index 0000000..ea53ddb
+--- /dev/null
++++ b/fixtures/phase1-vdom-playground/__tests__/patchErrorMessage.test.ts
+@@ -0,0 +1,21 @@
++import { describe, it, expect } from 'vitest';
++import { patchErrorMessage } from '../patchErrorMessage';
++
++describe('patchErrorMessage — Patch 오류 알림 글 (검수 2회차 NB-2)', () => {
++  it('복구에 성공했으면 마지막 기록 상태로 되돌렸다고 알린다', () => {
++    const message = patchErrorMessage(new Error('경로 없음'), 'Patch를 적용하는 중');
++    expect(message).toBe('Patch를 적용하는 중 오류가 났습니다 (경로 없음). 실제 영역을 마지막 기록 상태로 되돌렸습니다. 다시 작성해 주세요.');
++  });
++
++  it('복구까지 실패해 recoveryError가 붙은 예외는 되돌렸다고 하지 않고 새로고침을 안내한다', () => {
++    const error = Object.assign(new Error('경로 없음'), { recoveryError: new Error('복구 그리기 실패') });
++    const message = patchErrorMessage(error, '뒤로 이동하는 중');
++    expect(message).toContain('뒤로 이동하는 중 오류가 났습니다 (경로 없음)');
++    expect(message).toContain('실제 영역을 되돌리지 못했습니다. 새로고침해 주세요.');
++    expect(message).not.toContain('되돌렸습니다');
++  });
++
++  it('Error가 아닌 값도 글로 바꿔 알린다', () => {
++    expect(patchErrorMessage('문자열 예외', 'Patch를 적용하는 중')).toContain('(문자열 예외)');
++  });
++});
+diff --git a/fixtures/phase1-vdom-playground/main.ts b/fixtures/phase1-vdom-playground/main.ts
+index ec070bf..4593339 100644
+--- a/fixtures/phase1-vdom-playground/main.ts
++++ b/fixtures/phase1-vdom-playground/main.ts
+@@ -1,6 +1,7 @@
+ import { createVDomRoot } from '@mini-react/react-dom';
+ import type { AreaChildren } from '@mini-react/shared';
+ import { createOverlay } from './overlay';
++import { patchErrorMessage } from './patchErrorMessage';
+ import { checkHtml, formatProblems, readAreaChildren, renderAreaChildren, setAreaHtml, vnodesToHtml } from '@mini-react/react-dom-bindings';
+ 
+ // [AI Note]: 엔진 로직 없음. 패키지 공개 API만 이어 붙이는 연결 코드다.
+@@ -53,15 +54,7 @@ byTestId<HTMLButtonElement>('btn-patch').addEventListener('click', () => {
+ // [AI Note]: Patch · 뒤로 · 앞으로 도중 예외(C2). react-dom이 이미 기록을 그대로 두고 실제 영역을 마지막 기록 모습으로 다시 그린 뒤
+ // 원래 예외를 던져 준다. 페이지는 그 예외를 잡아 alert로만 알린다 — 편집창 글 · 테스트 영역은 그대로 둬서 다시 해 볼 수 있다.
+ function reportPatchError(error: unknown, doing = 'Patch를 적용하는 중'): void {
+-  const detail = error instanceof Error ? error.message : String(error);
+-  alert(
+-    formatProblems([
+-      {
+-        kind: 'PATCH_ERROR',
+-        message: `${doing} 오류가 났습니다 (${detail}). 실제 영역을 마지막 기록 상태로 되돌렸습니다. 다시 작성해 주세요.`,
+-      },
+-    ]),
+-  );
++  alert(formatProblems([{ kind: 'PATCH_ERROR', message: patchErrorMessage(error, doing) }]));
+ }
+ 
+ // [AI Note]: 뒤로 · 앞으로 (P1-28 ~ P1-30). 실제 영역은 root가 역패치 · patch로 바꾸고, 돌려받은 스냅샷(VNode)으로
+diff --git a/fixtures/phase1-vdom-playground/patchErrorMessage.ts b/fixtures/phase1-vdom-playground/patchErrorMessage.ts
+new file mode 100644
+index 0000000..d6e5b74
+--- /dev/null
++++ b/fixtures/phase1-vdom-playground/patchErrorMessage.ts
+@@ -0,0 +1,10 @@
++// [AI Note]: Patch · 뒤로 · 앞으로 도중 예외(C2)를 알리는 alert 글을 만든다. main.ts가 DOM을 읽으며 시작되는 파일이라
++// 글을 만드는 부분만 따로 떼어 단위 테스트한다 (검수 2회차 NB-2).
++export function patchErrorMessage(error: unknown, doing: string): string {
++  const detail = error instanceof Error ? error.message : String(error);
++  // react-dom은 복구 그리기까지 실패하면 원래 예외에 `recoveryError`를 붙여 던진다 (NB-5). 그때는 되돌렸다고 알리면 사실과 다르다.
++  if (typeof error === 'object' && error !== null && 'recoveryError' in error) {
++    return `${doing} 오류가 났습니다 (${detail}). 실제 영역을 되돌리지 못했습니다. 새로고침해 주세요.`;
++  }
++  return `${doing} 오류가 났습니다 (${detail}). 실제 영역을 마지막 기록 상태로 되돌렸습니다. 다시 작성해 주세요.`;
++}
+diff --git a/packages/react-dom-bindings/src/client/__tests__/domToVNode.test.ts b/packages/react-dom-bindings/src/client/__tests__/domToVNode.test.ts
+index a20734a..8b680b8 100644
+--- a/packages/react-dom-bindings/src/client/__tests__/domToVNode.test.ts
++++ b/packages/react-dom-bindings/src/client/__tests__/domToVNode.test.ts
+@@ -67,6 +67,16 @@ describe('domToVNode', () => {
+     });
+   });
+ 
++  // 검수 2회차 B-1: 속성 이름이 `__proto__`여도 보통 항목으로 담는다 (대입하면 프로토타입 설정이라 속성이 사라진다)
++  it('속성 이름이 __proto__여도 보통 항목으로 담는다 (검수 2회차 B-1)', () => {
++    const box = area('<p __proto__="x" id="a">a</p>');
++    const props = domToVNode(box.firstChild!).props as { [name: string]: unknown };
++    expect(Object.hasOwn(props, '__proto__')).toBe(true);
++    expect(Object.getOwnPropertyDescriptor(props, '__proto__')?.value).toBe('x');
++    expect(Object.keys(props)).toEqual(['__proto__', 'id']);
++    expect(Object.getPrototypeOf(props)).toBe(Object.prototype); // 프로토타입은 건드리지 않는다
++  });
++
+   it('빈 style · 항목이 하나도 없는 style은 props에 두지 않는다 (B21)', () => {
+     const box = area('<p style=""></p><p style=";;"></p><p style="color:"></p>');
+     for (const child of Array.from(box.childNodes)) {
+diff --git a/packages/react-dom-bindings/src/client/domToVNode.ts b/packages/react-dom-bindings/src/client/domToVNode.ts
+index 732091c..9ee02fa 100644
+--- a/packages/react-dom-bindings/src/client/domToVNode.ts
++++ b/packages/react-dom-bindings/src/client/domToVNode.ts
+@@ -29,15 +29,17 @@ export function readAreaChildren(area: Element): AreaChildren {
+ }
+ 
+ function readProps(element: Element): Props {
+-  const props: { [name: string]: string | StyleMap } = {};
++  // [AI Note]: `props[이름] = 값` 대입 대신 [이름, 값] 쌍을 모아 Object.fromEntries로 만든다.
++  // 속성 이름이 `__proto__`이면 대입은 항목이 아니라 프로토타입 setter를 불러 속성이 사라진다 — fromEntries는 보통 항목으로 담는다 (검수 2회차 B-1).
++  const entries: Array<[string, string | StyleMap]> = [];
+   for (const attr of Array.from(element.attributes)) {
+     if (attr.name === 'style') {
+       // 항목이 하나도 없으면 style props를 두지 않는다 (B21)
+       const map = parseStyleText(attr.value);
+-      if (Object.keys(map).length > 0) props.style = map;
++      if (Object.keys(map).length > 0) entries.push(['style', map]);
+     } else {
+-      props[attr.name] = attr.value;
++      entries.push([attr.name, attr.value]);
+     }
+   }
+-  return props;
++  return Object.fromEntries(entries);
+ }
+diff --git a/packages/react-dom/src/__tests__/createVDomRoot.test.ts b/packages/react-dom/src/__tests__/createVDomRoot.test.ts
+index fe4a19e..5b6e197 100644
+--- a/packages/react-dom/src/__tests__/createVDomRoot.test.ts
++++ b/packages/react-dom/src/__tests__/createVDomRoot.test.ts
+@@ -71,6 +71,18 @@ describe('createVDomRoot.update — diff → patch → 기록 (D-01 ~ D-05)', ()
+     updateTo('<p class="a" id="x">글</p>', '<p id="x">글</p>');
+   });
+ 
++  it('D-02 속성 이름이 __proto__여도 두 영역이 같아진다: 추가 · 수정 · 삭제 (검수 2회차 B-1)', () => {
++    // 테스트 영역 = 편집창 글을 브라우저가 그린 것. 실제 영역 요소에 같은 속성이 생겨 속성 글이 같아야 한다.
++    const attr = (area: HTMLElement) => (area.firstElementChild as Element).getAttribute('__proto__');
++    // updateTo가 실제 영역 글 = 테스트 영역 글(nextHtml)임을 확인한다. 새 속성은 기존 속성 뒤에 붙으므로 id를 앞에 둔다.
++    const added = updateTo('<p id="a">글</p>', '<p id="a" __proto__="x">글</p>');
++    expect(attr(added.area)).toBe('x');
++    const edited = updateTo('<p __proto__="x">글</p>', '<p __proto__="y">글</p>');
++    expect(attr(edited.area)).toBe('y');
++    const removed = updateTo('<p __proto__="x" id="a">글</p>', '<p id="a">글</p>');
++    expect(removed.area.firstElementChild!.hasAttribute('__proto__')).toBe(false);
++  });
++
+   it('D-03 노드 추가 (P1-10)', () => {
+     updateTo('<ul><li>1</li></ul>', '<ul><li>1</li><li>2</li></ul>');
+   });
+diff --git a/packages/react-reconciler/src/__tests__/applyPatches.ts b/packages/react-reconciler/src/__tests__/applyPatches.ts
+index 194e808..ce38134 100644
+--- a/packages/react-reconciler/src/__tests__/applyPatches.ts
++++ b/packages/react-reconciler/src/__tests__/applyPatches.ts
+@@ -38,10 +38,11 @@ export function applyPatch(list: AreaChildren, patch: Patch): AreaChildren {
+       });
+     case 'SET_ATTR':
+       return mapNode(list, patch.path, (node) => {
+-        const props: { [name: string]: unknown } = { ...node.props };
+-        if (patch.after === null) delete props[patch.name];
+-        else props[patch.name] = patch.after;
+-        return withProps(node, props);
++        // [AI Note]: `props[이름] = 값` 대신 Map을 거쳐 fromEntries로 만든다. 이름이 `__proto__`면 대입은 프로토타입 설정이라 속성이 사라진다 (검수 2회차 B-1).
++        const attrs = new Map(Object.entries(node.props));
++        if (patch.after === null) attrs.delete(patch.name);
++        else attrs.set(patch.name, patch.after);
++        return withProps(node, Object.fromEntries(attrs));
+       });
+     case 'SET_STYLE':
+       return mapNode(list, patch.path, (node) => {
+@@ -89,13 +90,15 @@ export function applyPatches(list: AreaChildren, patches: readonly Patch[]): Are
+ export function normalizeTree(list: AreaChildren): AreaChildren {
+   return list.map((node) => {
+     if (node.type === TEXT_NODE || node.type === COMMENT_NODE) return node;
+-    const props: { [name: string]: unknown } = {};
++    // [AI Note]: 쌍을 모아 fromEntries로 만든다 — `__proto__` 속성 이름도 보통 항목으로 남긴다 (검수 2회차 B-1).
++    const entries: Array<[string, unknown]> = [];
+     for (const [name, value] of Object.entries(node.props)) {
+-      if (name === 'style' && typeof value === 'object' && value !== null) props[name] = value;
+-      else if (typeof value === 'string') props[name] = value;
+-      else if (typeof value === 'number') props[name] = String(value);
+-      else if (value === true) props[name] = '';
++      if (name === 'style' && typeof value === 'object' && value !== null) entries.push([name, value]);
++      else if (typeof value === 'string') entries.push([name, value]);
++      else if (typeof value === 'number') entries.push([name, String(value)]);
++      else if (value === true) entries.push([name, '']);
+     }
++    const props = Object.fromEntries(entries);
+     return { ...(node as ElementVNode), props, children: normalizeTree(node.children) } as VNode;
+   });
+ }
+diff --git a/packages/react-reconciler/src/__tests__/diff.test.ts b/packages/react-reconciler/src/__tests__/diff.test.ts
+index 9a10aed..941a7ea 100644
+--- a/packages/react-reconciler/src/__tests__/diff.test.ts
++++ b/packages/react-reconciler/src/__tests__/diff.test.ts
+@@ -97,6 +97,35 @@ describe('diff 기본 — 속성', () => {
+     ]);
+   });
+ 
++  describe('속성 이름 __proto__ (검수 2회차 B-1)', () => {
++    // [AI Note]: `{ __proto__: 'x' }` 리터럴은 프로토타입 설정이라 속성이 되지 않는다. fromEntries로 자기 속성을 만든다.
++    const attrs = (entries: Array<[string, string]>) => Object.fromEntries(entries);
++    // run()은 검산기가 양쪽을 같은 방식으로 정규화해 `__proto__`가 사라져도 같아 보일 수 있다 — 적용 결과에 자기 속성이 남았는지 따로 본다.
++    const own = (list: AreaChildren) => Object.hasOwn(list[0].props, '__proto__');
++
++    it('__proto__ 속성 추가는 SET_ATTR before null', () => {
++      const oldTree = [el('p', attrs([['id', 'a']]))];
++      const patches = run(oldTree, [el('p', attrs([['id', 'a'], ['__proto__', 'x']]))]);
++      expect(patches).toEqual([{ kind: 'SET_ATTR', path: [0], name: '__proto__', before: null, after: 'x' }]);
++      expect(own(applyPatches(oldTree, patches))).toBe(true);
++    });
++
++    it('__proto__ 속성 삭제는 SET_ATTR after null', () => {
++      const oldTree = [el('p', attrs([['id', 'a'], ['__proto__', 'x']]))];
++      const patches = run(oldTree, [el('p', attrs([['id', 'a']]))]);
++      expect(patches).toEqual([{ kind: 'SET_ATTR', path: [0], name: '__proto__', before: 'x', after: null }]);
++      expect(own(applyPatches(oldTree, patches))).toBe(false);
++      expect(own(normalizeTree(oldTree))).toBe(true); // 비교용 정규화도 __proto__ 항목을 지우지 않는다
++    });
++
++    it('__proto__ 속성 값 수정은 SET_ATTR 전 · 후 값', () => {
++      const oldTree = [el('p', attrs([['__proto__', 'x']]))];
++      const patches = run(oldTree, [el('p', attrs([['__proto__', 'y']]))]);
++      expect(patches).toEqual([{ kind: 'SET_ATTR', path: [0], name: '__proto__', before: 'x', after: 'y' }]);
++      expect(Object.getOwnPropertyDescriptor(applyPatches(oldTree, patches)[0].props, '__proto__')?.value).toBe('y');
++    });
++  });
++
+   it('함수 · style이 아닌 객체 props는 속성으로 다루지 않는다 (이벤트는 phase2)', () => {
+     const patches = diff([el('button', { onClick: () => {}, data: { a: 1 } })], [el('button', { onClick: () => {} })]);
+     expect(patches).toEqual([]);

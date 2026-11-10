@@ -1,0 +1,468 @@
+diff --git a/e2e/phase1-guard.spec.ts b/e2e/phase1-guard.spec.ts
+index 5f746c0..b327a95 100644
+--- a/e2e/phase1-guard.spec.ts
++++ b/e2e/phase1-guard.spec.ts
+@@ -174,17 +174,24 @@ test('QA-32 <style> · <link rel="stylesheet">는 미리보기에서 빠져 모
+   expect(requested, '스타일 시트를 요청하지 않았다').toEqual([]);
+ });
+ 
+-test('QA-31 두 영역 안의 링크 클릭 · 폼 버튼 클릭에도 페이지가 이동하거나 새로고침되지 않는다', async ({ page }) => {
++test('QA-31 두 영역 안의 링크(<a> · <area> · SVG <a>) 클릭 · 폼 버튼 클릭에도 페이지가 이동하거나 새로고침되지 않는다', async ({ page }) => {
+   await open(page);
+   const initialReal = await structureOf(page, 'real-area');
+-  const typed = await edit(page, (t) => t + '<a href="https://example.com">링크</a><form><button>보내기</button></form>');
++  // 검수 1회차 B-2: <a href> · 폼 버튼 말고도 이미지 맵의 <area href> 두 영역을 함께 넣는다
++  const imageMap =
++    '<img src="data:," width="100" height="100" usemap="#m"><map name="m">' +
++    '<area shape="rect" coords="0,0,50,100" href="https://example.com/left">' +
++    '<area shape="rect" coords="50,0,100,100" href="https://example.com/right"></map>';
++  const typed = await edit(page, (t) => t + '<a href="https://example.com">링크</a>' + imageMap + '<form><button>보내기</button></form>');
+   await page.getByTestId('btn-patch').click(); // 두 영역에 모두 있고 기록이 한 칸 있다 (alert가 뜨면 헬퍼가 실패시킨다)
+   const real = page.getByTestId('real-area');
+   const testArea = page.getByTestId('test-area');
+   await expect(real.locator('a[href]')).toHaveCount(1);
+   await expect(real.locator('form button')).toHaveCount(1);
++  await expect(real.locator('area[href]')).toHaveCount(2);
+   await expect(testArea.locator('a[href]')).toHaveCount(1);
+   await expect(testArea.locator('form button')).toHaveCount(1);
++  await expect(testArea.locator('area[href]')).toHaveCount(2);
+ 
+   // 페이지가 살아 있다는 표시와 문서 이동 요청 감시
+   const urlBefore = page.url();
+@@ -201,6 +208,11 @@ test('QA-31 두 영역 안의 링크 클릭 · 폼 버튼 클릭에도 페이지
+   await testArea.locator('form button').click();
+   await real.locator('a').click();
+   await real.locator('form button').click();
++  // 이미지 맵: 클릭 대상은 <area>다. 이미지 위 두 영역 자리를 눌러 <area> 두 개를 모두 누른다 (양쪽 영역)
++  for (const box of [testArea, real]) {
++    await box.locator('img[usemap]').click({ position: { x: 25, y: 50 } });
++    await box.locator('img[usemap]').click({ position: { x: 75, y: 50 } });
++  }
+   await page.waitForTimeout(300); // 이동이 일어난다면 이 사이에 일어난다
+ 
+   expect(page.url()).toBe(urlBefore);
+@@ -210,6 +222,16 @@ test('QA-31 두 영역 안의 링크 클릭 · 폼 버튼 클릭에도 페이지
+   // 클릭 뒤에도 Patch한 상태가 그대로다 (새로고침됐다면 초기 샘플로 돌아갔을 것). 편집창 글도 그대로
+   expect(await structureOf(page, 'real-area')).toEqual(structBefore);
+   expect(await editorValue(page)).toBe(typed);
++
++  // 검수 1회차 B-2: SVG <a xlink:href>는 Patch는 못 하지만(SVG 미지원) 미리보기(테스트 영역)에는 그려진다. 클릭해도 이동하지 않는다
++  await edit(page, (t) => t + '<svg width="200" height="40"><a xlink:href="https://example.com/svg"><text x="5" y="25">svg 링크</text></a></svg>');
++  await expect(testArea.locator('svg a')).toHaveCount(1);
++  await testArea.locator('svg a text').click();
++  await page.waitForTimeout(300);
++  expect(page.url()).toBe(urlBefore);
++  expect(await page.evaluate(() => (window as unknown as { __stay?: boolean }).__stay)).toBe(true);
++  expect(navigations, 'SVG 링크 클릭에도 프레임 이동이 없어야 한다').toBe(0);
++  expect(documentRequests, 'SVG 링크 클릭에도 문서 이동 요청이 없어야 한다').toEqual([]);
+   // 기록이 살아 있다: 뒤로를 누르면 Patch 전(초기 샘플) 상태로 돌아가고 세 칸이 일치한다
+   await page.getByTestId('btn-back').click();
+   expect(await structureOf(page, 'real-area')).toEqual(initialReal);
+diff --git a/fixtures/phase1-vdom-playground/main.ts b/fixtures/phase1-vdom-playground/main.ts
+index 85bdf7a..ec070bf 100644
+--- a/fixtures/phase1-vdom-playground/main.ts
++++ b/fixtures/phase1-vdom-playground/main.ts
+@@ -87,7 +87,9 @@ for (const area of [realArea, testArea]) {
+   area.addEventListener(
+     'click',
+     (event) => {
+-      if (event.target instanceof Element && event.target.closest('a[href]') !== null) event.preventDefault();
++      // [AI Note]: `a[href]`만 보면 이미지 맵 `<area>`와 SVG `<a xlink:href>`(이름공간 속성이라 `[href]`에 안 걸림)가 빠진다.
++      // href 종류와 상관없이 링크 요소 자체(`a` 타입 선택자는 SVG `<a>`도 맞춘다 · `area`)를 잡는다 (검수 1회차 B-2).
++      if (event.target instanceof Element && event.target.closest('a, area') !== null) event.preventDefault();
+     },
+     true,
+   );
+diff --git a/packages/react-dom-bindings/src/client/__tests__/checkHtml.test.ts b/packages/react-dom-bindings/src/client/__tests__/checkHtml.test.ts
+index f7c8e4b..cace51f 100644
+--- a/packages/react-dom-bindings/src/client/__tests__/checkHtml.test.ts
++++ b/packages/react-dom-bindings/src/client/__tests__/checkHtml.test.ts
+@@ -51,6 +51,14 @@ describe('checkHtml 1 — 위험 코드', () => {
+     expect(kinds('<a href=" JAVA\tscript:alert(1)">4</a>')).toEqual(['DANGEROUS']);
+   });
+ 
++  it('SVG <a xlink:href="javascript:…">도 DANGEROUS이고 xlink:href가 메시지에 들어간다 (검수 1회차 B-3)', () => {
++    const problems = checkHtml('<svg><a xlink:href="javascript:alert(1)"><text y="20">x</text></a></svg>');
++    expect(problems.map((p) => p.kind)).toContain('DANGEROUS');
++    const dangerous = problems.find((p) => p.kind === 'DANGEROUS')!;
++    expect(dangerous.message).toContain('xlink:href');
++    expect(dangerous.message).toContain('javascript:');
++  });
++
+   it('<iframe srcdoc="<script>…">도 DANGEROUS이고 요소 이름이 들어간다 (B11 · C3)', () => {
+     const problems = checkHtml('<iframe srcdoc="&lt;script&gt;parent.__pwned=1&lt;/script&gt;"></iframe>');
+     expect(problems.map((p) => p.kind)).toEqual(['DANGEROUS']);
+@@ -67,6 +75,18 @@ describe('checkHtml 1 — 위험 코드', () => {
+     expect(text).toContain('<link rel="stylesheet">');
+   });
+ 
++  it('<meta http-equiv="refresh"> · <base>도 DANGEROUS이고 알림 글에 요소 이름이 들어간다 (검수 1회차 NB-4)', () => {
++    const problems = checkHtml('<meta http-equiv="Refresh" content="0;url=https://example.com"><base href="https://example.com/">');
++    expect(problems.map((p) => p.kind)).toEqual(['DANGEROUS', 'DANGEROUS']);
++    const text = formatProblems(problems);
++    expect(text).toContain('<meta http-equiv="refresh">');
++    expect(text).toContain('<base>');
++  });
++
++  it('다른 <meta>(charset · name · 다른 http-equiv)는 문제 없음 (검수 1회차 NB-4)', () => {
++    expect(checkHtml('<meta charset="utf-8"><meta name="viewport" content="width=device-width"><meta http-equiv="content-type" content="text/html">')).toEqual([]);
++  });
++
+   it('<link rel="icon">은 문제 없음 (C5)', () => {
+     expect(checkHtml('<link rel="icon" href="a.ico">')).toEqual([]);
+   });
+diff --git a/packages/react-dom-bindings/src/client/__tests__/patch.test.ts b/packages/react-dom-bindings/src/client/__tests__/patch.test.ts
+index 675bc22..c2be040 100644
+--- a/packages/react-dom-bindings/src/client/__tests__/patch.test.ts
++++ b/packages/react-dom-bindings/src/client/__tests__/patch.test.ts
+@@ -93,6 +93,42 @@ describe('patch — 종류별 반영 (손으로 쓴 Patch 목록)', () => {
+     expect(readAreaChildren(box)[0].props).toEqual({ style: { 'not-a-real-prop': 'x', color: 'blue' } });
+   });
+ 
++  // 검수 1회차 B-1: style 항목 이름이 `__proto__` · `constructor`여도 보통 항목처럼 담고 지운다
++  it('SET_STYLE __proto__ 항목 추가: 프로토타입이 바뀌지 않고 항목으로 들어간다', () => {
++    const box = area('<p style="color: red"></p>');
++    patch(box, [{ kind: 'SET_STYLE', path: [0], property: '__proto__', before: null, after: 'x' }]);
++    const p = box.firstChild as Element;
++    expect(p.getAttribute('style')).toBe('color: red; __proto__: x');
++    expect(Object.hasOwn((readAreaChildren(box)[0].props as { style: object }).style, '__proto__')).toBe(true);
++  });
++
++  it('SET_STYLE __proto__ 항목 삭제: 다른 항목은 남긴다', () => {
++    const box = area('<p style="color: red; __proto__: x"></p>');
++    patch(box, [{ kind: 'SET_STYLE', path: [0], property: '__proto__', before: 'x', after: null }]);
++    expect((box.firstChild as Element).getAttribute('style')).toBe('color: red');
++  });
++
++  it('SET_STYLE __proto__ 항목 값 수정', () => {
++    const box = area('<p style="__proto__: x; color: red"></p>');
++    patch(box, [{ kind: 'SET_STYLE', path: [0], property: '__proto__', before: 'x', after: 'y' }]);
++    expect((box.firstChild as Element).getAttribute('style')).toBe('__proto__: y; color: red');
++  });
++
++  it('SET_STYLE constructor 항목 추가 · 삭제', () => {
++    const box = area('<p style="color: red"></p>');
++    const p = box.firstChild as Element;
++    patch(box, [{ kind: 'SET_STYLE', path: [0], property: 'constructor', before: null, after: 'x' }]);
++    expect(p.getAttribute('style')).toBe('color: red; constructor: x');
++    patch(box, [{ kind: 'SET_STYLE', path: [0], property: 'constructor', before: 'x', after: null }]);
++    expect(p.getAttribute('style')).toBe('color: red');
++  });
++
++  it('SET_STYLE __proto__ 항목이 마지막이면 지울 때 style 속성도 제거한다', () => {
++    const box = area('<p style="__proto__: x"></p>');
++    patch(box, [{ kind: 'SET_STYLE', path: [0], property: '__proto__', before: 'x', after: null }]);
++    expect((box.firstChild as Element).hasAttribute('style')).toBe(false);
++  });
++
+   it('D-03 INSERT: path 마지막 번호 자리에 끼운다 (P1-10)', () => {
+     const box = area('<ul><li>a</li><li>c</li></ul>');
+     patch(box, [{ kind: 'INSERT', path: [0, 1], node: el('li', {}, text('b')) }]);
+diff --git a/packages/react-dom-bindings/src/client/__tests__/sanitize.test.ts b/packages/react-dom-bindings/src/client/__tests__/sanitize.test.ts
+index b12fba1..5d52886 100644
+--- a/packages/react-dom-bindings/src/client/__tests__/sanitize.test.ts
++++ b/packages/react-dom-bindings/src/client/__tests__/sanitize.test.ts
+@@ -40,6 +40,15 @@ describe('scanDangerous — 미리보기에서 빼고 Patch 때 막는 단 하
+     expect(summarize('<link rel="icon" href="a.ico"><link href="a"><link rel="preload stylesheeted">')).toEqual([]);
+   });
+ 
++  it('<meta http-equiv="refresh">(대소문자 무시)와 <base>는 차단, 다른 <meta>는 허용 (검수 1회차 NB-4)', () => {
++    expect(summarize('<meta http-equiv="refresh" content="0;url=https://example.com"><meta http-equiv="REFRESH" content="5"><base href="https://example.com/">')).toEqual([
++      '<meta>',
++      '<meta>',
++      '<base>',
++    ]);
++    expect(summarize('<meta charset="utf-8"><meta name="viewport" content="width=device-width"><meta http-equiv="content-type" content="text/html"><meta>')).toEqual([]);
++  });
++
+   it('javascript: 주소 — href · src · action · formaction만', () => {
+     expect(
+       summarize(
+@@ -49,6 +58,12 @@ describe('scanDangerous — 미리보기에서 빼고 Patch 때 막는 단 하
+     expect(summarize('<a title="javascript:a()" data-x="javascript:b()">javascript:c()</a>')).toEqual([]);
+   });
+ 
++  it('SVG <a xlink:href="javascript:…">도 찾는다 (한정 이름 xlink:href)', () => {
++    expect(summarize('<svg><a xlink:href="javascript:x"><text y="1">t</text></a><a xlink:href="https://example.com"></a></svg>')).toEqual([
++      '<a> xlink:href',
++    ]);
++  });
++
+   it('javascript: 판정은 파서가 읽은 값으로: 문자 참조 · 탭 · 줄바꿈 · 앞 공백 · 대문자', () => {
+     expect(summarize('<a href="jav&#x61;script:x"></a>')).toEqual(['<a> href']);
+     expect(summarize('<a href="&#106;avascript:x"></a>')).toEqual(['<a> href']);
+diff --git a/packages/react-dom-bindings/src/client/__tests__/setAreaHtml.test.ts b/packages/react-dom-bindings/src/client/__tests__/setAreaHtml.test.ts
+index 0489edd..9096dfa 100644
+--- a/packages/react-dom-bindings/src/client/__tests__/setAreaHtml.test.ts
++++ b/packages/react-dom-bindings/src/client/__tests__/setAreaHtml.test.ts
+@@ -124,6 +124,15 @@ describe('setAreaHtml — 위험한 것을 빼고 그린다 (§5 실행 가능
+     expect(globals.__pwned).toBeUndefined();
+   });
+ 
++  it('SVG <a xlink:href="javascript:…">도 xlink:href가 빠진다 (검수 1회차 B-3)', () => {
++    const box = makeArea();
++    setAreaHtml(box, '<svg width="100" height="40"><a xlink:href="javascript:window.__pwned=1"><text y="20">x</text></a><a xlink:href="https://example.com/ok"><text y="20">ok</text></a></svg>');
++    const anchors = Array.from(box.querySelectorAll('svg a'));
++    expect(anchors).toHaveLength(2);
++    expect(anchors.map((a) => a.hasAttribute('xlink:href'))).toEqual([false, true]);
++    expect(globals.__pwned).toBeUndefined();
++  });
++
+   it('javascript:가 아닌 주소는 그대로 둔다', () => {
+     const box = makeArea();
+     setAreaHtml(box, '<a href="/javascript:x">a</a><a href="#top">b</a><img src="data:image/png;base64,AAAA">');
+@@ -158,6 +167,20 @@ describe('setAreaHtml — 위험한 것을 빼고 그린다 (§5 실행 가능
+     expect(box.innerHTML).toBe('<p>글</p>');
+   });
+ 
++  it('<meta http-equiv="refresh"> · <base> 제거 — http-equiv 대소문자 무시 (검수 1회차 NB-4)', () => {
++    const box = makeArea();
++    setAreaHtml(box, '<meta http-equiv="refresh" content="0;url=https://example.com"><meta http-equiv="Refresh" content="9"><base href="https://example.com/"><p>글</p>');
++    expect(box.querySelector('meta')).toBeNull();
++    expect(box.querySelector('base')).toBeNull();
++    expect(box.children.length).toBe(1);
++  });
++
++  it('다른 <meta>(charset · name · 다른 http-equiv)는 그대로 둔다 (검수 1회차 NB-4)', () => {
++    const box = makeArea();
++    setAreaHtml(box, '<meta charset="utf-8"><meta name="viewport" content="width=device-width"><meta http-equiv="content-type" content="text/html">');
++    expect(box.querySelectorAll('meta').length).toBe(3);
++  });
++
+   it('<link rel="icon"> 등 다른 rel은 그대로 둔다 (C5)', () => {
+     const box = makeArea();
+     setAreaHtml(box, '<link rel="icon" href="a.ico"><link rel="preload" href="b">');
+diff --git a/packages/react-dom-bindings/src/client/checkHtml.ts b/packages/react-dom-bindings/src/client/checkHtml.ts
+index 670343b..390702c 100644
+--- a/packages/react-dom-bindings/src/client/checkHtml.ts
++++ b/packages/react-dom-bindings/src/client/checkHtml.ts
+@@ -77,8 +77,10 @@ export function formatProblems(problems: readonly HtmlProblem[]): string {
+ function describeDangerous(finding: DangerousFinding): string {
+   switch (finding.kind) {
+     case 'ELEMENT':
+-      // <link>는 rel="stylesheet"일 때만 막히므로 그 모습 그대로 적는다
+-      return finding.element === 'link' ? '<link rel="stylesheet"> 요소' : `<${finding.element}> 요소`;
++      // <link> · <meta>는 일부 모습만 막히므로 그 모습 그대로 적는다
++      if (finding.element === 'link') return '<link rel="stylesheet"> 요소';
++      if (finding.element === 'meta') return '<meta http-equiv="refresh"> 요소';
++      return `<${finding.element}> 요소`;
+     case 'EVENT_ATTRIBUTE':
+       return `<${finding.element}> 요소의 ${finding.attribute} 속성`;
+     case 'JAVASCRIPT_URL':
+diff --git a/packages/react-dom-bindings/src/client/patch.ts b/packages/react-dom-bindings/src/client/patch.ts
+index 775c1fd..df71fac 100644
+--- a/packages/react-dom-bindings/src/client/patch.ts
++++ b/packages/react-dom-bindings/src/client/patch.ts
+@@ -40,11 +40,12 @@ function applyPatch(area: Element, p: Patch, observer?: PatchObserver): void {
+     case 'SET_STYLE': {
+       const element = elementAt(area, p.path, 'SET_STYLE');
+       // [AI Note]: style 속성 글을 직접 쪼개 항목 하나만 고치고 다시 쓴다. CSSOM(el.style)을 쓰면 축약형이 풀리고 모르는 항목이 사라진다.
+-      const map: { [property: string]: string } = { ...parseStyleText(element.getAttribute('style') ?? '') };
+-      if (p.after === null) delete map[p.property];
+-      else map[p.property] = p.after;
+-      if (Object.keys(map).length === 0) element.removeAttribute('style');
+-      else element.setAttribute('style', styleMapToText(map));
++      // Map으로 고치는 이유: 보통 객체에 `map['__proto__'] = 값`을 쓰면 항목이 아니라 프로토타입이 바뀐다 (검수 1회차 B-1).
++      const map = new Map(Object.entries(parseStyleText(element.getAttribute('style') ?? '')));
++      if (p.after === null) map.delete(p.property);
++      else map.set(p.property, p.after);
++      if (map.size === 0) element.removeAttribute('style');
++      else element.setAttribute('style', styleMapToText(Object.fromEntries(map)));
+       observer?.({ patch: p, node: element, stage: 'after' });
+       return;
+     }
+diff --git a/packages/react-dom-bindings/src/client/sanitize.ts b/packages/react-dom-bindings/src/client/sanitize.ts
+index c632911..06dc9ce 100644
+--- a/packages/react-dom-bindings/src/client/sanitize.ts
++++ b/packages/react-dom-bindings/src/client/sanitize.ts
+@@ -2,14 +2,17 @@
+ // 미리보기(setAreaHtml)는 여기서 찾은 것을 빼고 그리고, Patch 때 검사(checkHtml)는 같은 목록을 문제로 알린다.
+ // 두 곳이 어긋나면 "미리보기에는 있는데 Patch는 통과" 같은 틈이 생기므로 기준을 이 파일 하나에 둔다.
+ 
+-/** 요소째 빼는 것: <script> · <iframe> · <object> · <embed> · <style> (+ <link rel="stylesheet">은 아래에서 따로 판정) */
+-const BLOCKED_ELEMENTS = new Set(['script', 'iframe', 'object', 'embed', 'style']);
++/**
++ * 요소째 빼는 것: <script> · <iframe> · <object> · <embed> · <style> · <base>
++ * (+ <link rel="stylesheet"> · <meta http-equiv="refresh">는 아래에서 따로 판정)
++ */
++const BLOCKED_ELEMENTS = new Set(['script', 'iframe', 'object', 'embed', 'style', 'base']);
+ 
+-/** 주소를 담는 속성 중 `javascript:`를 막을 것 */
+-const URL_ATTRIBUTES = new Set(['href', 'src', 'action', 'formaction']);
++/** 주소를 담는 속성 중 `javascript:`를 막을 것 (`xlink:href`는 SVG 링크의 한정 이름이라 따로 적는다, 검수 1회차 B-3) */
++const URL_ATTRIBUTES = new Set(['href', 'src', 'action', 'formaction', 'xlink:href']);
+ 
+ export type DangerousKind =
+-  /** 요소 자체가 막힌 종류 (`<script>` · `<iframe>` · `<object>` · `<embed>` · `<style>` · `<link rel="stylesheet">`) */
++  /** 요소 자체가 막힌 종류 (`<script>` · `<iframe>` · `<object>` · `<embed>` · `<style>` · `<link rel="stylesheet">` · `<meta http-equiv="refresh">` · `<base>`) */
+   | 'ELEMENT'
+   /** `on…` 이벤트 핸들러 속성 */
+   | 'EVENT_ATTRIBUTE'
+@@ -80,6 +83,9 @@ function isBlockedElement(element: Element): boolean {
+       .split(/\s+/)
+       .some((word) => word.toLowerCase() === 'stylesheet');
+   }
++  // [AI Note]: <meta http-equiv="refresh">는 문서에 들어가면 페이지를 옮겨 C4와 같은 위험이다 (검수 1회차 NB-4). 다른 <meta>(charset 등)는 막지 않는다.
++  // http-equiv 값은 HTML 규칙처럼 대소문자만 무시해 비교한다. <base>는 BLOCKED_ELEMENTS에서 요소째 막는다 (이후 주소를 바꿔 버림).
++  if (tag === 'meta') return (element.getAttribute('http-equiv') ?? '').toLowerCase() === 'refresh';
+   return false;
+ }
+ 
+diff --git a/packages/react-dom-bindings/src/client/setAreaHtml.ts b/packages/react-dom-bindings/src/client/setAreaHtml.ts
+index 8f74895..cd45f05 100644
+--- a/packages/react-dom-bindings/src/client/setAreaHtml.ts
++++ b/packages/react-dom-bindings/src/client/setAreaHtml.ts
+@@ -2,7 +2,7 @@ import { removeDangerous } from './sanitize';
+ 
+ // [AI Note]: 편집창 글 → 미리보기(테스트 영역). 칠 때마다 불린다.
+ // 살아 있는 요소에 innerHTML로 바로 넣지 않는다: `<img src=x onerror=…>`는 파싱 · 삽입 순간 실행될 수 있다.
+-// 비활성 문서인 <template> 안에서 읽고 위험한 것(`on…` · script · iframe · object · embed · style · stylesheet link ·
++// 비활성 문서인 <template> 안에서 읽고 위험한 것(`on…` · script · iframe · object · embed · style · stylesheet link · meta refresh · base ·
+ // `javascript:`)을 뺀 뒤에야 영역으로 옮긴다. 영역 상자 자신은 건드리지 않고 안의 자식만 바꾼다 (§5).
+ export function setAreaHtml(area: Element, html: string): void {
+   const template = document.createElement('template');
+diff --git a/packages/react-dom/src/__tests__/createVDomRoot.test.ts b/packages/react-dom/src/__tests__/createVDomRoot.test.ts
+index d1f0336..fe4a19e 100644
+--- a/packages/react-dom/src/__tests__/createVDomRoot.test.ts
++++ b/packages/react-dom/src/__tests__/createVDomRoot.test.ts
+@@ -239,6 +239,27 @@ describe('createVDomRoot.update — Patch 도중 예외 복구 (C2 · B22)', ()
+     expect(area.innerHTML).toBe(START);
+   });
+ 
++  it('복구 그리기도 실패하면 원래 예외가 던져진다 (복구 실패는 recoveryError로 붙음, 검수 1회차 NB-5)', () => {
++    const area = box(START);
++    const root = createVDomRoot(area);
++    const before = root.snapshot();
++    area.firstElementChild!.remove(); // patch가 경로를 못 찾아 실패한다
++    // 복구는 영역을 통째로 다시 그리는 replaceChildren을 쓴다 — 이것도 실패하게 만든다
++    area.replaceChildren = () => {
++      throw new Error('복구 그리기 실패');
++    };
++    let thrown: unknown;
++    try {
++      root.update(parse(NEXT));
++    } catch (error) {
++      thrown = error;
++    }
++    expect(thrown).toBeInstanceOf(Error);
++    expect((thrown as Error).message).toMatch(/patch: 경로/); // 복구 실패가 원래 예외를 덮지 않는다
++    expect(((thrown as { recoveryError?: Error }).recoveryError as Error).message).toBe('복구 그리기 실패');
++    expect(root.snapshot()).toBe(before); // current는 그대로
++  });
++
+   it('B22: 복구 뒤 이어서 정상 update가 성공하고 기록이 정확히 한 칸 늘어난다', () => {
+     const area = box(START);
+     const root = createVDomRoot(area);
+diff --git a/packages/react-dom/src/createVDomRoot.ts b/packages/react-dom/src/createVDomRoot.ts
+index 6337e66..6b39e59 100644
+--- a/packages/react-dom/src/createVDomRoot.ts
++++ b/packages/react-dom/src/createVDomRoot.ts
+@@ -20,6 +20,7 @@ export interface VDomRoot {
+    * Patch 흐름: 지금 기록의 VNode와 next를 diff → 실제 영역에 patch → 새 기록으로 저장.
+    * 바뀐 게 없으면 아무것도 하지 않고 `false` (무변경 Patch는 기록하지 않는다, §3.3).
+    * patch 도중 예외가 나면 기록은 그대로 두고 실제 영역을 지금 기록으로 복구한 뒤 원래 예외를 다시 던진다 (C2).
++   * 복구 그리기까지 실패하면 그래도 원래 예외를 던지고, 복구 예외는 그 예외의 `recoveryError`로 붙인다.
+    */
+   update(next: AreaChildren): boolean;
+   /**
+@@ -48,7 +49,15 @@ export function createVDomRoot(realArea: Element, options: CreateVDomRootOptions
+       // [AI Note]: 세 동작(update · back · forward)이 모두 이 함수를 지나므로 관찰 콜백도 여기 한 곳에서 전달한다 (Diff 시각화).
+       patch(realArea, patches, onPatch);
+     } catch (error) {
+-      renderAreaChildren(realArea, history.current.entry.snapshot);
++      // [AI Note]: 복구 그리기가 또 실패해도 던지는 것은 "원래 예외"다. 복구 예외가 원인을 덮으면 페이지가 엉뚱한 알림을 띄운다.
++      // `cause`는 "이 예외를 일으킨 원인"이라 방향이 반대여서 쓰지 않고, 원래 예외에 `recoveryError`로 붙여 둔다 (검수 1회차 NB-5).
++      try {
++        renderAreaChildren(realArea, history.current.entry.snapshot);
++      } catch (recoveryError) {
++        if (typeof error === 'object' && error !== null && Object.isExtensible(error)) {
++          Object.defineProperty(error, 'recoveryError', { value: recoveryError, configurable: true, writable: true });
++        }
++      }
+       throw error;
+     }
+   }
+diff --git a/packages/react-reconciler/src/__tests__/applyPatches.ts b/packages/react-reconciler/src/__tests__/applyPatches.ts
+index eefaca9..194e808 100644
+--- a/packages/react-reconciler/src/__tests__/applyPatches.ts
++++ b/packages/react-reconciler/src/__tests__/applyPatches.ts
+@@ -45,13 +45,14 @@ export function applyPatch(list: AreaChildren, patch: Patch): AreaChildren {
+       });
+     case 'SET_STYLE':
+       return mapNode(list, patch.path, (node) => {
+-        const style: { [property: string]: string } = { ...((node.props as { style?: StyleMap }).style ?? {}) };
+-        if (patch.after === null) delete style[patch.property];
+-        else style[patch.property] = patch.after;
++        // [AI Note]: Map으로 고친다. 보통 객체에 `style['__proto__'] = '값'`을 쓰면 항목이 아니라 프로토타입 설정이라 무시된다 (검수 1회차 B-1).
++        const style = new Map(Object.entries((node.props as { style?: StyleMap }).style ?? {}));
++        if (patch.after === null) style.delete(patch.property);
++        else style.set(patch.property, patch.after);
+         const props: { [name: string]: unknown } = { ...node.props };
+         // 항목이 하나도 없으면 style props를 두지 않는다 (domToVNode와 같은 규칙)
+-        if (Object.keys(style).length === 0) delete props.style;
+-        else props.style = style;
++        if (style.size === 0) delete props.style;
++        else props.style = Object.fromEntries(style);
+         return withProps(node, props);
+       });
+     case 'INSERT': {
+diff --git a/packages/react-reconciler/src/__tests__/diff.test.ts b/packages/react-reconciler/src/__tests__/diff.test.ts
+index 1aa6e01..9a10aed 100644
+--- a/packages/react-reconciler/src/__tests__/diff.test.ts
++++ b/packages/react-reconciler/src/__tests__/diff.test.ts
+@@ -144,6 +144,34 @@ describe('diff 기본 — style 항목', () => {
+     expect(diff([el('p', { style: { a: '1', b: '2' } })], [el('p', { style: { b: '2', a: '1' } })])).toEqual([]);
+   });
+ 
++  // 검수 1회차 B-1: style 항목 이름이 Object.prototype 이름과 겹쳐도 "있는지 · 값"을 자기 것만 본다
++  describe('프로토타입 이름 항목 (constructor · __proto__ · toString)', () => {
++    // [AI Note]: `{ __proto__: 'x' }` 리터럴은 프로토타입 설정이라 항목이 되지 않는다. parseStyleText와 같은 방식(fromEntries)으로 자기 속성을 만든다.
++    const style = (entries: Array<[string, string]>) => Object.fromEntries(entries);
++
++    for (const name of ['constructor', '__proto__', 'toString', 'hasOwnProperty']) {
++      it(`${name} 항목 추가는 SET_STYLE before null`, () => {
++        const patches = run([el('p', { style: style([['color', 'red']]) })], [el('p', { style: style([['color', 'red'], [name, 'x']]) })]);
++        expect(patches).toEqual([{ kind: 'SET_STYLE', path: [0], property: name, before: null, after: 'x' }]);
++      });
++
++      it(`${name} 항목 삭제는 SET_STYLE after null (함수가 아니라 null)`, () => {
++        const patches = run([el('p', { style: style([['color', 'red'], [name, 'x']]) })], [el('p', { style: style([['color', 'red']]) })]);
++        expect(patches).toEqual([{ kind: 'SET_STYLE', path: [0], property: name, before: 'x', after: null }]);
++      });
++
++      it(`${name} 항목 값 수정은 SET_STYLE 전 · 후 값`, () => {
++        const patches = run([el('p', { style: style([[name, 'x']]) })], [el('p', { style: style([[name, 'y']]) })]);
++        expect(patches).toEqual([{ kind: 'SET_STYLE', path: [0], property: name, before: 'x', after: 'y' }]);
++      });
++    }
++
++    it('style이 통째로 없어질 때도 프로토타입 이름 항목을 지운다', () => {
++      const patches = run([el('p', { style: style([['__proto__', 'x']]) })], [el('p', {})]);
++      expect(patches).toEqual([{ kind: 'SET_STYLE', path: [0], property: '__proto__', before: 'x', after: null }]);
++    });
++  });
++
+   it('문자열 style 속성은 보통 속성으로 비교한다', () => {
+     const patches = run([el('p', { style: 'color: red' })], [el('p', { style: 'color: blue' })]);
+     expect(patches).toEqual([{ kind: 'SET_ATTR', path: [0], name: 'style', before: 'color: red', after: 'color: blue' }]);
+diff --git a/packages/react-reconciler/src/diff.ts b/packages/react-reconciler/src/diff.ts
+index 0038703..aad3c8f 100644
+--- a/packages/react-reconciler/src/diff.ts
++++ b/packages/react-reconciler/src/diff.ts
+@@ -139,12 +139,14 @@ function diffAttrs(oldNode: VNode, newNode: VNode, path: Path, out: Patch[]): vo
+ function diffStyle(oldNode: VNode, newNode: VNode, path: Path, out: Patch[]): void {
+   const before = readStyle(oldNode);
+   const after = readStyle(newNode);
++  // [AI Note]: 보통 객체의 `after[property]` · `property in before`는 프로토타입 체인까지 본다 (`constructor` · `__proto__` 등).
++  // 항목이 "자기 것으로" 있는지만 `Object.hasOwn`으로 보고, 값도 자기 것일 때만 읽는다 (검수 1회차 B-1).
+   for (const [property, oldValue] of Object.entries(before)) {
+-    const newValue = after[property];
++    const newValue = Object.hasOwn(after, property) ? after[property] : undefined;
+     if (newValue === undefined) out.push({ kind: 'SET_STYLE', path, property, before: oldValue, after: null });
+     else if (newValue !== oldValue) out.push({ kind: 'SET_STYLE', path, property, before: oldValue, after: newValue });
+   }
+   for (const [property, newValue] of Object.entries(after)) {
+-    if (!(property in before)) out.push({ kind: 'SET_STYLE', path, property, before: null, after: newValue });
++    if (!Object.hasOwn(before, property)) out.push({ kind: 'SET_STYLE', path, property, before: null, after: newValue });
+   }
+ }
