@@ -125,12 +125,20 @@
     - 무작위 200쌍 왕복: `무작위(고정 씨앗) 트리 쌍 200개에서 applyPatches(new, invert(diff(old, new)))가 old와 같다 (왕복)` 통과 (Dev-4와 같은 `randomTree.ts` 재사용, 앞으로 적용 결과가 new인 것도 함께 확인)
     - 실행: `npx vitest run` 6 files · 128 passed, `npx tsc --noEmit` 오류 0, 커밋: 메시지 `(Dev-5)`
 
-- [ ] **Dev-6** (`react-dom-bindings`): `patch` — 경로 + 순서대로 하나씩 실제 DOM에 반영 (SET_TEXT · SET_ATTR · SET_STYLE · INSERT · REMOVE · REPLACE) [P1-34 · P1-13 · P1-17 · P1-18 · T-03 · T-04 · T-06 · B20]
+- [x] **Dev-6** (`react-dom-bindings`): `patch` — 경로 + 순서대로 하나씩 실제 DOM에 반영 (SET_TEXT · SET_ATTR · SET_STYLE · INSERT · REMOVE · REPLACE) [P1-34 · P1-13 · P1-17 · P1-18 · T-03 · T-04 · T-06 · B20]
   - 의존: Dev-1 (INSERT · REPLACE가 `renderVNode` 사용), Dev-2 (결과를 `domToVNode`로 비교), Dev-4 (diff 결과 모양 확인)
   - 만들 · 고칠 파일: `packages/react-dom-bindings/src/client/patch.ts`, `packages/react-dom-bindings/src/index.ts`
   - 테스트: `packages/react-dom-bindings/src/client/__tests__/patch.test.ts` — 손으로 쓴 Patch 목록으로: 종류별 반영(D-01 ~ D-05), 글자 노드의 `nodeValue`만 바꿈(노드 참조 유지), 속성 추가 / 수정 / 삭제 · boolean(`""`) · style 항목별(다른 항목 유지, 마지막 항목을 지우면 `style` 속성도 제거), 경로가 영역 상자 안 자식부터이고 공백 · 주석 번호를 셈, 한 목록 안에서 INSERT(앞에서) · REMOVE(뒤에서)를 순서대로 적용, 빈 목록이면 `MutationObserver` 기록 0건(T-04), 대상 · 부모 · 형제 요소의 참조 유지(T-06 · P1-17 · P1-18), REPLACE는 새 노드로 바뀜(옛 참조 분리), MOVE는 이 Dev에서는 "Key 확장에서 구현" 오류를 낸다(`// [AI Note]`로 표시), 경로가 없으면 분명한 오류(C2 복구의 재료), **깊이 300 중첩 · 형제 2,000개에 `diff` 결과를 적용해도 스택 넘침 없이 끝나고 결과가 목표와 같음(B20)** (T-03 · T-04 · T-06)
   - 알고리즘: 결정 4 A (경로 + 순서대로) · 공백 · 주석 유지 · boolean · style
   - 완료 근거로 남길 것: `patch.test.ts` 통과 개수, `MutationObserver` 0건 테스트 이름, 참조 유지 테스트 이름, 깊이 300 · 형제 2,000 테스트 이름
+  - **완료 근거 (Evidence)**:
+    - 만든 · 고친 파일: `packages/react-dom-bindings/src/client/patch.ts`(`patch(area, patches)` — SET_TEXT · SET_ATTR · SET_STYLE · INSERT · REMOVE · REPLACE를 경로 + 순서대로 하나씩 적용, MOVE는 "Key 확장(Dev-22)에서 구현" 오류, 경로가 없으면 `경로 [..]에 해당하는 노드가 DOM에 없습니다` 오류), `packages/react-dom-bindings/src/index.ts`(내보내기). 세 번째 인자 `observer?`는 Dev-24(PatchObserver)에서 추가하므로 이 Dev에서는 `patch(area, patches)` 두 인자만 둠
+    - 테스트: `packages/react-dom-bindings/src/client/__tests__/patch.test.ts` 31건 통과 (`npx vitest run packages/react-dom-bindings/src/client/__tests__/patch.test.ts`). 모듈이 없는 상태에서 실패하는 것을 먼저 확인
+    - MutationObserver 0건: `빈 목록이면 MutationObserver 기록 0건 (T-04, P1-13)` (+ `글자 하나 바꾸기는 기록 1건(characterData)뿐이다`, `속성 하나 바꾸기는 기록 1건(attributes)뿐이다`)
+    - 참조 유지: `D-01 SET_TEXT: 글자 노드의 nodeValue만 바꾼다 (노드 참조 유지, P1-06)`, `대상 · 부모 · 형제 요소의 참조가 유지된다`, `추가 · 삭제 때도 관련 없는 형제 노드의 참조가 유지된다`, `일부 변경에서 바뀌지 않는 노드의 참조가 유지된다 (T-06)`, `D-05 REPLACE: 새 노드로 바뀌고 옛 노드는 분리된다`
+    - diff 결합 검증: D-01 ~ D-05 · 복합 · 복수 루트 · 0개 · 역패치 왕복, 무작위 200쌍(실제 DOM에 적용 후 `readAreaChildren` 결과가 목표와 같고 역패치로 원래대로)
+    - B20: `깊이 300 중첩의 맨 아래 글자 바꾸기가 스택 넘침 없이 끝나고 결과가 목표와 같다 (B20)`, `형제 2,000개에서 끝에 추가 · 전부 삭제가 끝나고 결과가 목표와 같다 (B20)` 통과
+    - 실행: `npx vitest run` 7 files · 159 passed, `npx tsc --noEmit` 오류 0, 커밋: 메시지 `(Dev-6)`
 
 - [ ] **Dev-7** (`react-dom-bindings`): `vnodesToHtml` — 저장한 VNode를 편집창에 채울 HTML 글로 [P1-22 · P1-30 · §5 공백 · 주석 · B18 · B19]
   - 의존: Dev-1 (`styleMapToText`), Dev-2 (왕복 검증)
