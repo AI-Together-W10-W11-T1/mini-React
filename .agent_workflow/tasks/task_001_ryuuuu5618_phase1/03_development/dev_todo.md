@@ -323,12 +323,19 @@ script:` · `" JAVA	script:"`), `<iframe> 제거 — srcdoc 안에 <script>paren
     - 명세에 없어 판단한 세부: ① 뒤로 · 앞으로 예외 알림 글을 Patch용 문구("Patch를 적용하는 중")가 아니라 "뒤로 이동하는 중" · "앞으로 이동하는 중"으로 나눔(말머리 `[Patch 오류]`는 약속대로 유지). ② `[Patch 오류]` 도중 예외 e2e(QA-33)는 qa_todo에 번호가 없어 QA-33으로 새로 붙임
     - 실행: `npx playwright test e2e/phase1-guard.spec.ts e2e/phase1-patch.spec.ts e2e/phase1-render.spec.ts` 50 passed(변경 없이 기존 통과 유지), `npx vitest run` 13 files · 334 passed, `npx tsc --noEmit` 오류 0, 커밋 (아래 docs 커밋에서 기록)
 
-- [ ] **Dev-19** (`e2e`): 편집창 왕복 · 다양한 태그 인수 테스트 — 브라우저에서 `vnodesToHtml` → 파싱 왕복을 확인하고, 빈 태그 · 인라인 중첩 · 표(`tbody` 유무)를 Patch한다. 발견된 결함이 있으면 앱 코드를 고친다(`fix(...)` 별도 커밋) [P1-13 · P1-23 · T-04 · T-07 · P1-07 ~ P1-12 · §5 · B4 · B5 · B6 · B8 · B9 · B10 · C1]
+- [x] **Dev-19** (`e2e`): 편집창 왕복 · 다양한 태그 인수 테스트 — 브라우저에서 `vnodesToHtml` → 파싱 왕복을 확인하고, 빈 태그 · 인라인 중첩 · 표(`tbody` 유무)를 Patch한다. 발견된 결함이 있으면 앱 코드를 고친다(`fix(...)` 별도 커밋) [P1-13 · P1-23 · T-04 · T-07 · P1-07 ~ P1-12 · §5 · B4 · B5 · B6 · B8 · B9 · B10 · C1]
   - 의존: Dev-15, Dev-18 (QA-23 (b)가 뒤로를 씀) — **시간이 모자라면 이 Dev를 통째로 미룰 수 있다 (우선순위 3, `dev_todo` 위 표)**
   - 만들 · 고칠 파일: `e2e/phase1-patch.spec.ts`(추가) 또는 `e2e/phase1-roundtrip.spec.ts`(새로, 분리해도 됨. 정하면 `qa_todo` 스펙 파일 열을 함께 고침)
   - 테스트(바깥 루프): QA-23(B4) · QA-24(B5) · QA-25(B6) · QA-26(B8 빈 태그) · QA-27(B9 인라인 중첩) · QA-28(B10 표 + C1 `tbody` 없는 표 허용)
   - 알고리즘: 결정 5 · 6 · §5 (C1: `tbody` 자동 추가 허용)
   - 완료 근거로 남길 것: `npx playwright test <해당 파일>` desktop · mobile 통과 개수, QA-23 ~ QA-28 테스트 이름, 고친 결함 목록
+  - **완료 근거 (Evidence)**:
+    - 만든 · 고친 파일: `e2e/phase1-roundtrip.spec.ts`(새로, 분리), `04_qa_evidence/qa_todo.md`(QA-23 ~ QA-28 스펙 파일 열을 `e2e/phase1-roundtrip.spec.ts`로 고침). 앱 코드는 고치지 않음
+    - 실행: `npx playwright test e2e/phase1-roundtrip.spec.ts` **12 passed**(desktop 6 · mobile 6). 이미 구현된 동작을 인수 시나리오로 확인하는 Dev라 "먼저 실패" 단계는 없고(Dev-15 · 18에서 구현된 Patch · 뒤로가 이 시나리오를 그대로 통과하는지 보는 것), 첫 실행에서 모두 통과했다. 통과했다는 것은 앱 결함이 발견되지 않았다는 뜻이다
+    - 테스트 이름: `QA-23 글을 쳤다 지워 원래 글로 되돌리거나 스냅샷 글(뒤로 뒤 편집창)을 그대로 Patch해도 DOM 변경 0건이고 기록이 안 늘어난다` · `QA-24 편집창에서 안녕 → 반가워 → 안녕으로 고쳐 두고 Patch하면 값이 같아 DOM 변경 0건이고 기록이 안 늘어난다` · `QA-25 글자를 치자마자(기다림 없이) Patch해도 마지막 글자까지 실제 영역에 반영된다` · `QA-26 빈 태그(img · br · hr · input)를 넣고 속성을 바꾸고 지워도 매번 실제 영역이 테스트 영역과 같다` · `QA-27 글자 사이 요소(안<b>녕</b>하세요)에서 <b>만 <i>로 바꾸면 <i>는 새 노드이고 앞뒤 글자 노드 · <p>는 같은 참조다` · `QA-28 표: tbody 있는 표를 넣고 고치고 행을 더해도 맞고, tbody 없는 표는 [구조 불일치] alert 없이 반영된다 (C1)`
+    - 확인한 것: QA-23(b)는 뒤로 뒤 편집창 글이 처음 글과 문자열까지 같고(`vnodesToHtml` → 파싱 왕복 안정), 그대로 Patch하면 `MutationObserver` 0건이며, 이어서 앞으로가 여전히 S1로 가서(무변경 Patch가 기록 · redo를 건드리지 않음) 기록이 안 늘었음을 증명한다. QA-25는 `안녕` 바로 뒤에 커서를 두고 `page.keyboard.type('요!!')` 직후 기다림 없이 Patch → `안녕요!!` 반영. QA-27은 두 번째 Patch에서 `<i>`가 새 노드(옛 `<b>`와 `!==`, `<b>`는 `isConnected` 거짓)이고 앞 · 뒤 글자 노드(자식 0번 · 2번)와 `<p>`는 같은 참조. QA-28(b) `tbody` 없는 표는 선언 없는 alert가 없고(있으면 헬퍼가 실패시킴) 실제 영역 표에 `<tbody>`가 들어가며 이어서 고친 칸 글자도 반영
+    - 고친 결함: 없음
+    - 전체 실행: Dev-19 시점 `npx vitest run` 13 files · 334 passed · `npx tsc --noEmit` 오류 0 (아래 Dev-20 기록에 최종 전체 실행 포함), 커밋 (아래 docs 커밋에서 기록)
 
 - [ ] **Dev-20** (`e2e`): 공격적 시나리오 모음 + 전체 확인 — 발견된 결함이 있으면 앱 코드를 고친다 (결함마다 별도 커밋은 `fix(...)`로) [P1-32 · §6.2 경계 조건 · A4 · A5]
   - 의존: Dev-14 ~ Dev-19
