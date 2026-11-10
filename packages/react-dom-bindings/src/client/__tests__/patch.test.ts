@@ -434,3 +434,161 @@ describe('patch — diff 결과 적용 (T-03 · T-05 · P1-34)', () => {
     pick().forEach((node, i) => expect(node).toBe(keep[i]));
   });
 });
+
+// Diff 시각화 확장: patch가 바꾼 노드를 바깥(페이지)에 알려 주는 콜백 (PatchObserver)
+describe('patch — 관찰 콜백 (Diff 시각화 재료)', () => {
+  interface Seen {
+    patch: Patch;
+    node: Node;
+    stage: 'before' | 'after';
+    connected: boolean;
+    value: string | null;
+  }
+
+  /** 콜백이 불리는 순간의 노드 상태(붙어 있는지 · 글자)를 그 자리에서 기록한다 */
+  function record(): { seen: Seen[]; observer: (e: { patch: Patch; node: Node; stage: 'before' | 'after' }) => void } {
+    const seen: Seen[] = [];
+    return {
+      seen,
+      observer: (e) => seen.push({ ...e, connected: e.node.isConnected, value: e.node.nodeValue }),
+    };
+  }
+
+  /** 문서에 붙은 영역 (isConnected 확인용) */
+  function attached(html: string): HTMLElement {
+    const box = area(html);
+    document.body.appendChild(box);
+    return box;
+  }
+
+  it('콜백이 patch 개수만큼 목록 순서대로 불린다', () => {
+    const box = attached('<ul><li>하나</li><li>둘</li></ul><p>끝</p>');
+    const patches: Patch[] = [
+      { kind: 'SET_TEXT', path: [0, 0, 0], before: '하나', after: '일' },
+      { kind: 'SET_ATTR', path: [1], name: 'class', before: null, after: 'x' },
+      { kind: 'REMOVE', path: [0, 1], node: el('li', {}, text('둘')) },
+      { kind: 'INSERT', path: [0, 1], node: el('li', {}, text('셋')) },
+    ];
+    const { seen, observer } = record();
+    patch(box, patches, observer);
+    expect(seen.map((s) => s.patch)).toEqual(patches);
+    box.remove();
+  });
+
+  it('REMOVE는 지우기 직전(before)에 아직 붙어 있는 노드를 넘기고, 불린 뒤에야 지운다', () => {
+    const box = attached('<ul><li>하나</li><li>둘</li></ul>');
+    const target = box.firstChild!.childNodes[1];
+    const { seen, observer } = record();
+    patch(box, [{ kind: 'REMOVE', path: [0, 1], node: el('li', {}, text('둘')) }], observer);
+    expect(seen).toHaveLength(1);
+    expect(seen[0].stage).toBe('before');
+    expect(seen[0].node).toBe(target);
+    expect(seen[0].connected).toBe(true);
+    expect(target.isConnected).toBe(false);
+    box.remove();
+  });
+
+  it('SET_TEXT는 적용 직후(after) 이미 새 글이 든 같은 글자 노드를 넘긴다', () => {
+    const box = attached('<p>안녕</p>');
+    const textNode = box.firstChild!.firstChild!;
+    const { seen, observer } = record();
+    patch(box, [{ kind: 'SET_TEXT', path: [0, 0], before: '안녕', after: '잘가' }], observer);
+    expect(seen).toEqual([expect.objectContaining({ stage: 'after', node: textNode, value: '잘가' })]);
+    box.remove();
+  });
+
+  it('SET_ATTR · SET_STYLE는 적용 직후 이미 고쳐진 요소를 넘긴다', () => {
+    const box = attached('<p class="a"></p>');
+    const p = box.firstChild as Element;
+    const attrs: (string | null)[] = [];
+    patch(
+      box,
+      [
+        { kind: 'SET_ATTR', path: [0], name: 'class', before: 'a', after: 'b' },
+        { kind: 'SET_STYLE', path: [0], property: 'color', before: null, after: 'red' },
+      ],
+      (e) => {
+        expect(e.node).toBe(p);
+        expect(e.stage).toBe('after');
+        attrs.push(p.getAttribute('class') + '|' + p.getAttribute('style'));
+      },
+    );
+    expect(attrs).toEqual(['b|null', 'b|color: red']);
+    box.remove();
+  });
+
+  it('INSERT · REPLACE는 새로 만든 노드가 이미 붙은 뒤(after) 그 새 노드를 넘긴다', () => {
+    const box = attached('<div><span>옛</span></div>');
+    const { seen, observer } = record();
+    patch(
+      box,
+      [
+        { kind: 'REPLACE', path: [0, 0], before: el('span', {}, text('옛')), after: el('b', {}, text('새')) },
+        { kind: 'INSERT', path: [0, 1], node: el('i') },
+      ],
+      observer,
+    );
+    const div = box.firstChild!;
+    expect(seen.map((s) => s.stage)).toEqual(['after', 'after']);
+    expect(seen[0].node).toBe(div.childNodes[0]);
+    expect((seen[0].node as Element).localName).toBe('b');
+    expect(seen[0].connected).toBe(true);
+    expect(seen[1].node).toBe(div.childNodes[1]);
+    expect(seen[1].connected).toBe(true);
+    box.remove();
+  });
+
+  it('MOVE는 옮긴 뒤(after) 옮겨진 같은 노드를 넘긴다 (Key 확장)', () => {
+    const box = attached('<ul><li>a</li><li>b</li><li>c</li></ul>');
+    const a = box.firstChild!.childNodes[0];
+    const { seen, observer } = record();
+    patch(box, [{ kind: 'MOVE', parent: [0], from: 0, to: 2 }], observer);
+    expect(seen).toHaveLength(1);
+    expect(seen[0].stage).toBe('after');
+    expect(seen[0].node).toBe(a);
+    expect(box.firstChild!.childNodes[2]).toBe(a);
+    box.remove();
+  });
+
+  it('콜백이 없을 때와 있을 때 결과 DOM이 같다', () => {
+    const oldTree = [el('div', {}, el('p', {}, text('가')), el('ul', {}, el('li', {}, text('1')), el('li', {}, text('2'))))];
+    const newTree = [el('div', { class: 'k' }, el('p', {}, text('나')), el('ul', {}, el('li', {}, text('2'))), el('hr'))];
+    const patches = diff(oldTree, newTree);
+    const plain = area('');
+    const watched = area('');
+    renderAreaChildren(plain, oldTree);
+    renderAreaChildren(watched, oldTree);
+    patch(plain, patches);
+    const { seen, observer } = record();
+    patch(watched, patches, observer);
+    expect(watched.innerHTML).toBe(plain.innerHTML);
+    expect(seen).toHaveLength(patches.length);
+  });
+
+  it('콜백을 넘겨도 MutationObserver 기록이 콜백 없을 때와 같다 (표시용 변경 없음)', () => {
+    const oldTree = [el('div', { id: 'a' }, el('p', {}, text('가')), el('ul', {}, el('li', {}, text('1')), el('li', {}, text('2'))))];
+    const newTree = [el('div', { id: 'b' }, el('p', {}, text('나')), el('ul', {}, el('li', {}, text('2'))))];
+    const patches = diff(oldTree, newTree);
+    const counts = (withObserver: boolean): string[] => {
+      const box = area('');
+      renderAreaChildren(box, oldTree);
+      const records: MutationRecord[] = [];
+      const mo = new MutationObserver(() => {});
+      mo.observe(box, { subtree: true, childList: true, attributes: true, characterData: true });
+      patch(box, patches, withObserver ? () => {} : undefined);
+      records.push(...mo.takeRecords());
+      return records.map((r) => `${r.type}:${r.target.nodeName}:${r.attributeName ?? ''}:${r.addedNodes.length}:${r.removedNodes.length}`);
+    };
+    expect(counts(true)).toEqual(counts(false));
+    expect(counts(false).length).toBeGreaterThan(0);
+  });
+
+  it('콜백에서 예외가 나면 그대로 밖으로 던져진다 (patch가 삼키지 않는다)', () => {
+    const box = area('<p>안녕</p>');
+    expect(() =>
+      patch(box, [{ kind: 'SET_TEXT', path: [0, 0], before: '안녕', after: 'x' }], () => {
+        throw new Error('콜백 오류');
+      }),
+    ).toThrow('콜백 오류');
+  });
+});

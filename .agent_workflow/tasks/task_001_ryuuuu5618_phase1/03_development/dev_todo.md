@@ -398,13 +398,18 @@ script:` · `" JAVA	script:"`), `<iframe> 제거 — srcdoc 안에 <script>paren
     - **전체 확인(Dev-21 ~ 23 끝)**: `npx vitest run` 15 files · **381 passed**, `npx tsc --noEmit` 오류 **0**, `npx playwright test` **94 passed**(회귀 확인, 포트 5199 사용 중이 아니었고 끝난 뒤 서버 남음 없음)
     - 커밋: c242817
 
-- [ ] **Dev-24** (`react-dom-bindings`): `patch`가 적용하는 노드를 바깥에 알리는 콜백 (`PatchObserver`) — Diff 시각화 재료 [Diff 시각화 확장]
+- [x] **Dev-24** (`react-dom-bindings`): `patch`가 적용하는 노드를 바깥에 알리는 콜백 (`PatchObserver`) — Diff 시각화 재료 [Diff 시각화 확장]
   - 의존: Dev-6 (MOVE까지 알리려면 Dev-22)
   - 만들 · 고칠 파일: `packages/react-dom-bindings/src/client/patch.ts`(`patch(area, patches, observer?)`), `packages/react-dom-bindings/src/index.ts`(타입 내보내기)
   - 설계: `PatchObserver = (event: { patch: Patch; node: Node; stage: 'before' | 'after' }) => void`. **REMOVE는 지우기 직전에 `stage: 'before'`로**(위치를 재야 하므로 아직 붙어 있는 노드를 넘김), 나머지(SET_TEXT · SET_ATTR · SET_STYLE · INSERT · REPLACE · MOVE)는 **적용 직후 `stage: 'after'`로** 바뀐 노드(INSERT · REPLACE는 새 노드)를 넘긴다. 콜백이 없으면 지금과 똑같이 동작. 실제 DOM에 표시용 class · 속성을 붙이지 않는다
   - 테스트: `packages/react-dom-bindings/src/client/__tests__/patch.test.ts`(추가) — 콜백이 patch 개수만큼 순서대로 불림, REMOVE는 `before` · 노드가 아직 `isConnected`, 나머지는 `after` · 노드가 이미 반영됨(`nodeValue` · 속성 확인), 콜백이 없을 때 결과 DOM 동일, 콜백을 넘겨도 `MutationObserver` 기록이 콜백 없을 때와 같음(표시용 변경 없음)
   - 알고리즘: 해당 없음 (Diff 시각화 명세: patch가 바꾼 노드 정보를 넘겨 줌)
   - 완료 근거로 남길 것: `patch.test.ts` 통과 개수, 콜백 순서 테스트 이름
+  - **완료 근거 (Evidence)**:
+    - 만든 · 고친 파일: `packages/react-dom-bindings/src/client/patch.ts`(`PatchObserver` 타입, `patch(area, patches, observer?)` — REMOVE는 지우기 직전 `stage: 'before'`, SET_TEXT · SET_ATTR · SET_STYLE · INSERT · REPLACE · MOVE는 적용 직후 `stage: 'after'`로 바뀐 노드(INSERT · REPLACE는 새 노드, MOVE는 옮겨진 노드)를 넘김, `observer`가 없으면 이전과 같음), `packages/react-dom-bindings/src/index.ts`(`PatchObserver` 타입 내보내기)
+    - 테스트: `packages/react-dom-bindings/src/client/__tests__/patch.test.ts`에 `patch — 관찰 콜백 (Diff 시각화 재료)` 9건 추가 — `콜백이 patch 개수만큼 목록 순서대로 불린다`, `REMOVE는 지우기 직전(before)에 아직 붙어 있는 노드를 넘기고…`(`isConnected` true → 불린 뒤 지움), `SET_TEXT는 적용 직후(after) 이미 새 글이 든 같은 글자 노드를…`, `SET_ATTR · SET_STYLE…`, `INSERT · REPLACE는 새로 만든 노드가 이미 붙은 뒤(after)…`, `MOVE는 옮긴 뒤(after)…`, `콜백이 없을 때와 있을 때 결과 DOM이 같다`, `콜백을 넘겨도 MutationObserver 기록이 콜백 없을 때와 같다 (표시용 변경 없음)`, `콜백에서 예외가 나면 그대로 밖으로 던져진다`. 구현 전에 8건 실패(1건은 우연히 통과)를 확인한 뒤 구현
+    - 실행: `npx vitest run packages/react-dom-bindings` 8 files · 233 passed(`patch.test.ts` 50건 전부 통과), `npx tsc --noEmit` 오류 0
+    - 커밋: (아래 docs 커밋에서 기록)
 
 - [ ] **Dev-25** (`react-dom`): `createVDomRoot`가 `update` · `back` · `forward`의 patch에 같은 콜백을 전달한다 [Diff 시각화 확장]
   - 의존: Dev-24, Dev-13
