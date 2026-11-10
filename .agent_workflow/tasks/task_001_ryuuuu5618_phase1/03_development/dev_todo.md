@@ -215,7 +215,7 @@ script:` · `" JAVA	script:"`), `<iframe> 제거 — srcdoc 안에 <script>paren
     - 갈림길: `뒤로 간 뒤 push하면 앞쪽(redo) 기록이 끊겨 앞으로가 안 된다` · `갈림길 뒤에는 갈림길 쪽 기록만 이어진다`
     - 저장 기록 불변(P1-27): `깊게 얼린 기록을 넣어도 push · back · forward · 갈림길 · 한도 제거가 snapshot · patches · inverse를 고치지 않는다`(`deepFreeze`한 기록 55개 push + 이동 + 갈림길 + 한도 제거를 예외 없이 마침) · `push한 기록 객체를 그대로 보관한다 (복사 · 변형 없음)`
     - B17: `50개 꽉 찬 상태에서 뒤로 10번 → push: 개수 41(잘린 10개를 뺌) · head 그대로 · 앞으로 불가` · `이어서 9번 push → 50, 한 번 더 push → head가 다음으로 밀리고 개수 50 유지` · `그 뒤 뒤로를 끝까지 하면 49번 이동하고, 앞으로로 current까지 되돌아온다`. 변이 확인: `push`의 끊기 루프에서 `this.#size--`를 빼면 위 B17 3건 + 갈림길 1건, 총 4건이 실패하는 것을 확인한 뒤 되돌림
-    - 실행: `npx tsc --noEmit` 오류 0, 커밋 (마지막 docs 커밋에서 기록)
+    - 실행: `npx tsc --noEmit` 오류 0, 커밋 21fb97c
 
 - [x] **Dev-12** (`react-dom`): `createVDomRoot` 1 — 로드 때 실제 영역을 읽어 0번 기록으로, `update`(Patch 흐름)로 diff → patch → 기록, Patch 도중 예외 복구 [P1-24 · P1-25 · P1-26 · P1-13 · P1-33 · P1-34 · T-03 ~ T-06 · C2 · B22]
   - 의존: Dev-2, Dev-3, Dev-4, Dev-5, Dev-6, Dev-11
@@ -231,7 +231,7 @@ script:` · `" JAVA	script:"`), `<iframe> 제거 — srcdoc 안에 <script>paren
     - 무변경 0건(T-04): `무변경 무시: false를 돌려주고 DOM 변경 0건 · 기록이 안 늘어난다` (`MutationObserver.takeRecords()` 0건 · snapshot 참조 그대로). 부분 갱신(T-06): `부분 갱신: 글자 하나를 바꿔도 관련 없는 노드 · 부모의 참조가 그대로다` (변경 기록 1건 = `characterData`). 연속 Patch(P1-25): `연속 update 3회가 매번 직전 반영 상태를 기준으로 정확하다`. 기록 불변(P1-26 · 27): `update마다 snapshot이 새 객체로 쌓이고, 이미 저장한 과거 snapshot의 내용은 안 바뀐다`
     - Patch 도중 예외 복구(C2 · B22): `B22: 실제 영역을 바깥에서 망가뜨려 경로가 사라지면 원래 예외가 다시 던져지고, 기록은 안 늘고 current는 안 움직인다` · `B22: 적용되다 만 patch도 되돌려져 실제 영역이 지금(current) 기록의 snapshot과 같아진다`(`<ul>`을 뗀 뒤 `<li>` INSERT가 `<p>`에 먼저 들어가고 다음 patch에서 실패하는 반쯤 적용된 상태) · `B22: 영역을 통째로 비워 첫 patch부터 실패해도 같은 복구가 된다` · `B22: 복구 뒤 이어서 정상 update가 성공하고 기록이 정확히 한 칸 늘어난다`. 변이 확인: 복구의 `renderAreaChildren` 줄을 지우면 B22 3건 실패하는 것을 확인하고 되돌림
     - 미룬 확인: `back()`이 필요한 단언(처음에 뒤로 · 앞으로가 `null` · 무변경 · 예외 뒤 "기록이 늘지 않음" · 복구 뒤 "정확히 한 칸 늘어남")은 `back`이 Dev-13에서 만들어지므로 Dev-13 테스트에 이어서 넣음. Dev-12에서는 `snapshot()` 참조 그대로로 같은 사실을 확인
-    - 실행: `npx tsc --noEmit` 오류 0, 커밋 (마지막 docs 커밋에서 기록)
+    - 실행: `npx tsc --noEmit` 오류 0, 커밋 a4ec636
 
 - [x] **Dev-13** (`react-dom`): `createVDomRoot` 2 — `back` · `forward`: 실제 영역은 역패치 · patch로, 돌려주는 스냅샷으로 테스트 영역 · 편집창이 따라가게 [P1-28 ~ P1-30 · T-08 · §3.3 · C2]
   - 의존: Dev-12
@@ -247,7 +247,7 @@ script:` · `" JAVA	script:"`), `<iframe> 제거 — srcdoc 안에 <script>paren
     - 부분 갱신: `뒤로 · 앞으로도 부분 갱신이다: 관련 없는 노드의 참조가 유지된다` (역패치 · patch 모두 변경 기록 1건 `characterData`, 부모 · 형제 · 자식 참조 그대로)
     - 이동 도중 예외(C2): `back 도중 예외: 원래 예외가 다시 던져지고 current가 안 움직이며 실제 영역이 current 기록으로 다시 그려진다` · `back 도중 일부만 적용되다 실패해도 되돌려진다 (역패치 첫 줄은 성공, 둘째 줄에서 실패)` · `forward 도중 예외: …` (각각 이어서 정상 back · forward가 성공). Dev-12에서 미룬 `B22(이어서): update 도중 예외 뒤에도 기록이 안 늘어난다 - 뒤로가 없고, 복구 뒤 정상 update는 정확히 한 칸 늘린다`도 여기서 확인
     - 변이 확인: `back`에서 `history.back()`을 patch보다 먼저 하면(이동 먼저) back 예외 테스트 2건이 실패 · 역패치를 다시 뒤집어 적용하면 `최상위가 여러 개 · 0개인 상태 사이를 오가도 맞다` 실패하는 것을 확인하고 되돌림
-    - 실행: `npx vitest run` 13 files · 334 passed, `npx tsc --noEmit` 오류 0, 커밋 (마지막 docs 커밋에서 기록)
+    - 실행: `npx vitest run` 13 files · 334 passed, `npx tsc --noEmit` 오류 0, 커밋 d022767
 
 - [ ] **Dev-14** (`fixture` + `e2e`): 검증 페이지 — 실제 영역 · 테스트 영역(편집창 + 미리보기) · 버튼 3개를 놓고, 로드 때 실제 영역을 읽어 편집창 · 테스트 영역을 채운다. 기존 최소 페이지를 대체한다. e2e 헬퍼에 구조 비교 · dialog 감시 · 콘솔 감시를 둔다 [P1-19 ~ P1-22 · P1-32 · A4 · A5]
   - 의존: Dev-2, Dev-7, Dev-8, Dev-12
