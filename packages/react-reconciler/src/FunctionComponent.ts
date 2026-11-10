@@ -17,6 +17,8 @@ export interface FunctionComponentHost {
   apply(patches: readonly Patch[]): void;
 }
 
+const ORDER_ERROR = 'Hook 호출 순서 · 개수가 달라졌습니다';
+
 interface PendingEffect {
   readonly slot: EffectHook;
   readonly effect: EffectCallback;
@@ -44,6 +46,8 @@ export class FunctionComponent {
   private pendingEffects: PendingEffect[] = [];
   private readonly latestPending = new WeakMap<EffectHook, PendingEffect>();
   private readonly runCount = new WeakMap<EffectHook, number>();
+  // 첫 렌더가 끝났을 때의 Hook 수. 이후 렌더가 이 수와 다르면 오류 (null = 아직 첫 렌더 전)
+  private expectedHookCount: number | null = null;
   // 이번 렌더에서 지금까지 부른 Hook 수 = 다음 Hook이 쓸 hooks 배열 번호 (렌더마다 0번부터)
   private hookIndex = 0;
 
@@ -61,7 +65,7 @@ export class FunctionComponent {
   /** 최초 호출: 초기 UI를 실제 DOM에 그린다 (P2-05) */
   mount(): void {
     if (this.mounted) throw new Error('mount()는 한 번만 부를 수 있습니다');
-    const next = this.render();
+    const next = this.renderChecked();
     const effects = this.takePendingEffects();
     this.host.mount([next]);
     this.previous = next;
@@ -73,7 +77,7 @@ export class FunctionComponent {
   update(): void {
     if (!this.mounted || this.previous === null) throw new Error('mount()를 먼저 불러야 update()를 쓸 수 있습니다');
     if (this.unmounted) return;
-    const next = this.render();
+    const next = this.renderChecked();
     const effects = this.takePendingEffects();
     // [AI Note]: Phase 1 diff를 그대로 재사용한다 (P2-19). App() 결과 하나 = 영역 자식 목록 [결과] (Phase 1 규칙)
     const patches = diff([this.previous], [next]);
@@ -93,6 +97,28 @@ export class FunctionComponent {
         slot.cleanup = null;
         cleanup();
       }
+    }
+  }
+
+  // [AI Note]: 렌더가 실패하면(Hook 순서 · 개수 오류, 자식 Hook 호출, 컴포넌트 예외) 이번 렌더는 "없었던 일"로 한다 —
+  // 이전 VNode · DOM(host는 아직 안 불렸음)은 그대로이고, 이번 렌더가 만든 슬롯은 버리고 바꾼 슬롯 값(memo 등)은 되돌린다.
+  // (setter가 렌더 전에 바꿔 둔 state 값은 렌더의 일이 아니라 그대로 둔다.) 예외는 그대로 위로 던진다.
+  private renderChecked(): VNode {
+    const saved = this.hooks.map((slot) => ({ ...slot }));
+    try {
+      const next = this.render();
+      // 부른 Hook 수가 첫 렌더와 다르면 번호가 밀려 상태가 섞이므로 막는다 (if · for 안 Hook 금지)
+      if (this.expectedHookCount === null) {
+        this.expectedHookCount = this.hookIndex;
+      } else if (this.hookIndex !== this.expectedHookCount) {
+        throw new Error(`${ORDER_ERROR}: 첫 렌더 ${this.expectedHookCount}개, 이번 ${this.hookIndex}개`);
+      }
+      return next;
+    } catch (error) {
+      this.hooks.length = saved.length;
+      saved.forEach((copy, i) => Object.assign(this.hooks[i], copy));
+      this.pendingEffects = [];
+      throw error;
     }
   }
 
@@ -133,7 +159,7 @@ export class FunctionComponent {
       this.hooks[index] = created;
       slot = created;
     } else if (slot.kind !== 'state') {
-      throw new Error(`Hook 호출 순서가 달라졌습니다: ${index}번 Hook이 지난번에는 ${slot.kind}, 이번에는 state입니다`);
+      throw new Error(`${ORDER_ERROR}: ${index}번 Hook이 지난번에는 ${slot.kind}, 이번에는 state입니다`);
     }
     return [slot.value as S, slot.setter as (next: SetStateAction<S>) => void];
   }
@@ -149,7 +175,7 @@ export class FunctionComponent {
       this.hooks[index] = slot;
       changed = true; // 처음 렌더는 의존성이 [] 여도 한 번 돈다
     } else if (slot.kind !== 'effect') {
-      throw new Error(`Hook 호출 순서가 달라졌습니다: ${index}번 Hook이 지난번에는 ${slot.kind}, 이번에는 effect입니다`);
+      throw new Error(`${ORDER_ERROR}: ${index}번 Hook이 지난번에는 ${slot.kind}, 이번에는 effect입니다`);
     } else {
       changed = depsChanged(slot.deps, deps);
     }
@@ -204,7 +230,7 @@ export class FunctionComponent {
       return created.value as T;
     }
     if (slot.kind !== 'memo') {
-      throw new Error(`Hook 호출 순서가 달라졌습니다: ${index}번 Hook이 지난번에는 ${slot.kind}, 이번에는 memo입니다`);
+      throw new Error(`${ORDER_ERROR}: ${index}번 Hook이 지난번에는 ${slot.kind}, 이번에는 memo입니다`);
     }
     if (depsChanged(slot.deps, deps)) {
       slot.value = factory();
