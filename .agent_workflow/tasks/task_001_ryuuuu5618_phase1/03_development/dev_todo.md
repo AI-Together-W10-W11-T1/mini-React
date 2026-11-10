@@ -423,13 +423,19 @@ script:` · `" JAVA	script:"`), `<iframe> 제거 — srcdoc 안에 <script>paren
     - 실행: `npx vitest run packages/react-dom/src/__tests__/createVDomRoot.test.ts` 44 passed(기존 37 + 7), `npx tsc --noEmit` 오류 0
     - 커밋: (아래 docs 커밋에서 기록)
 
-- [ ] **Dev-26** (`fixture` + `e2e`): [시각화 켜기] 스위치(기본 꺼짐) + 오버레이 깜빡임 — Patch · 뒤로 · 앞으로 [Diff 시각화 확장 · A1]
+- [x] **Dev-26** (`fixture` + `e2e`): [시각화 켜기] 스위치(기본 꺼짐) + 오버레이 깜빡임 — Patch · 뒤로 · 앞으로 [Diff 시각화 확장 · A1]
   - 의존: Dev-25, Dev-18
   - 만들 · 고칠 파일: `fixtures/phase1-vdom-playground/index.html`(스위치 `viz-toggle`, 실제 영역을 감싼 상대 위치 박스 안에 `pointer-events:none` 오버레이 `viz-overlay` — 실제 영역 **밖**에 둠), `fixtures/phase1-vdom-playground/overlay.ts`(새로: 콜백으로 받은 노드의 위치를 재서 상자를 그림), `fixtures/phase1-vdom-playground/main.ts`(`createVDomRoot(…, { onPatch })`에 연결), `e2e/phase1-visual.spec.ts`
   - 설계: 스위치가 꺼져 있으면 콜백이 아무것도 재지 않음(**patch 개수만 세서 `viz-overlay`의 `data-last-patch-count`에 남김**). 켜져 있으면 patch 하나마다 상자 하나: `before`(REMOVE)는 그 순간 재서 저장, `after`는 바로 잰다. 글자 노드는 `Range`로 재고, 크기가 0이거나 주석이면 부모 요소로 대신한다. 한 번의 `update` · `back` · `forward`가 끝나면 저장한 위치에 상자를 그리고 CSS 애니메이션이 끝나면 지운다. **그린 상자 개수는 `data-last-flash-count`, 이번 동작의 patch 개수는 `data-last-patch-count`에 다음 동작 전까지 남겨** e2e가 깜빡임 시간에 흔들리지 않게 한다(A1). 실제 DOM에는 class · 속성을 붙이지 않는다
   - 테스트(바깥 루프): `e2e/phase1-visual.spec.ts` — QA-22 (기본 꺼짐 · 켜면 Patch · 뒤로 · 앞으로에서 **깜빡임 개수 = 그 동작의 patch 개수** · 정확한 숫자(= 1)는 글자 하나 Patch만 · 실제 영역에 표시용 변경 없음 · 끄면 깜빡임 0)
   - 알고리즘: Diff 시각화 (스위치 + 오버레이 깜빡임만, 실제 노드에 class 안 붙임)
   - 완료 근거로 남길 것: `npx playwright test e2e/phase1-visual.spec.ts` desktop · mobile 통과 개수, `npx playwright test` 전체 통과 개수
+  - **완료 근거 (Evidence)**:
+    - 만든 · 고친 파일: `fixtures/phase1-vdom-playground/index.html`(툴바에 `<input type="checkbox" data-testid="viz-toggle">` [시각화 켜기] 기본 꺼짐, 실제 영역을 감싼 `.real-wrap`(상대 위치) 안에 실제 영역 **밖** 형제로 `pointer-events:none` 오버레이 `viz-overlay`(`data-last-patch-count="0"` · `data-last-flash-count="0"`), `.viz-box` 깜빡임 CSS 애니메이션 0.7s), `fixtures/phase1-vdom-playground/overlay.ts`(새로: `createOverlay(layer, realArea, isEnabled)` → `onPatch` · `run(action)`. 꺼져 있으면 개수만 셈, 켜져 있으면 patch마다 위치를 재서(REMOVE는 `before`에서 그 순간) 동작이 끝난 뒤 상자를 그림. 글자 노드는 `Range`, 0 크기 · 주석은 가장 가까운 크기 있는 부모 요소, `animationend`(+ 타이머)로 지움), `fixtures/phase1-vdom-playground/main.ts`(`createVDomRoot(realArea, { onPatch })`, Patch · 뒤로 · 앞으로를 `overlay.run`으로 감쌈), `e2e/phase1-visual.spec.ts`(새로)
+    - 바깥 루프: 구현 전에 `npx playwright test e2e/phase1-visual.spec.ts`가 `viz-toggle`을 못 찾아 desktop · mobile 2건 실패하는 것을 확인한 뒤 구현. QA-22 1건: 기본 꺼짐 · 오버레이가 실제 영역 밖 · `pointer-events:none` / 꺼짐에서 글자 Patch는 patch ≥ 1 · 깜빡임 0 / 켠 뒤 글자 하나 Patch는 정확히 `{ patch: 1, flash: 1 }`(상자 하나가 바뀐 글자만 감쌈) / 뒤로 · 앞으로도 `{ 1, 1 }` / `<li>` 삭제 Patch는 깜빡임 = patch 개수(≥ 1)이고 상자 중 하나가 지우기 전 `<li>` 자리와 겹침 / 삭제를 뒤로 되돌릴 때도 깜빡임 = patch / 끄면 깜빡임 0 · patch 개수는 남음. 켜져 있어도 실제 영역 `MutationObserver`는 글자 Patch · 뒤로 · 앞으로에서 `characterData` 1건뿐이고 세 칸 구조 일치(표시용 class · 속성 없음)
+    - 실행: `npx playwright test e2e/phase1-visual.spec.ts` 2 passed(desktop 1 · mobile 1), `npx playwright test` **96 passed**(기존 94 + 2), `npx vitest run` 15 files · **397 passed**(381 + Dev-24 9 + Dev-25 7), `npx tsc --noEmit` 오류 0. 포트 5199는 사용 중이 아니었고 끝난 뒤 서버 남음 없음
+    - 판단한 세부(명세에 없음): 무변경 Patch · 경계 이동처럼 patch가 하나도 없는 동작은 두 data 속성을 지난 값 그대로 둠 / 동작 도중 예외(C2)는 모아 둔 위치를 버리고 깜빡이지 않음 / 새 동작이 시작되면 아직 남은 지난 상자를 치우고 이번 동작의 상자만 그림 / 오버레이 초기 속성은 `0` · `0`
+    - 커밋: (아래 docs 커밋에서 기록)
 
 <!-- 완료 예시
 - [x] **Dev-3** (`react-reconciler`): diff 기본 ...

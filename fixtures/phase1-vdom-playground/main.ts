@@ -1,5 +1,6 @@
 import { createVDomRoot } from '@mini-react/react-dom';
 import type { AreaChildren } from '@mini-react/shared';
+import { createOverlay } from './overlay';
 import { checkHtml, formatProblems, readAreaChildren, renderAreaChildren, setAreaHtml, vnodesToHtml } from '@mini-react/react-dom-bindings';
 
 // [AI Note]: 엔진 로직 없음. 패키지 공개 API만 이어 붙이는 연결 코드다.
@@ -15,7 +16,11 @@ const realArea = byTestId<HTMLElement>('real-area');
 const testArea = byTestId<HTMLElement>('test-area');
 const editor = byTestId<HTMLTextAreaElement>('html-editor');
 
-const root = createVDomRoot(realArea);
+// [AI Note]: Diff 시각화(확장). 스위치는 기본 꺼짐. 엔진(createVDomRoot)이 patch마다 알려 주는 노드를 오버레이가 받아 그린다.
+// 오버레이는 실제 영역 밖 투명 판이라 실제 DOM 변경은 스위치와 상관없이 같다. 한 동작(update · back · forward)은 overlay.run으로 감싼다.
+const vizToggle = byTestId<HTMLInputElement>('viz-toggle');
+const overlay = createOverlay(byTestId<HTMLElement>('viz-overlay'), realArea, () => vizToggle.checked);
+const root = createVDomRoot(realArea, { onPatch: overlay.onPatch });
 const initial = root.snapshot();
 renderAreaChildren(testArea, initial);
 editor.value = vnodesToHtml(initial);
@@ -39,7 +44,7 @@ byTestId<HTMLButtonElement>('btn-patch').addEventListener('click', () => {
   }
   setAreaHtml(testArea, editor.value);
   try {
-    root.update(readAreaChildren(testArea));
+    overlay.run(() => root.update(readAreaChildren(testArea)));
   } catch (error) {
     reportPatchError(error);
   }
@@ -64,7 +69,7 @@ function reportPatchError(error: unknown, doing = 'Patch를 적용하는 중'): 
 // null이면 처음 · 끝이라 아무 일도 없다: 편집창에 쳐 둔 글도 그대로 남는다(경계 이동 무시).
 function move(go: () => AreaChildren | null, doing: string): void {
   try {
-    const snapshot = go();
+    const snapshot = overlay.run(go);
     if (snapshot === null) return;
     renderAreaChildren(testArea, snapshot);
     editor.value = vnodesToHtml(snapshot);

@@ -23,6 +23,22 @@
       .pane h3 { margin: 12px 0 4px; font-size: 0.875rem; color: var(--label); }
       .area { min-height: 3rem; overflow-wrap: anywhere; border: 1px dashed var(--line); padding: 8px; }
       #html-editor { display: block; width: 100%; min-height: 14rem; font: 0.8125rem/1.4 ui-monospace, monospace; }
+      .toolbar .viz-switch { display: inline-flex; align-items: center; gap: 6px; margin-left: 8px; cursor: pointer; user-select: none; }
+      /* Diff 시각화(확장): 오버레이는 실제 영역 "밖"에 같은 크기로 겹쳐 두는 투명 판이다. 마우스를 받지 않고, 실제 DOM에는 아무것도 붙이지 않는다 */
+      .real-wrap { position: relative; }
+      .viz-overlay { position: absolute; inset: 0; pointer-events: none; overflow: visible; }
+      .viz-box {
+        position: absolute;
+        border: 2px solid #e8590c;
+        background: rgba(255, 146, 43, 0.3);
+        border-radius: 3px;
+        animation: viz-flash 0.7s ease-out forwards;
+      }
+      @keyframes viz-flash {
+        0% { opacity: 1; }
+        50% { opacity: 0.2; }
+        100% { opacity: 0; }
+      }
       /* 모바일: 두 영역이 위아래로 쌓이고 가로 스크롤이 없다 */
       @media (max-width: 720px) {
         .panes { grid-template-columns: 1fr; }
@@ -35,11 +51,13 @@
       <button type="button" data-testid="btn-patch">Patch</button>
       <button type="button" data-testid="btn-back">뒤로</button>
       <button type="button" data-testid="btn-forward">앞으로</button>
+      <label class="viz-switch"><input type="checkbox" data-testid="viz-toggle" /> 시각화 켜기</label>
     </div>
     <div class="panes">
       <section class="pane pane-real">
         <h2>실제 영역</h2>
         <!-- 초기 샘플 HTML: 이 영역 안 글을 로드 때 읽어 초기 VNode(0번 기록)로 삼는다 (P1-20). 줄 들여쓰기도 샘플의 일부 -->
+        <div class="real-wrap">
         <div class="area" data-testid="real-area">
 <section id="card" class="card">
   <h2>제목</h2>
@@ -52,6 +70,9 @@
   </ul>
   <button disabled>잠김</button>
 </section>
+        </div>
+        <!-- Diff 시각화(확장) 오버레이: 실제 영역(real-area) 밖. 깜빡임 상자는 여기에만 그린다 -->
+        <div class="viz-overlay" data-testid="viz-overlay" data-last-patch-count="0" data-last-flash-count="0" aria-hidden="true"></div>
         </div>
       </section>
       <section class="pane pane-test">
