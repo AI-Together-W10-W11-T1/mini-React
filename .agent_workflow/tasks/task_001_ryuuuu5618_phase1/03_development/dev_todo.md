@@ -409,7 +409,7 @@ script:` · `" JAVA	script:"`), `<iframe> 제거 — srcdoc 안에 <script>paren
     - 만든 · 고친 파일: `packages/react-dom-bindings/src/client/patch.ts`(`PatchObserver` 타입, `patch(area, patches, observer?)` — REMOVE는 지우기 직전 `stage: 'before'`, SET_TEXT · SET_ATTR · SET_STYLE · INSERT · REPLACE · MOVE는 적용 직후 `stage: 'after'`로 바뀐 노드(INSERT · REPLACE는 새 노드, MOVE는 옮겨진 노드)를 넘김, `observer`가 없으면 이전과 같음), `packages/react-dom-bindings/src/index.ts`(`PatchObserver` 타입 내보내기)
     - 테스트: `packages/react-dom-bindings/src/client/__tests__/patch.test.ts`에 `patch — 관찰 콜백 (Diff 시각화 재료)` 9건 추가 — `콜백이 patch 개수만큼 목록 순서대로 불린다`, `REMOVE는 지우기 직전(before)에 아직 붙어 있는 노드를 넘기고…`(`isConnected` true → 불린 뒤 지움), `SET_TEXT는 적용 직후(after) 이미 새 글이 든 같은 글자 노드를…`, `SET_ATTR · SET_STYLE…`, `INSERT · REPLACE는 새로 만든 노드가 이미 붙은 뒤(after)…`, `MOVE는 옮긴 뒤(after)…`, `콜백이 없을 때와 있을 때 결과 DOM이 같다`, `콜백을 넘겨도 MutationObserver 기록이 콜백 없을 때와 같다 (표시용 변경 없음)`, `콜백에서 예외가 나면 그대로 밖으로 던져진다`. 구현 전에 8건 실패(1건은 우연히 통과)를 확인한 뒤 구현
     - 실행: `npx vitest run packages/react-dom-bindings` 8 files · 233 passed(`patch.test.ts` 50건 전부 통과), `npx tsc --noEmit` 오류 0
-    - 커밋: (아래 docs 커밋에서 기록)
+    - 커밋: 574d11c
 
 - [x] **Dev-25** (`react-dom`): `createVDomRoot`가 `update` · `back` · `forward`의 patch에 같은 콜백을 전달한다 [Diff 시각화 확장]
   - 의존: Dev-24, Dev-13
@@ -421,7 +421,7 @@ script:` · `" JAVA	script:"`), `<iframe> 제거 — srcdoc 안에 <script>paren
     - 만든 · 고친 파일: `packages/react-dom/src/createVDomRoot.ts`(`CreateVDomRootOptions { onPatch?: PatchObserver }`, `createVDomRoot(realArea, options = {})`, `applyOrRecover`가 `patch(realArea, patches, onPatch)`로 전달 — `update` · `back` · `forward`가 모두 이 한 곳을 지남), `packages/react-dom/src/index.ts`(`CreateVDomRootOptions` 타입 내보내기)
     - 테스트: `packages/react-dom/src/__tests__/createVDomRoot.test.ts`에 `createVDomRoot — onPatch 관찰 콜백 (Diff 시각화)` 7건 추가 — `update: diff가 만든 patch 수만큼…`, `back · forward: 각각 저장해 둔 inverse · patches 개수만큼 불린다`, `REMOVE는 before, 나머지는 after로 불린다 (update · back · forward 모두)`, `무변경 update · 경계 이동…에서는 콜백이 불리지 않는다`, `콜백을 넘겨도 실제 영역 DOM 변경(MutationObserver 기록)은 콜백 없을 때와 같다`, `options 없이 · onPatch 없이 만들어도 기존처럼 동작한다`, `patch 도중 예외로 복구할 때는 콜백을 부르지 않는다`. 구현 전 3건 실패(나머지는 옵션 무시로 우연히 통과)를 확인한 뒤 구현
     - 실행: `npx vitest run packages/react-dom/src/__tests__/createVDomRoot.test.ts` 44 passed(기존 37 + 7), `npx tsc --noEmit` 오류 0
-    - 커밋: (아래 docs 커밋에서 기록)
+    - 커밋: 35d9435
 
 - [x] **Dev-26** (`fixture` + `e2e`): [시각화 켜기] 스위치(기본 꺼짐) + 오버레이 깜빡임 — Patch · 뒤로 · 앞으로 [Diff 시각화 확장 · A1]
   - 의존: Dev-25, Dev-18
@@ -435,7 +435,7 @@ script:` · `" JAVA	script:"`), `<iframe> 제거 — srcdoc 안에 <script>paren
     - 바깥 루프: 구현 전에 `npx playwright test e2e/phase1-visual.spec.ts`가 `viz-toggle`을 못 찾아 desktop · mobile 2건 실패하는 것을 확인한 뒤 구현. QA-22 1건: 기본 꺼짐 · 오버레이가 실제 영역 밖 · `pointer-events:none` / 꺼짐에서 글자 Patch는 patch ≥ 1 · 깜빡임 0 / 켠 뒤 글자 하나 Patch는 정확히 `{ patch: 1, flash: 1 }`(상자 하나가 바뀐 글자만 감쌈) / 뒤로 · 앞으로도 `{ 1, 1 }` / `<li>` 삭제 Patch는 깜빡임 = patch 개수(≥ 1)이고 상자 중 하나가 지우기 전 `<li>` 자리와 겹침 / 삭제를 뒤로 되돌릴 때도 깜빡임 = patch / 끄면 깜빡임 0 · patch 개수는 남음. 켜져 있어도 실제 영역 `MutationObserver`는 글자 Patch · 뒤로 · 앞으로에서 `characterData` 1건뿐이고 세 칸 구조 일치(표시용 class · 속성 없음)
     - 실행: `npx playwright test e2e/phase1-visual.spec.ts` 2 passed(desktop 1 · mobile 1), `npx playwright test` **96 passed**(기존 94 + 2), `npx vitest run` 15 files · **397 passed**(381 + Dev-24 9 + Dev-25 7), `npx tsc --noEmit` 오류 0. 포트 5199는 사용 중이 아니었고 끝난 뒤 서버 남음 없음
     - 판단한 세부(명세에 없음): 무변경 Patch · 경계 이동처럼 patch가 하나도 없는 동작은 두 data 속성을 지난 값 그대로 둠 / 동작 도중 예외(C2)는 모아 둔 위치를 버리고 깜빡이지 않음 / 새 동작이 시작되면 아직 남은 지난 상자를 치우고 이번 동작의 상자만 그림 / 오버레이 초기 속성은 `0` · `0`
-    - 커밋: (아래 docs 커밋에서 기록)
+    - 커밋: e254a5b
 
 <!-- 완료 예시
 - [x] **Dev-3** (`react-reconciler`): diff 기본 ...
