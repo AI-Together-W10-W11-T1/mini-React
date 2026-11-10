@@ -88,12 +88,16 @@
     - 샘플 HTML 읽은 VNode 요약(테스트 "샘플 HTML을 읽은 VNode (요약)"): `section{id:card,class:card}` 자식 종류 = `#text, h2, #text, #comment, #text, p{class:note, style:{color:red,font-size:16px}}, #text, ul, #text, button{disabled:""}, #text` (11개)
     - 실행: `npx vitest run` 4 files · 70 passed, `npx tsc --noEmit` 오류 0, 커밋: 메시지 `(Dev-2)`
 
-- [ ] **Dev-3** (`react-reconciler`): `diff` 기본 — 글자 · 주석 글 · 속성 추가 · 수정 · 삭제 · style 항목 · 교체 · 무변경 (자식은 같은 길이까지) [P1-06 ~ P1-09 · P1-12 · P1-13 · P1-33 · T-03 · T-04]
+- [x] **Dev-3** (`react-reconciler`): `diff` 기본 — 글자 · 주석 글 · 속성 추가 · 수정 · 삭제 · style 항목 · 교체 · 무변경 (자식은 같은 길이까지) [P1-06 ~ P1-09 · P1-12 · P1-13 · P1-33 · T-03 · T-04]
   - 의존: 없음 (DOM 없이 VNode만)
   - 만들 · 고칠 파일: `packages/react-reconciler/src/diff.ts`, `packages/react-reconciler/src/index.ts`(새로), `packages/react-reconciler/src/__tests__/applyPatches.ts`(**테스트 전용 검산기**: VNode 목록에 patch를 순서대로 적용해 새 VNode 목록을 만든다. MOVE 포함 7종)
   - 테스트: `packages/react-reconciler/src/__tests__/diff.test.ts` — D-01 글자(SET_TEXT) · 주석 글 · D-02 속성 추가 / 수정 / 삭제(SET_ATTR before · after null) · boolean 속성 켜기 · 끄기(교체 아님) · style 항목 추가 / 수정 / 삭제(SET_STYLE) · D-05 태그가 다르면 REPLACE(before · after 통째) · 글자 ↔ 요소 ↔ 주석 종류가 다르면 REPLACE · 같은 입력이면 빈 목록(T-04) · 입력 VNode를 고치지 않음(깊은 얼림) · `applyPatches(old, diff(old, new))`가 new와 같음 (T-03 · T-04)
   - 알고리즘: 결정 2 (필수: 위치 기반) · 결정 3 A · 결정 4 A
   - 완료 근거로 남길 것: `diff.test.ts` 통과 개수, D-01 ~ D-05 중 D-01 · D-02 · D-05가 이 Dev에서 통과함을 테스트 이름으로 표시
+  - **완료 근거 (Evidence)**:
+    - 만든 · 고친 파일: `packages/react-reconciler/src/diff.ts`(`diff` · `diffNode` — TEXT/COMMENT 분기 SET_TEXT, 속성 · style 항목 비교, 종류 · 태그가 다르면 REPLACE, 자식은 겹치는 길이까지만), `packages/react-reconciler/src/index.ts`(새로, `diff` 내보내기), `packages/react-reconciler/src/__tests__/applyPatches.ts`(테스트 전용 검산기, MOVE 포함 7종 + `normalizeTree`)
+    - 테스트: `diff.test.ts` 30건 통과 (`npx vitest run packages/react-reconciler`). 모듈이 없는 상태에서 실패하는 것을 먼저 확인. 이 Dev에서 통과한 기본 케이스: `D-01 글자가 바뀌면 SET_TEXT 한 줄`, `D-01 중첩 안의 글자`, `D-02 속성 추가 · 수정 · 삭제`, `D-05 태그가 다르면 REPLACE`, `D-05 중첩 안의 교체`, `글자 ↔ 요소 ↔ 주석 종류가 다르면 REPLACE`, `같은 입력이면 빈 목록 (P1-13)`, `입력 VNode를 고치지 않는다(깊게 얼린 입력)`, 모든 `run()` 테스트가 `applyPatches(old, diff(old, new))`가 new와 같음을 함께 확인
+    - 실행: `npx vitest run` 5 files · 100 passed, `npx tsc --noEmit` 오류 0, 커밋: 메시지 `(Dev-3)`
 
 - [ ] **Dev-4** (`react-reconciler`): `diff` 자식 추가 · 삭제 · 중첩 · 복합 — 길이가 다른 자식 목록(INSERT 앞에서 · REMOVE 뒤에서) [P1-10 · P1-11 · P1-14 ~ P1-16 · T-03 · T-05 · B20]
   - 의존: Dev-3
