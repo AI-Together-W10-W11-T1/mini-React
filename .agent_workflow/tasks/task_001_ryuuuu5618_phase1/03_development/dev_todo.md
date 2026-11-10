@@ -65,12 +65,16 @@
 
 ## Dev 항목 — 필수
 
-- [ ] **Dev-1** (`react-dom-bindings`): `renderVNode`가 주석 · style(StyleMap)을 그리고, 영역 상자 안을 통째로 그리는 `renderAreaChildren`을 추가한다 [P1-05 · T-02 · B21]
+- [x] **Dev-1** (`react-dom-bindings`): `renderVNode`가 주석 · style(StyleMap)을 그리고, 영역 상자 안을 통째로 그리는 `renderAreaChildren`을 추가한다 [P1-05 · T-02 · B21]
   - 의존: 없음
   - 만들 · 고칠 파일: `packages/react-dom-bindings/src/client/renderVNode.ts`(주석 분기 `createComment`, `style` 객체 → 속성 글, `renderAreaChildren`), `packages/react-dom-bindings/src/client/style.ts`(`parseStyleText` · `styleMapToText`), `packages/react-dom-bindings/src/index.ts`(내보내기), `packages/shared/src/__tests__/helpers.ts`(테스트용 `comment()` 추가)
   - 테스트: `packages/react-dom-bindings/src/client/__tests__/renderVNode.test.ts`(고침) — 주석 VNode → Comment 노드, `style` StyleMap → 속성 글(경고 없음, 기존 "객체 props 경고" 테스트는 `style` 아닌 객체만 경고하도록 고침), `renderAreaChildren`(여러 개 · 0개 · 공백 텍스트 유지) / `packages/react-dom-bindings/src/client/__tests__/style.test.ts`(새로) — 쪼개기(세미콜론 · `url(data:…;…)` · 따옴표 · 대문자 이름 · 같은 이름 · 빈 글), 다시 쓰기, **경계(B21): `!important`(값의 일부로 유지) · 값 안 주석 `/* ; */`(주석 안 `;`로 쪼개지 않음) · 끝 `;` 여러 개(`a:b;;;`) · 빈 값 `color:`(항목으로 안 남김) · 빈 값 뒤에 정상 항목이 이어지는 경우** (T-02 · P1-05)
   - 알고리즘: 공백 · 주석 유지(결정 5) · 영역 상자 = 보이지 않는 감싸개(§5)
   - 완료 근거로 남길 것: `renderVNode.test.ts` · `style.test.ts` 통과 개수, 기존 UT 4+6건이 그대로 통과(경고 테스트만 수정), `npx tsc --noEmit` 0
+  - **완료 근거 (Evidence)**:
+    - 만든 · 고친 파일: `packages/react-dom-bindings/src/client/renderVNode.ts`(주석 분기 `createComment`, `style` 객체 → 속성 글, `renderAreaChildren`), `packages/react-dom-bindings/src/client/style.ts`(`parseStyleText` · `styleMapToText`), `packages/react-dom-bindings/src/index.ts`(내보내기), `packages/shared/src/__tests__/helpers.ts`(`comment()`)
+    - 테스트: `style.test.ts` 18건 통과(쪼개기 · 다시 쓰기 · B21 경계 `!important` / 값 안 주석 `/* ; */` / 끝 `;;;` / 빈 값 `color:` / 빈 값 뒤 정상 항목), `renderVNode.test.ts` 21건 통과(기존 4+6건 유지, "객체 props 경고"는 `style` 아닌 객체(`data`)만 경고하도록 수정, 주석 · style · `renderAreaChildren` 추가). 먼저 모듈이 없는 상태에서 두 파일이 실패하는 것을 확인한 뒤 구현
+    - 실행: `npx vitest run` 3 files · 46 passed, `npx tsc --noEmit` 오류 0, 커밋: 메시지 `(Dev-1)` (`git log --oneline --grep "Dev-1)"`)
 
 - [ ] **Dev-2** (`react-dom-bindings`): `domToVNode` · `readAreaChildren` — 요소 · 텍스트(공백 포함) · 주석 · 속성 · boolean · style · 중첩을 VNode로 [P1-01 ~ P1-04 · P1-20 · P1-23 · T-01]
   - 의존: Dev-1 (`style.ts`, 되돌려 그리는 비교용 `renderVNode`)
