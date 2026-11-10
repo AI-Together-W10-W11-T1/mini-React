@@ -295,12 +295,18 @@ script:` · `" JAVA	script:"`), `<iframe> 제거 — srcdoc 안에 <script>paren
     - 명세에 없어 판단한 세부: QA-16 · QA-21의 `<img src="x" …>`를 `<img src="data:," onerror=…>`로 썼다. `src="x"`는 미리보기가 이미지를 실제로 요청해 404가 되고 크로미움이 `console.error: Failed to load resource … 404`를 남겨 공통 콘솔 감시(A5)에 걸리기 때문이다(실제로 QA-21이 그 한 건으로 실패하는 것을 확인). 깨진 이미지라 `onerror`가 노리는 모양은 같고 네트워크 요청이 없다. 공통 감시는 약하게 만들지 않았다
     - 실행: `npx tsc --noEmit` 오류 0
 
-- [ ] **Dev-17** (`fixture` + `e2e`): 페이지 보호 · 오류 복구 — 두 영역 안 링크 클릭 · 폼 제출은 기본 동작을 막고, Patch 도중 예외는 복구 뒤 `[Patch 오류]` alert [§5 · P1-19 · P1-32 · C2 · C4 · B13]
+- [x] **Dev-17** (`fixture` + `e2e`): 페이지 보호 · 오류 복구 — 두 영역 안 링크 클릭 · 폼 제출은 기본 동작을 막고, Patch 도중 예외는 복구 뒤 `[Patch 오류]` alert [§5 · P1-19 · P1-32 · C2 · C4 · B13]
   - 의존: Dev-12, Dev-15, Dev-16 (`captureAlert` · alert 흐름)
   - 만들 · 고칠 파일: `fixtures/phase1-vdom-playground/main.ts`(`real-area` · `test-area`에 **캡처 단계** `click`(대상이 `a[href]` 안이면 `preventDefault`) · `submit`(`preventDefault`) 리스너. Patch 클릭의 `root.update(…)`를 `try/catch`로 감싸 예외가 나면 `alert('[Patch 오류] …실제 영역을 마지막 기록 상태로 되돌렸습니다. 다시 작성해 주세요.')`, 편집창 · 테스트 영역은 그대로. 이 오류 알림 함수는 Dev-18이 `back` · `forward`에도 씀), `e2e/phase1-guard.spec.ts`(추가)
   - 테스트(바깥 루프): **QA-31**(B13 · C4: 두 영역의 링크 클릭 · 폼 버튼 클릭에도 페이지가 이동 · 새로고침되지 않고 기록이 살아 있음) · **QA-A12**(C2: 실제 영역을 바깥에서 망가뜨린 뒤 Patch → `[Patch 오류]` alert, 실제 영역이 마지막 기록 상태로 복구, 기록 그대로, 편집창 글 유지, 다시 Patch하면 성공 · 기록 한 칸). 스펙 파일은 `e2e/phase1-guard.spec.ts`
   - 알고리즘: C2(기록 그대로 + 실제 영역을 마지막 기록 VNode로 다시 그림) · C4(기본 동작 막기는 엔진이 아니라 검증 페이지의 일)
   - 완료 근거로 남길 것: `npx playwright test e2e/phase1-guard.spec.ts` desktop · mobile 통과 개수, QA-31 · QA-A12 테스트 이름, 링크 클릭 뒤 `framenavigated` 0건 확인
+  - **완료 근거 (Evidence)**:
+    - 만든 · 고친 파일: `fixtures/phase1-vdom-playground/main.ts`(`real-area` · `test-area`에 캡처 단계 `click` 리스너 — 대상이 `a[href]` 안이면 `preventDefault` — 와 `submit` 리스너 `preventDefault`(C4). Patch 클릭의 `root.update(…)`를 `try/catch`로 감싸 `reportPatchError(error)` → `alert('[Patch 오류] Patch를 적용하는 중 오류가 났습니다 (…). 실제 영역을 마지막 기록 상태로 되돌렸습니다. 다시 작성해 주세요.')`(`formatProblems([{ kind: 'PATCH_ERROR', … }])`로 만듦, 편집창 · 테스트 영역은 건드리지 않음). `reportPatchError`는 Dev-18이 `back` · `forward` 예외에도 쓴다), `e2e/phase1-guard.spec.ts`(QA-31 · QA-A12 추가)
+    - 테스트(바깥 루프): 먼저 쓰고 미연결 상태에서 `npx playwright test e2e/phase1-guard.spec.ts -g "QA-31|QA-A12"` 4 failed 확인(QA-31: 링크 클릭이 막히지 않아 30s 시간 초과 — 페이지 이동 시도, QA-A12: `선언한 alert가 뜨지 않았다` + 콘솔 `Unhandled error: patch: 경로 [1,7,1,0]에 해당하는 노드가 DOM에 없습니다`) 뒤 구현. 구현 후 `npx playwright test e2e/phase1-guard.spec.ts` 22 passed (desktop 11 · mobile 11, QA-16~21 · 29 · 30 · 32 + QA-31 · QA-A12)
+    - 테스트 이름: `QA-31 두 영역 안의 링크 클릭 · 폼 버튼 클릭에도 페이지가 이동하거나 새로고침되지 않는다`(테스트 영역 링크 · 폼 버튼, 실제 영역 링크 · 폼 버튼 4회 클릭 뒤 주소 그대로 · `window.__stay` 살아 있음 · `framenavigated` 0건 · 문서 이동 요청 0건 · 실제 영역 구조 그대로 · 편집창 글 그대로 · 콘솔 오류 없음) · `QA-A12 Patch 도중 예외가 나면 [Patch 오류] alert 뒤 실제 영역이 마지막 기록 상태로 복구되고 다시 Patch하면 성공한다`(실제 영역 `<ul>`을 `remove()`한 뒤 `<li>` · `<p>` 글자를 고쳐 Patch → alert `[Patch 오류]` · `되돌렸습니다`, `<p>` 글자 · `<ul>`이 마지막 기록(초기 샘플) 구조로 복구, 편집창 글 · 테스트 영역 그대로, 다시 Patch하면 성공 — 첫 실패가 기록을 앞으로 보냈다면 두 번째 diff가 비어 실패했을 것이라 "기록 그대로"의 간접 증거)
+    - 미룬 것(이유): QA-31의 "클릭 뒤에도 뒤로가 동작해 기록이 살아 있다", QA-A12의 "뒤로 무시 · 다시 Patch 뒤 기록이 정확히 한 칸"은 뒤로 버튼이 Dev-18에서 연결되므로 **Dev-18이 같은 두 테스트에 덧붙여야 한다**(테스트 안 `// [AI Note]`에 표시해 둠). 그 외 C 항목(C2 · C4)은 미루지 않았다
+    - 전체 실행(Dev-14 ~ 17 끝): `npx vitest run` 13 files · 334 passed, `npx tsc --noEmit` 오류 0, `npx playwright test` 50 passed (render 10 · patch 18 · guard 22, desktop 25 · mobile 25), 끝난 뒤 5199 대기 중인 프로세스 없음
 
 - [ ] **Dev-18** (`fixture` + `e2e`): 뒤로 · 앞으로 버튼 — 세 칸(편집창 · 테스트 영역 · 실제 영역)이 그 기록 상태로 [P1-26 ~ P1-30 · P1-32 · T-08 · B3]
   - 의존: Dev-13, Dev-15, Dev-17 (오류 알림 함수)

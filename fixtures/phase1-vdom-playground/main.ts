@@ -37,5 +37,37 @@ byTestId<HTMLButtonElement>('btn-patch').addEventListener('click', () => {
     return;
   }
   setAreaHtml(testArea, editor.value);
-  root.update(readAreaChildren(testArea));
+  try {
+    root.update(readAreaChildren(testArea));
+  } catch (error) {
+    reportPatchError(error);
+  }
 });
+
+// [AI Note]: Patch 도중 예외(C2). react-dom이 이미 기록을 그대로 두고 실제 영역을 마지막 기록 모습으로 다시 그린 뒤
+// 원래 예외를 던져 준다. 페이지는 그 예외를 잡아 alert로만 알린다 — 편집창 글 · 테스트 영역은 그대로 둬서 다시 Patch해 볼 수 있다.
+// 뒤로 · 앞으로 도중 예외도 같은 알림을 쓴다(Dev-18).
+function reportPatchError(error: unknown): void {
+  const detail = error instanceof Error ? error.message : String(error);
+  alert(
+    formatProblems([
+      {
+        kind: 'PATCH_ERROR',
+        message: `Patch를 적용하는 중 오류가 났습니다 (${detail}). 실제 영역을 마지막 기록 상태로 되돌렸습니다. 다시 작성해 주세요.`,
+      },
+    ]),
+  );
+}
+
+// [AI Note]: 검증 페이지 보호(C4). 두 영역 안의 링크를 누르거나 폼을 제출하면 페이지가 이동해 기록이 모두 날아간다.
+// 엔진이 아니라 이 페이지의 일이라 여기서 기본 동작만 막는다. 캡처 단계에서 막아야 영역 안 어느 요소의 리스너보다 먼저 적용된다.
+for (const area of [realArea, testArea]) {
+  area.addEventListener(
+    'click',
+    (event) => {
+      if (event.target instanceof Element && event.target.closest('a[href]') !== null) event.preventDefault();
+    },
+    true,
+  );
+  area.addEventListener('submit', (event) => event.preventDefault(), true);
+}
