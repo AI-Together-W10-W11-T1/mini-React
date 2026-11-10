@@ -368,12 +368,18 @@ script:` · `" JAVA	script:"`), `<iframe> 제거 — srcdoc 안에 <script>paren
     - 결정한 세부: 이동 수 최소 보장 안 함(`[a,b,c] → [b,c,a]`는 2번), 숫자 `1`과 문자열 `"1"`은 다른 key, 글자 · 주석 노드는 key가 없어 섞이면 위치 비교, 빈 목록은 key 목록으로 취급(결과는 위치 비교와 같음), 위치 비교로 돌아간 목록에서 key는 patch로 옮기지 않음(key는 props가 아님)
     - 커밋: (해시는 이 Dev 묶음의 마지막 docs 커밋에 기록)
 
-- [ ] **Dev-22** (`react-dom-bindings`): `patch`의 MOVE — 같은 DOM 노드를 옮긴다 [Key 확장]
+- [x] **Dev-22** (`react-dom-bindings`): `patch`의 MOVE — 같은 DOM 노드를 옮긴다 [Key 확장]
   - 의존: Dev-6, Dev-21
   - 만들 · 고칠 파일: `packages/react-dom-bindings/src/client/patch.ts`(Dev-6의 "MOVE 오류" 자리를 구현: `parent` 경로의 자식 `from`번을 빼서 뺀 뒤 목록의 `to`번 자리에 넣음)
   - 테스트: `packages/react-dom-bindings/src/client/__tests__/patch.test.ts`(추가) — MOVE 앞으로 · 뒤로 이동, 이동한 노드의 참조가 그대로(`===`), 이동 중에 다른 형제 참조도 그대로, MOVE 뒤 INSERT · REMOVE가 이어질 때 경로가 그 순간 기준, MOVE의 역(from ↔ to)이 원래 순서를 되돌림, Dev-6의 "MOVE 오류" 테스트는 제거 (PRD §5)
   - 알고리즘: 결정 2 B (이동) · 결정 4 A (그 순간 기준)
   - 완료 근거로 남길 것: `patch.test.ts` 통과 개수, 참조 유지 테스트 이름
+  - **완료 근거 (Evidence)**:
+    - 만든 · 고친 파일: `packages/react-dom-bindings/src/client/patch.ts`(`case 'MOVE'` 구현: `parent.insertBefore(moved, 뺀 뒤 목록의 to번 노드)`), `packages/react-dom-bindings/src/client/__tests__/patch.test.ts`(Dev-6의 "MOVE 오류" 테스트 1건 제거, `patch — MOVE (Key 확장…)` 10건 추가)
+    - 실행: `npx vitest run packages/react-dom-bindings` 8 files · **224 passed**(patch.test.ts 40건). 전체 `npx vitest run` · `npx tsc --noEmit` 결과는 이 묶음 마지막 커밋의 확인에 기록
+    - 참조 유지 테스트 이름: `이동한 노드의 참조가 그대로다 (===): 새로 만들지 않고 같은 DOM 노드를 옮긴다`(이동하지 않은 형제 · 부모도 `toBe`), `이동 중에 다른 형제를 새로 만들거나 지우지 않는다 (childList 기록은 옮긴 노드 하나의 제거 + 삽입뿐)`(`MutationObserver`), `MOVE의 역(from ↔ to)이 원래 순서와 같은 참조로 되돌린다`, `MOVE 뒤에 이어지는 INSERT · REMOVE · SET_TEXT의 경로는 그 순간의 트리 기준이다 (결정 4 A)`, `diff(Key) 결과를 그대로 적용하면 같은 key 노드의 참조가 유지되고 결과가 목표와 같다`
+    - 결정한 세부: `from === to`는 DOM을 건드리지 않음(기록 0건 확인), `from` · `to`가 목록 밖이면 `from N` · `to N`이 적힌 오류(C2 복구 재료), `parent: []`는 영역 상자 자신의 자식 목록
+    - 커밋: (해시는 이 Dev 묶음의 마지막 docs 커밋에 기록)
 
 - [ ] **Dev-23** (`react-dom`): Key 통합 테스트 — 삽입 · 삭제 · 재정렬 뒤에도 같은 key 노드가 유지되고, 역패치(MOVE 포함)로 되돌아온다 [Key 확장 · PRD §5 · §6.2]
   - 의존: Dev-21, Dev-22

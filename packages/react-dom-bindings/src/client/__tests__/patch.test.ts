@@ -213,12 +213,134 @@ describe('patch — 참조 유지 (T-06 · P1-17 · P1-18)', () => {
   });
 });
 
-describe('patch — 오류', () => {
-  it('MOVE는 이 단계에서 "Key 확장에서 구현" 오류를 낸다', () => {
-    const box = area('<ul><li>a</li><li>b</li></ul>');
-    expect(() => patch(box, [{ kind: 'MOVE', parent: [0], from: 0, to: 1 }])).toThrow(/Key 확장/);
+describe('patch — MOVE (Key 확장, 같은 DOM 노드를 옮긴다)', () => {
+  const texts = (ul: Element) => Array.from(ul.children).map((c) => c.textContent);
+
+  it('뒤로 이동: from번을 빼서 뺀 뒤 목록의 to번 자리에 넣는다', () => {
+    const box = area('<ul><li>a</li><li>b</li><li>c</li><li>d</li></ul>');
+    const ul = box.firstChild as Element;
+    patch(box, [{ kind: 'MOVE', parent: [0], from: 0, to: 2 }]);
+    expect(texts(ul)).toEqual(['b', 'c', 'a', 'd']);
   });
 
+  it('앞으로 이동', () => {
+    const box = area('<ul><li>a</li><li>b</li><li>c</li><li>d</li></ul>');
+    const ul = box.firstChild as Element;
+    patch(box, [{ kind: 'MOVE', parent: [0], from: 3, to: 1 }]);
+    expect(texts(ul)).toEqual(['a', 'd', 'b', 'c']);
+  });
+
+  it('맨 끝으로 · 맨 앞으로 · 제자리(from = to)는 아무 일 없음', () => {
+    const box = area('<ul><li>a</li><li>b</li><li>c</li></ul>');
+    const ul = box.firstChild as Element;
+    patch(box, [{ kind: 'MOVE', parent: [0], from: 0, to: 2 }]);
+    expect(texts(ul)).toEqual(['b', 'c', 'a']);
+    patch(box, [{ kind: 'MOVE', parent: [0], from: 2, to: 0 }]);
+    expect(texts(ul)).toEqual(['a', 'b', 'c']);
+    const observer = observe(box);
+    patch(box, [{ kind: 'MOVE', parent: [0], from: 1, to: 1 }]);
+    expect(observer.takeRecords()).toHaveLength(0);
+    expect(texts(ul)).toEqual(['a', 'b', 'c']);
+  });
+
+  it('이동한 노드의 참조가 그대로다 (===): 새로 만들지 않고 같은 DOM 노드를 옮긴다', () => {
+    const box = area('<ul><li>a</li><li>b</li><li>c</li></ul>');
+    const ul = box.firstChild as Element;
+    const [a, b, c] = Array.from(ul.children);
+    const aText = a.firstChild;
+    patch(box, [{ kind: 'MOVE', parent: [0], from: 0, to: 2 }]);
+    expect(Array.from(ul.children)).toEqual([b, c, a]);
+    expect(ul.children[2]).toBe(a);
+    expect(a.firstChild).toBe(aText);
+    // 이동하지 않은 형제 · 부모의 참조도 그대로
+    expect(ul.children[0]).toBe(b);
+    expect(ul.children[1]).toBe(c);
+    expect(box.firstChild).toBe(ul);
+  });
+
+  it('이동 중에 다른 형제를 새로 만들거나 지우지 않는다 (childList 기록은 옮긴 노드 하나의 제거 + 삽입뿐)', () => {
+    const box = area('<ul><li>a</li><li>b</li><li>c</li></ul>');
+    const ul = box.firstChild as Element;
+    const observer = observe(box);
+    patch(box, [{ kind: 'MOVE', parent: [0], from: 0, to: 2 }]);
+    const records = observer.takeRecords();
+    const a = ul.children[2];
+    const removed = records.flatMap((r) => Array.from(r.removedNodes));
+    const added = records.flatMap((r) => Array.from(r.addedNodes));
+    expect(removed).toEqual([a]);
+    expect(added).toEqual([a]);
+    expect(records.every((r) => r.type === 'childList')).toBe(true);
+  });
+
+  it('영역 맨 위 목록도 옮긴다 (parent가 [])', () => {
+    const box = area('<p>a</p><p>b</p><p>c</p>');
+    const [a, b, c] = Array.from(box.children);
+    patch(box, [{ kind: 'MOVE', parent: [], from: 2, to: 0 }]);
+    expect(Array.from(box.children)).toEqual([c, a, b]);
+  });
+
+  it('공백 · 글자 노드도 번호를 차지하므로 번호는 childNodes 기준이다', () => {
+    const box = area('<ul> <li>a</li> <li>b</li> </ul>');
+    const ul = box.firstChild as Element;
+    const [, a, , b] = Array.from(ul.childNodes);
+    patch(box, [{ kind: 'MOVE', parent: [0], from: 3, to: 1 }]);
+    expect(Array.from(ul.childNodes).slice(1, 3)).toEqual([b, a]);
+  });
+
+  it('MOVE 뒤에 이어지는 INSERT · REMOVE · SET_TEXT의 경로는 그 순간의 트리 기준이다 (결정 4 A)', () => {
+    const box = area('<ul><li>a</li><li>b</li><li>c</li></ul>');
+    const ul = box.firstChild as Element;
+    const [a, b, c] = Array.from(ul.children);
+    patch(box, [
+      { kind: 'MOVE', parent: [0], from: 2, to: 0 }, // [c,a,b]
+      { kind: 'INSERT', path: [0, 1], node: el('li', {}, text('x')) }, // [c,x,a,b]
+      { kind: 'REMOVE', path: [0, 3], node: el('li', {}, text('b')) }, // [c,x,a]
+      { kind: 'SET_TEXT', path: [0, 2, 0], before: 'a', after: 'A' }, // a가 2번 자리
+    ]);
+    expect(texts(ul)).toEqual(['c', 'x', 'A']);
+    expect(ul.children[0]).toBe(c);
+    expect(ul.children[2]).toBe(a);
+    expect(b.isConnected).toBe(false);
+  });
+
+  it('MOVE의 역(from ↔ to)이 원래 순서와 같은 참조로 되돌린다', () => {
+    const box = area('<ul><li>a</li><li>b</li><li>c</li><li>d</li></ul>');
+    const ul = box.firstChild as Element;
+    const before = Array.from(ul.children);
+    const moves: Patch[] = [
+      { kind: 'MOVE', parent: [0], from: 0, to: 3 },
+      { kind: 'MOVE', parent: [0], from: 2, to: 0 },
+    ];
+    patch(box, moves);
+    expect(Array.from(ul.children)).not.toEqual(before);
+    patch(box, invertPatches(moves));
+    expect(Array.from(ul.children)).toEqual(before);
+  });
+
+  it('대상이 없으면 어느 경로 · 번호인지 적힌 오류를 낸다 (C2 복구의 재료)', () => {
+    const box = area('<ul><li>a</li><li>b</li></ul>');
+    expect(() => patch(box, [{ kind: 'MOVE', parent: [0], from: 5, to: 0 }])).toThrow(/from 5/);
+    expect(() => patch(box, [{ kind: 'MOVE', parent: [0], from: 0, to: 5 }])).toThrow(/to 5/);
+    expect(() => patch(box, [{ kind: 'MOVE', parent: [3], from: 0, to: 1 }])).toThrow(/3/);
+  });
+
+  it('diff(Key) 결과를 그대로 적용하면 같은 key 노드의 참조가 유지되고 결과가 목표와 같다', () => {
+    const k = (key: string, label: string) => ({ ...el('li', {}, text(label)), key });
+    const oldTree = [el('ul', {}, k('a', 'A'), k('b', 'B'), k('c', 'C'))];
+    const newTree = [el('ul', {}, k('c', 'C'), k('a', 'A'), k('b', 'B!'))];
+    const box = area('');
+    renderAreaChildren(box, oldTree);
+    const [a, b, c] = Array.from((box.firstChild as Element).children);
+    const patches = diff(oldTree, newTree);
+    expect(patches.some((p) => p.kind === 'MOVE')).toBe(true);
+    patch(box, patches);
+    const ul = box.firstChild as Element;
+    expect(Array.from(ul.children)).toEqual([c, a, b]);
+    expect(texts(ul)).toEqual(['C', 'A', 'B!']);
+  });
+});
+
+describe('patch — 오류', () => {
   it('경로에 노드가 없으면 어느 경로인지 적힌 분명한 오류를 낸다 (C2 복구의 재료)', () => {
     const box = area('<p>x</p>');
     expect(() => patch(box, [{ kind: 'SET_TEXT', path: [3, 0], before: 'a', after: 'b' }])).toThrow(/3,0/);

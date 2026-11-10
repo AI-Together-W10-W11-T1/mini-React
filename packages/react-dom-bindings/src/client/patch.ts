@@ -52,9 +52,24 @@ function applyPatch(area: Element, p: Patch): void {
       node.parentNode!.replaceChild(renderVNode(p.after), node);
       return;
     }
-    case 'MOVE':
-      // [AI Note]: MOVE는 Key 확장(Dev-22)에서 구현한다. 필수 diff(위치 기반)는 MOVE를 만들지 않는다.
-      throw new Error('patch: MOVE는 Key 확장(Dev-22)에서 구현합니다. 아직 지원하지 않습니다.');
+    case 'MOVE': {
+      // [AI Note]: Key 확장 — 같은 DOM 노드를 새로 만들지 않고 옮긴다 (참조 유지). parent의 자식 from번을 빼서
+      // "뺀 뒤 목록"의 to번 자리에 넣는다. insertBefore는 이미 붙어 있는 노드를 그대로 옮기므로 제거 + 삽입이 한 번에 된다.
+      const parent = p.parent.length === 0 ? area : nodeAt(area, p.parent);
+      const count = parent.childNodes.length;
+      if (!Number.isInteger(p.from) || p.from < 0 || p.from >= count) {
+        throw new Error(`patch: MOVE 대상이 없습니다 (부모 경로 [${p.parent.join(',')}], from ${p.from})`);
+      }
+      if (!Number.isInteger(p.to) || p.to < 0 || p.to >= count) {
+        throw new Error(`patch: MOVE 자리가 목록 밖입니다 (부모 경로 [${p.parent.join(',')}], to ${p.to})`);
+      }
+      if (p.from === p.to) return;
+      const moved = parent.childNodes[p.from];
+      // 뺀 뒤 목록의 to번 노드 = 원래 목록에서 to < from이면 to번, to > from이면 to + 1번 (from번 하나가 빠져서 한 칸 당겨짐)
+      const before = parent.childNodes[p.to < p.from ? p.to : p.to + 1] ?? null;
+      parent.insertBefore(moved, before);
+      return;
+    }
   }
 }
 
