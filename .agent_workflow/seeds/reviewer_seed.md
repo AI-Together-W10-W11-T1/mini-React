@@ -53,5 +53,6 @@
 - 편집 UI: HTML 편집창 + 미리보기(테스트 영역) (결정 6 A). 미리보기는 `on…` · `<script>` · `javascript:` 제거 후 그림. Patch 때 위험 코드 · 태그 짝 · 구조 비교 · `<svg>` 검사 → 문제면 alert, Patch 안 함
 - 속성: boolean = 보통 속성(값 `""`, SET_ATTR before/after null), style = 항목별(`StyleMap`, SET_STYLE)
 - SVG 미지원. Phase 1 검증 페이지는 key를 쓰지 않음 (Key 엔진은 단위 테스트로만)
+- (테스트 케이스 확인 C1~C5) `tbody` 자동 추가는 구조 비교 예외로 허용 · Patch 도중 예외면 기록 그대로 + 실제 영역을 마지막 기록 VNode로 다시 그린 뒤 alert · `<iframe>` · `<object>` · `<embed>` · `<style>` · `<link rel="stylesheet">`는 미리보기에서 빼고 Patch 때 막음 · 두 영역 안 링크 클릭 · 폼 제출은 기본 동작 막음(fixture)
 - Diff 시각화(확장): 스위치(기본 꺼짐), 켜면 바뀐 노드만 실제 영역 위 오버레이에서 깜빡임. 실제 DOM에 표시용 class를 붙이지 않음
 - 근거 · 이유 전문: `.agent_workflow/tasks/task_001_ryuuuu5618_phase1/01_request_spec.md` 「알고리즘 결정」

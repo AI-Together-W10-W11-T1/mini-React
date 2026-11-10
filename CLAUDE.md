@@ -74,7 +74,7 @@
 **정책 (PRD §3.3 · §4.2 · §4.3 · §5)**
 - 이력: 초기 모습 = 0번 기록(뒤로가기의 바닥) · 무변경 Patch는 기록 안 함 · 뒤로 간 뒤 새 Patch면 앞쪽 기록 버림 · 처음 · 끝에서 누르면 무시 · 이동 때 미저장 편집은 버림(편집창 · 테스트 영역 · 실제 영역 모두 그 기록으로) · 보관 한도 50, 넘으면 가장 오래된 기록부터 뺌
 - Hook: (phase2에서 정함)
-- 지원 범위: 영역 상자 = 보이지 않는 감싸개(최상위 여러 개 · 0개 허용) · 공백 · 주석 유지 · **SVG 미지원**(Patch 때 막음) · boolean 속성 = 보통 속성(값 `""`, 추가 · 삭제) · style = 항목별 비교 · VNode 입력은 `h()` 기존 동작(phase2에서 확인) · 이벤트 · DOM 프로퍼티는 phase2 · 실행 가능한 HTML = 미리보기에서 `on…` · `<script>` · `javascript:` 제거 + Patch 때 검사 · 오류 = Patch 때 태그 짝 검사 + 구조 비교, 문제면 alert로 막고 실제 영역 · 기록은 그대로
+- 지원 범위: 영역 상자 = 보이지 않는 감싸개(최상위 여러 개 · 0개 허용) · 공백 · 주석 유지 · **SVG 미지원**(Patch 때 막음) · boolean 속성 = 보통 속성(값 `""`, 추가 · 삭제) · style = 항목별 비교 · VNode 입력은 `h()` 기존 동작(phase2에서 확인) · 이벤트 · DOM 프로퍼티는 phase2 · 실행 가능한 HTML = 미리보기에서 `on…` · `<script>` · `javascript:` · `<iframe>` · `<object>` · `<embed>` · `<style>` · `<link rel="stylesheet">` 제거 + Patch 때 검사해서 막음 · 오류 = Patch 때 태그 짝 검사 + 구조 비교(`tbody` 자동 추가만 허용), 문제면 alert로 막고 실제 영역 · 기록은 그대로. Patch 도중 예외면 기록은 그대로, 실제 영역을 마지막 기록 VNode로 다시 그린 뒤 alert · 검증 페이지: 두 영역 안 링크 클릭 · 폼 제출은 기본 동작을 막음
 
 ## 에이전트 워크플로
 - 시작: `/mini-react-kit:agent-workflow`. 메인 세션이 마스터, `mr-worker`(Sonnet)가 기획 · 개발, `mr-reviewer`(Opus, 읽기 전용)가 검수하고, `mr-qa`(Sonnet)가 `e2e/`를 실행해 캡처를 남기고, `mr-wiki`(Haiku)가 `wiki/` · `README.md` 발표 섹션을 정리한다.

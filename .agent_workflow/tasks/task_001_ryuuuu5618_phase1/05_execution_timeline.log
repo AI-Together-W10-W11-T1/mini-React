@@ -17,3 +17,9 @@
 2026-11-11T01:30 | stage=0 | agent=master | round=- | signal=DECISION | Diff 시각화: 스위치 + 오버레이 깜빡임만
 2026-11-11T01:37 | stage=0 | agent=master | round=- | signal=SPEC_DRAFT | 01_request_spec.md 초안, 사용자 승인 대기
 2026-11-11T01:40 | stage=0 | agent=master | round=- | signal=APPROVE | 01_request_spec.md 사용자 승인
+2026-11-11T01:41 | stage=0.5 | agent=master | round=- | signal=PASS | types.ts 커밋 6a7ccb1, CLAUDE.md 내 설계 결정 · seed 커밋 bcfa896 (feature/phase1)
+2026-11-11T01:53 | stage=1 | agent=mr-worker | round=- | signal=UNKNOWN | - | by=hook
+2026-11-11T01:53 | stage=1 | agent=master | round=- | signal=SKIP_REVIEW | 가벼운 모드: 기획 검수 생략, 테스트 케이스 확인으로
+2026-11-11T02:26 | stage=1 | agent=master | round=- | signal=TESTCASE_REVIEW | 사용자 검토 A1~5 · B1~22 · C1~5, C 정책을 명세 · CLAUDE.md · seed에 반영
+2026-11-11T02:36 | stage=1 | agent=mr-worker | round=- | signal=UNKNOWN | - | by=hook
+2026-11-11T02:38 | stage=1 | agent=master | round=- | signal=APPROVE | 테스트 케이스 확인 완료 (반영본 + 제안 10개), 2단계로
