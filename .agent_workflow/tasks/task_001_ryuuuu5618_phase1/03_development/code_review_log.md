@@ -49,6 +49,35 @@
 ## NON-BLOCKING 모음
 | 회차 | 번호 | 내용 | 반영 여부 |
 | --- | --- | --- | --- |
-| 1 | 4 | `<meta http-equiv=refresh>` · `<base>` 막기 여부 | 사용자 결정 "막기" → 1회차 재작업에 추가 |
-| 1 | 5 | C2 복구 `renderAreaChildren` try/catch, 원래 예외(cause) 유지 | 1회차 재작업에 넣음 |
+| 1 | 4 | `<meta http-equiv=refresh>` · `<base>` 막기 여부 | 사용자 결정 "막기" → 반영 (5406529) |
+| 1 | 5 | C2 복구 `renderAreaChildren` try/catch, 원래 예외 유지 | 반영 (e2def72, `recoveryError`) |
 | 1 | 6 | 테스트 변경 · `src="data:,"` · 시각화 설계 타당 | 반영 없음 |
+| 2 | 2 | 복구 실패(`recoveryError`) 때 `[Patch 오류]` 문구가 "되돌렸습니다"로 사실과 다름 | 반영 (3970fc2) |
+
+## 2회차 (2026-11-11) — 대상 214a09b..52a2b79 (`02_diff.patch`), Dev-3 · 6 · 8 · 9 · 12 · 17
+
+판정: **REJECT (회차 2/3)** — 1회차 [BLOCKING] 1 · 2 · 3 해결, NB-4 · NB-5 반영 확인. B-1과 같은 원인의 새 지적 1건 (같은 지적 반복이 아니라 DEADLOCK 아님)
+
+1. [BLOCKING] [Dev-6 · 두 영역 불일치 · B-1과 같은 원인] `domToVNode`의 `readProps`가 속성 이름 `__proto__`를 버립니다 (`packages/react-dom-bindings/src/client/domToVNode.ts:32-39`).
+   - 원인: `const props = {}` 뒤에 `props[attr.name] = attr.value`를 씁니다. 이름이 `__proto__`이면 항목이 생기지 않고 프로토타입 setter가 불리는데, 값이 문자열이라 setter는 아무것도 하지 않습니다. 그래서 이 속성이 VNode에서 사라집니다.
+   - 재현: 편집창에 `<p __proto__="x">a</p>`를 넣고 Patch합니다. HTML 파서는 `__proto__`를 보통 속성 이름으로 받아들이고 checkHtml도 통과합니다. 테스트 영역에는 속성이 남지만 `readAreaChildren` 결과에는 없어서 diff가 SET_ATTR을 내지 않습니다. 그 결과 실제 영역에는 속성이 빠져 두 영역의 속성 글이 어긋납니다. 1회차 B-1(style 항목 `__proto__`)과 같은 종류이고, 그때 BLOCKING으로 판정했으니 같은 기준을 적용합니다.
+   - 범위 확인: `diff.ts`의 `readAttrs`는 `Object.entries` + `Map`, `renderVNode`·`vnodesToHtml`은 `Object.entries`, `patch.ts` SET_ATTR은 `setAttribute`만 써서 이 문제가 없습니다. `constructor`·`toString` 같은 이름은 대입해도 자기 속성이 생기므로 괜찮습니다. 문제는 `__proto__` 대입뿐입니다.
+   - 고칠 방법: `readProps`에서 `[이름, 값]` 쌍을 모은 뒤 `Object.fromEntries`로 만들거나, `Object.defineProperty(props, attr.name, { value, enumerable: true, writable: true, configurable: true })`로 넣습니다. 테스트 검산기 `packages/react-reconciler/src/__tests__/applyPatches.ts:41-43`(SET_ATTR `props[patch.name] = …`)과 :92-98(`normalizeTree`)도 같은 방식으로 고칩니다.
+   - 테스트: `domToVNode.test.ts`에서 `<p __proto__="x">`의 props에 `Object.hasOwn(props, '__proto__')`가 true이고 값이 `'x'`인지 확인합니다. `diff.test.ts`에는 `__proto__` 속성 추가·삭제를 `run()`으로 넣습니다. `createVDomRoot.test.ts`(또는 `patch.test.ts`)에는 update 뒤 실제 영역 요소에 `__proto__` 속성이 생기는지 확인하는 테스트를 넣습니다. 고치기 전에 실패하는 것을 먼저 보고, 결과를 근거에 적습니다.
+
+2. [NON-BLOCKING] 복구까지 실패해 `recoveryError`가 붙은 경우에도 `main.ts`의 `reportPatchError`는 "실제 영역을 마지막 기록 상태로 되돌렸습니다"라고 알립니다. 실제로는 되돌리지 못한 상황이라 알림 글이 사실과 다릅니다. `recoveryError`가 있으면 문구를 바꾸는 정도로 충분합니다. 지금 흐름에서는 거의 일어나지 않는 경우입니다.
+
+확인한 것: B-1 · B-2 · B-3 해결(재현 경로 · 고치기 전 실패 테스트 포함), NB-4 정책 표와 일치, NB-5 `recoveryError` 방식 타당(`cause`는 방향이 반대), 검산기 `Map` 변경이 기존 동작을 깨지 않음, 의존 방향 위반 · `any` · 명세 밖 기능 없음, 완료 근거가 diff와 맞음.
+
+### 마스터 처리 (2회차)
+- 가벼운 모드 규칙: 2회차에도 REJECT → 3회차로 가지 않고 쟁점을 정리해 사용자에게 바로 물음
+- 사용자 결정 (원문): "1번으로 가자" = (1) 고치고, 확인은 마스터가 (3회차 Opus 검수 없음). [BLOCKING] 1 + [NON-BLOCKING] 2를 작업자 재작업으로
+
+## 2회차 재작업 확인 (마스터, 2026-11-11) — 대상 81ac068..12443c0 (`03_diff.patch`)
+
+사용자 선택 (1)에 따라 3회차 Opus 검수 대신 마스터가 확인. 판정: **통과 (마스터 확인, 개발 단계 종료)**
+- 커밋: a842724 (B-1, `domToVNode` `readProps` · 검산기 `fromEntries`) · 3970fc2 (NB-2, `patchErrorMessage.ts`) · 12443c0 (dev_todo 근거)
+- 고치기 전 실패 확인: `domToVNode.ts` · `applyPatches.ts`를 81ac068 판으로 되돌리고 새 테스트로 `npx vitest run` → **4 failed** | 428 passed (domToVNode 1 · diff 2(추가 · 삭제) · createVDomRoot 1). 확인 뒤 `git checkout --`로 원래대로
+- 고친 뒤: `npx vitest run` 16 files · **432 passed**, `npx tsc --noEmit` exit 0, `npx playwright test` **96 passed**, 5199 LISTEN 없음
+- 작업자 grep 보고: 같은 패턴은 고친 3곳뿐, 나머지는 `Map` · `Object.entries` · `setAttribute` · 고정 이름 배열이라 해당 없음 — 마스터가 보고 내용과 diff가 맞는 것 확인
+

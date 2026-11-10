@@ -175,6 +175,8 @@
 - 개발 검수 1회차 REJECT (BLOCKING 3: style 프로토타입 체인 · `<area>` · SVG 링크 · `xlink:href`) → 재작업. NB-5(복구 try/catch)는 마스터가 함께 넣음
 - Q (NB-4): `<meta http-equiv="refresh">` · `<base>`도 막을까? — 마스터 추천: 막기
 - A (원문): "\"막기\"로 가자" → 명세 「정책」 · CLAUDE.md · seed에 반영, 재작업 작업자에게 추가 지시. 이유 미기재 (추천안 수용)
+- 개발 검수 2회차 REJECT (BLOCKING 1: domToVNode `__proto__` 속성 버림, NB 1: 복구 실패 문구). 가벼운 모드 규칙으로 3회차 대신 물음: (1) 고치고 마스터 확인 (추천) / (2) 3회차 검수까지 / (3) 한계로 기록
+- A (원문): "1번으로 가자"
 
 ## 알고리즘 결정 문답
 
