@@ -31,7 +31,7 @@
 - **역패치**: 전후 뒤집기 + 역순. `HistoryEntry.inverse`는 이미 역순이므로 그대로 순서대로 적용
 - **속성 값 정규화(diff · renderVNode · patch 공통)**: 문자열 · 숫자 → 문자열, `true` → `""`, `false` · `null` · `undefined` → 속성 없음. 함수 · 객체(`style` 제외)는 Phase 1에서 속성으로 안 다룬다 (이벤트는 phase2)
 - **style 해석(`client/style.ts`)**: `style` 속성 글을 직접 쪼갠다 (`;`로 나누되 괄호 · 따옴표 · `/* … */` 주석 안은 제외, 첫 `:`로 이름 · 값, 이름은 소문자(`--` 시작은 그대로), 값은 앞뒤 공백만 제거하고 `!important` · 값 안 주석은 값의 일부로 그대로 둠, 값이 빈 항목(`color:`)은 버림(브라우저도 버림), 끝 `;` 여러 개 · 빈 조각은 무시, 같은 이름은 뒤가 이김). 쓸 때는 `이름: 값; 이름: 값`. 브라우저 CSSOM(`el.style`)으로 읽지 않는다 (축약형 `background`가 11개 낱개로 풀리고 모르는 항목이 사라져 VNode와 DOM이 어긋남 — jsdom에서 확인). 항목이 하나도 없으면 `style` props를 두지 않는다 (B21)
-- **미리보기에서 빼고 Patch 때 막는 목록(C3 · C5 포함, `sanitize.ts`의 `scanDangerous`가 단 하나의 기준)**: `on…` 속성 · `<script>` · `<iframe>` · `<object>` · `<embed>` · `<style>` · `<link rel="stylesheet">`(`rel` 값을 공백으로 쪼갠 낱말 중 `stylesheet`가 있으면 해당, 대소문자 무시) · `javascript:` 주소(`href` · `src` · `action` · `formaction`). **`javascript:` 판정은 브라우저가 글을 읽은 뒤의 값으로 한다**: 문자 참조(`jav&#x61;script:`)는 이미 풀려 있고, 값 앞의 공백 · 제어문자를 자르고 값 안의 탭 · 줄바꿈을 지운 뒤 소문자로 비교 (B12). 문제 종류는 기존 `DANGEROUS` 하나로 묶고 알림 글에 요소 · 속성 이름을 적는다
+- **미리보기에서 빼고 Patch 때 막는 목록(C3 · C5 포함, `sanitize.ts`의 `scanDangerous`가 단 하나의 기준)**: `on…` 속성 · `<script>` · `<iframe>` · `<object>` · `<embed>` · `<style>` · `<link rel="stylesheet">`(`rel` 값을 공백으로 쪼갠 낱말 중 `stylesheet`가 있으면 해당, 대소문자 무시) · `<meta http-equiv="refresh">`(`http-equiv` 값 대소문자 무시, 다른 `<meta>`는 막지 않음) · `<base>`(검수 1회차 NB-4, 사용자 결정) · `javascript:` 주소(`href` · `src` · `action` · `formaction` · SVG의 `xlink:href`, 검수 1회차 B-3). **`javascript:` 판정은 브라우저가 글을 읽은 뒤의 값으로 한다**: 문자 참조(`jav&#x61;script:`)는 이미 풀려 있고, 값 앞의 공백 · 제어문자를 자르고 값 안의 탭 · 줄바꿈을 지운 뒤 소문자로 비교 (B12). 문제 종류는 기존 `DANGEROUS` 하나로 묶고 알림 글에 요소 · 속성 이름을 적는다
 - **검사기 구조 비교 예외(C1)**: 엔진이 훑은 구조에는 없는데 브라우저가 `<table>` 안에 `<tbody>`를 **자동으로 끼워 넣은 경우만** 같은 것으로 본다(그 `<tbody>`의 자식을 `<table>`의 자식으로 놓고 비교). `<tr>` · `<tbody>` 이외의 자동 보정(`<table><td>`의 `<tr>` 자동 추가, `<p><div>` 등)은 그대로 `STRUCTURE`
 - **Patch 도중 예외 복구(C2)**: `patch` 적용 중 예외(경로가 없는 DOM 등)가 나면 `createVDomRoot`는 ① 기록(History)은 그대로 둔다(새 기록을 붙이지 않고 current도 안 움직임) ② 실제 영역을 **지금(current) 기록의 VNode로 다시 그린다**(`renderAreaChildren`) ③ 원래 예외를 다시 던진다. 페이지(fixture)가 받아서 `[Patch 오류]` alert. 영역을 통째로 다시 그리는 것은 **이 오류 복구 때만** 허용 (`// [AI Note]`로 남김). `update` · `back` · `forward` 모두 같은 규칙
 - **공개 API 이름(초안, Dev가 바꾸면 이 표와 `qa_todo`의 화면 약속을 함께 고침)**
@@ -61,7 +61,7 @@
     <button disabled>잠김</button>
   </section>
   ```
-- **Patch 때 검사 알림 문구(Dev-9 · 10에서 확정, `qa_todo`가 이 말마디로 확인)**: 문제 한 줄 = `[위험한 코드] …` · `[태그 짝] …` · `[구조 불일치] …` · `[SVG 미지원] …`, 마지막 줄 "다시 작성해 주세요." 문제가 여러 개면 한 번의 alert에 모두 담는다. `<iframe>` · `<object>` · `<embed>` · `<style>` · `<link rel="stylesheet">`는 `[위험한 코드]` 줄에 요소 이름을 적는다. **Patch 도중 예외(C2)는 별도 말마디 `[Patch 오류]`**(Dev-17): "실제 영역을 마지막 기록 상태로 되돌렸습니다" 안내 포함
+- **Patch 때 검사 알림 문구(Dev-9 · 10에서 확정, `qa_todo`가 이 말마디로 확인)**: 문제 한 줄 = `[위험한 코드] …` · `[태그 짝] …` · `[구조 불일치] …` · `[SVG 미지원] …`, 마지막 줄 "다시 작성해 주세요." 문제가 여러 개면 한 번의 alert에 모두 담는다. `<iframe>` · `<object>` · `<embed>` · `<style>` · `<link rel="stylesheet">` · `<meta http-equiv="refresh">` · `<base>`는 `[위험한 코드]` 줄에 요소 이름을 적는다. **Patch 도중 예외(C2)는 별도 말마디 `[Patch 오류]`**(Dev-17): "실제 영역을 마지막 기록 상태로 되돌렸습니다" 안내 포함
 
 ## Dev 항목 — 필수
 
@@ -98,6 +98,7 @@
     - 만든 · 고친 파일: `packages/react-reconciler/src/diff.ts`(`diff` · `diffNode` — TEXT/COMMENT 분기 SET_TEXT, 속성 · style 항목 비교, 종류 · 태그가 다르면 REPLACE, 자식은 겹치는 길이까지만), `packages/react-reconciler/src/index.ts`(새로, `diff` 내보내기), `packages/react-reconciler/src/__tests__/applyPatches.ts`(테스트 전용 검산기, MOVE 포함 7종 + `normalizeTree`)
     - 테스트: `diff.test.ts` 30건 통과 (`npx vitest run packages/react-reconciler`). 모듈이 없는 상태에서 실패하는 것을 먼저 확인. 이 Dev에서 통과한 기본 케이스: `D-01 글자가 바뀌면 SET_TEXT 한 줄`, `D-01 중첩 안의 글자`, `D-02 속성 추가 · 수정 · 삭제`, `D-05 태그가 다르면 REPLACE`, `D-05 중첩 안의 교체`, `글자 ↔ 요소 ↔ 주석 종류가 다르면 REPLACE`, `같은 입력이면 빈 목록 (P1-13)`, `입력 VNode를 고치지 않는다(깊게 얼린 입력)`, 모든 `run()` 테스트가 `applyPatches(old, diff(old, new))`가 new와 같음을 함께 확인
     - 실행: `npx vitest run` 5 files · 100 passed, `npx tsc --noEmit` 오류 0, 커밋 d88c6e4
+  - **검수 1회차 반영 (B-1)**: `packages/react-reconciler/src/diff.ts`의 `diffStyle`이 `Object.hasOwn(after, property) ? after[property] : undefined` · `!Object.hasOwn(before, property)`로 자기 항목만 본다(프로토타입 체인 배제). 검산기 `__tests__/applyPatches.ts`의 SET_STYLE도 Map으로 고침(`__proto__` 대입이 무시되던 것). 테스트: `diff.test.ts`에 `constructor` · `__proto__` · `toString` · `hasOwnProperty` 항목 추가 · 삭제 · 수정 + style 통째 제거 13건(`applyPatches` 결과까지 확인) 추가 → 58건 통과 (`npx vitest run packages/react-reconciler/src/__tests__/diff.test.ts`). 고치기 전 9건 실패(추가 · 삭제 · 통째 제거 케이스)를 먼저 확인. npx vitest run 전체 424 passed, npx tsc --noEmit 오류 0, npx playwright test 96 passed(desktop · mobile). 커밋 f936f0f
 
 - [x] **Dev-4** (`react-reconciler`): `diff` 자식 추가 · 삭제 · 중첩 · 복합 — 길이가 다른 자식 목록(INSERT 앞에서 · REMOVE 뒤에서) [P1-10 · P1-11 · P1-14 ~ P1-16 · T-03 · T-05 · B20]
   - 의존: Dev-3
@@ -139,6 +140,7 @@
     - diff 결합 검증: D-01 ~ D-05 · 복합 · 복수 루트 · 0개 · 역패치 왕복, 무작위 200쌍(실제 DOM에 적용 후 `readAreaChildren` 결과가 목표와 같고 역패치로 원래대로)
     - B20: `깊이 300 중첩의 맨 아래 글자 바꾸기가 스택 넘침 없이 끝나고 결과가 목표와 같다 (B20)`, `형제 2,000개에서 끝에 추가 · 전부 삭제가 끝나고 결과가 목표와 같다 (B20)` 통과
     - 실행: `npx vitest run` 7 files · 159 passed, `npx tsc --noEmit` 오류 0, 커밋 0dc2b24
+  - **검수 1회차 반영 (B-1)**: `packages/react-dom-bindings/src/client/patch.ts`의 SET_STYLE 적용을 `new Map(Object.entries(parseStyleText(...)))` → `styleMapToText(Object.fromEntries(map))`로 바꿈(`__proto__` 항목이 프로토타입을 바꾸던 문제). 테스트: `patch.test.ts`에 `__proto__` 항목 추가 · 삭제 · 수정 · 마지막 항목 삭제 + `constructor` 추가 · 삭제 5건 추가 → 55건 통과 (`npx vitest run packages/react-dom-bindings/src/client/__tests__/patch.test.ts`). 고치기 전 `__proto__` 추가 1건 실패를 먼저 확인. 커밋 f936f0f
 
 - [x] **Dev-7** (`react-dom-bindings`): `vnodesToHtml` — 저장한 VNode를 편집창에 채울 HTML 글로 [P1-22 · P1-30 · §5 공백 · 주석 · B18 · B19]
   - 의존: Dev-1 (`styleMapToText`), Dev-2 (왕복 검증)
@@ -168,6 +170,7 @@
 script:` · `" JAVA	script:"`), `<iframe> 제거 — srcdoc 안에 <script>parent.__pwned=1</script>가 있어도 영역에 안 남고 실행되지 않는다 (B11 · C3)`, `<iframe src> · <object> · <embed> 제거 (C3)`, `<style> 제거 (C5)`, `<link rel="stylesheet"> 제거 — rel="Stylesheet" · "alternate stylesheet" 포함 (C5)`, `<link rel="icon"> 등 다른 rel은 그대로 둔다 (C5)`, `글을 <template>로 파싱한 뒤 옮기므로 파싱 중에 코드가 실행되지 않는다 (<img onerror>)`, `javascript: 주소 제거 — %s on <%s>`(href · src · action · formaction, 앞 공백 · 제어문자 포함 6건), on… 속성(대소문자 섞어도) · `<script>` 제거 · 나머지 속성 · 구조 · 공백 · 주석 · 인라인 style 보존 · 빈 글 · 영역 상자 그대로 · 다시 호출 · 특수문자
     - 한계(숨기지 않고 기록): 이 jsdom 설정은 인라인 핸들러 · 스크립트를 실제로 실행하지 않는다(처음에 "innerHTML로 바로 넣으면 `onclick`이 돈다"는 대조 테스트를 넣었더니 실행이 안 돼 실패 → 그 대조 테스트와 `click()` 호출은 뺌). 그래서 `window.__pwned` 미정의 확인은 보조이고, 핵심 확인은 "영역에 그 요소 · 속성이 남지 않았다"이다. 실제 브라우저에서 코드가 안 도는지는 e2e(Dev-16 QA-29 · QA-30)가 본다
     - 실행: `npx vitest run` 10 files · 220 passed, `npx tsc --noEmit` 오류 0, 커밋 090b2b6
+  - **검수 1회차 반영 (B-3 · NB-4)**: (B-3) `packages/react-dom-bindings/src/client/sanitize.ts`의 `URL_ATTRIBUTES`에 `xlink:href` 추가 → SVG `<a xlink:href="javascript:…">`가 미리보기에서 빠진다. 테스트: `setAreaHtml.test.ts`(xlink:href만 빠지고 정상 주소는 남음) · `sanitize.test.ts` · `checkHtml.test.ts`(`DANGEROUS`, 메시지에 `xlink:href`) 각 1건, 고치기 전 3건 실패 확인. 커밋 74b7c3b. (NB-4) `scanDangerous`가 `<base>`(요소째)와 `<meta http-equiv="refresh">`(값 대소문자 무시)도 찾아 미리보기에서 빼고, 다른 `<meta>`(charset · name · 다른 http-equiv)는 남긴다. 테스트: `sanitize.test.ts` · `setAreaHtml.test.ts`(빠짐 · 다른 meta 남음) 추가, 고치기 전 2건 실패 확인. 결과: `sanitize.test.ts` 14 · `setAreaHtml.test.ts` 25 passed. 커밋 5406529. npx vitest run 전체 424 passed, npx tsc --noEmit 오류 0, npx playwright test 96 passed(desktop · mobile)
 
 - [x] **Dev-9** (`react-dom-bindings`): `checkHtml` 1 — 위험 코드 · SVG · 알림 글 만들기 [§5 실행 가능한 HTML · §5 HTML 범위(SVG 미지원) · §6.2 지원하지 않는 입력 · C3 · C5 · B11 · B12]
   - 의존: Dev-8 (`scanDangerous`)
@@ -184,6 +187,7 @@ script:` · `" JAVA	script:"`), `<iframe> 제거 — srcdoc 안에 <script>paren
     - 말머리 5종(`[위험한 코드]` · `[태그 짝]` · `[구조 불일치]` · `[SVG 미지원]` · `[Patch 오류]`)은 `PROBLEM_LABELS`로 테스트(`말머리 5종: …`). `[Patch 오류]`(`PATCH_ERROR`)만 있으면 "다시 작성해 주세요." 줄을 붙이지 않는다(Dev-17이 자체 안내 "실제 영역을 마지막 기록 상태로 되돌렸습니다"를 message에 담는 전제)
     - 짝(`UNPAIRED`) · 구조(`STRUCTURE`) 검사는 Dev-10 몫이라 이 Dev의 `checkHtml`은 아직 내지 않는다(타입 · 말머리만 준비)
     - 실행: `npx vitest run` 11 files · 239 passed, `npx tsc --noEmit` 오류 0, 커밋 443ca67
+  - **검수 1회차 반영 (NB-4)**: `checkHtml.ts`의 `describeDangerous`가 `<meta http-equiv="refresh"> 요소` · `<base> 요소`로 알림 글에 요소 이름을 적는다. 테스트: `checkHtml.test.ts`에 `<meta http-equiv="Refresh">` · `<base>` DANGEROUS 2줄(알림 글 포함)과 다른 `<meta>`는 문제 없음 2건 추가 → 62건 통과 (`npx vitest run packages/react-dom-bindings/src/client/__tests__/checkHtml.test.ts`) (B-3의 `xlink:href` DANGEROUS 1건 포함). 고치기 전 실패 확인. 커밋 5406529 · 74b7c3b
 
 - [x] **Dev-10** (`react-dom-bindings`): `checkHtml` 2 — 태그 짝 검사 + 구조 비교(`tbody` 자동 추가만 예외) [§5 HTML 편집 · 오류 · §6.2 지원하지 않는 입력과 오류 복구 · C1 · B14 · B15 · B16]
   - 의존: Dev-9, Dev-7 (`vnodesToHtml` 결과가 항상 통과하는지 확인)
@@ -232,6 +236,7 @@ script:` · `" JAVA	script:"`), `<iframe> 제거 — srcdoc 안에 <script>paren
     - Patch 도중 예외 복구(C2 · B22): `B22: 실제 영역을 바깥에서 망가뜨려 경로가 사라지면 원래 예외가 다시 던져지고, 기록은 안 늘고 current는 안 움직인다` · `B22: 적용되다 만 patch도 되돌려져 실제 영역이 지금(current) 기록의 snapshot과 같아진다`(`<ul>`을 뗀 뒤 `<li>` INSERT가 `<p>`에 먼저 들어가고 다음 patch에서 실패하는 반쯤 적용된 상태) · `B22: 영역을 통째로 비워 첫 patch부터 실패해도 같은 복구가 된다` · `B22: 복구 뒤 이어서 정상 update가 성공하고 기록이 정확히 한 칸 늘어난다`. 변이 확인: 복구의 `renderAreaChildren` 줄을 지우면 B22 3건 실패하는 것을 확인하고 되돌림
     - 미룬 확인: `back()`이 필요한 단언(처음에 뒤로 · 앞으로가 `null` · 무변경 · 예외 뒤 "기록이 늘지 않음" · 복구 뒤 "정확히 한 칸 늘어남")은 `back`이 Dev-13에서 만들어지므로 Dev-13 테스트에 이어서 넣음. Dev-12에서는 `snapshot()` 참조 그대로로 같은 사실을 확인
     - 실행: `npx tsc --noEmit` 오류 0, 커밋 a4ec636
+  - **검수 1회차 반영 (NB-5)**: `packages/react-dom/src/createVDomRoot.ts`의 `applyOrRecover`가 복구 `renderAreaChildren`을 `try/catch`로 감싸, 복구도 실패하면 원래 예외를 그대로 던지고 복구 예외는 그 예외의 `recoveryError`로 붙인다(`cause`는 "원인" 방향이 반대라 쓰지 않음). 테스트: `createVDomRoot.test.ts` "복구 그리기도 실패하면 원래 예외가 던져진다" 1건 추가 → 45건 통과 (`npx vitest run packages/react-dom/src/__tests__/createVDomRoot.test.ts`). 고치기 전 실패(복구 예외가 원래 예외를 덮음) 확인. 커밋 e2def72
 
 - [x] **Dev-13** (`react-dom`): `createVDomRoot` 2 — `back` · `forward`: 실제 영역은 역패치 · patch로, 돌려주는 스냅샷으로 테스트 영역 · 편집창이 따라가게 [P1-28 ~ P1-30 · T-08 · §3.3 · C2]
   - 의존: Dev-12
@@ -307,6 +312,7 @@ script:` · `" JAVA	script:"`), `<iframe> 제거 — srcdoc 안에 <script>paren
     - 테스트 이름: `QA-31 두 영역 안의 링크 클릭 · 폼 버튼 클릭에도 페이지가 이동하거나 새로고침되지 않는다`(테스트 영역 링크 · 폼 버튼, 실제 영역 링크 · 폼 버튼 4회 클릭 뒤 주소 그대로 · `window.__stay` 살아 있음 · `framenavigated` 0건 · 문서 이동 요청 0건 · 실제 영역 구조 그대로 · 편집창 글 그대로 · 콘솔 오류 없음) · `QA-A12 Patch 도중 예외가 나면 [Patch 오류] alert 뒤 실제 영역이 마지막 기록 상태로 복구되고 다시 Patch하면 성공한다`(실제 영역 `<ul>`을 `remove()`한 뒤 `<li>` · `<p>` 글자를 고쳐 Patch → alert `[Patch 오류]` · `되돌렸습니다`, `<p>` 글자 · `<ul>`이 마지막 기록(초기 샘플) 구조로 복구, 편집창 글 · 테스트 영역 그대로, 다시 Patch하면 성공 — 첫 실패가 기록을 앞으로 보냈다면 두 번째 diff가 비어 실패했을 것이라 "기록 그대로"의 간접 증거)
     - 미룬 것(이유): QA-31의 "클릭 뒤에도 뒤로가 동작해 기록이 살아 있다", QA-A12의 "뒤로 무시 · 다시 Patch 뒤 기록이 정확히 한 칸"은 뒤로 버튼이 Dev-18에서 연결되므로 **Dev-18이 같은 두 테스트에 덧붙여야 한다**(테스트 안 `// [AI Note]`에 표시해 둠). 그 외 C 항목(C2 · C4)은 미루지 않았다
     - 전체 실행(Dev-14 ~ 17 끝): `npx vitest run` 13 files · 334 passed, `npx tsc --noEmit` 오류 0, `npx playwright test` 50 passed (render 10 · patch 18 · guard 22, desktop 25 · mobile 25), 끝난 뒤 5199 대기 중인 프로세스 없음, 커밋 846a80a
+  - **검수 1회차 반영 (B-2)**: `fixtures/phase1-vdom-playground/main.ts`의 클릭 막기를 `closest('a[href]')` → `closest('a, area')`로 바꿔 `<area>`와 SVG `<a xlink:href>`도 막는다. 테스트: `e2e/phase1-guard.spec.ts` QA-31에 `<area>` 이미지 맵 두 영역(양쪽 영역) 클릭과 SVG `<a xlink:href>`(테스트 영역 미리보기) 클릭 추가, `framenavigated` 0건 · 문서 이동 요청 0건 · 주소 그대로 확인. 고치기 전 `<area>` 클릭에서 페이지가 이동해 실패, 임시로 `a[href], area`로 두면 SVG 링크에서 주소가 `https://example.com/svg`로 바뀌어 실패하는 것도 확인. 결과: `npx playwright test e2e/phase1-guard.spec.ts -g QA-31` desktop · mobile 2 passed. 커밋 dbe31eb
 
 - [x] **Dev-18** (`fixture` + `e2e`): 뒤로 · 앞으로 버튼 — 세 칸(편집창 · 테스트 영역 · 실제 영역)이 그 기록 상태로 [P1-26 ~ P1-30 · P1-32 · T-08 · B3]
   - 의존: Dev-13, Dev-15, Dev-17 (오류 알림 함수)
