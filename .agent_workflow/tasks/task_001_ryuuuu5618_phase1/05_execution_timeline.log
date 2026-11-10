@@ -48,3 +48,6 @@
 2026-11-11T03:59 | stage=2 | agent=master | round=2 | signal=DECISION | 사용자 (1) 고치고 마스터 확인 → 2회차 재작업 맡김 (3회차 Opus 없음)
 2026-11-11T04:03 | stage=2 | agent=mr-worker | round=- | signal=UNKNOWN | Dev-2617 | by=hook
 2026-11-11T04:04 | stage=2 | agent=master | round=2 | signal=APPROVE | 마스터 확인(사용자 선택 1): 고치기 전 4 failed → 고친 뒤 vitest 432 · tsc 0 · playwright 96 passed. 개발 단계 종료 → 2.5
+2026-11-11T04:09 | stage=2.5 | agent=master | round=- | signal=CHECKPOINT | CP1 Diff · Patch (예측 → 실제 diff 실행 → 한 줄 요약)
+2026-11-11T04:13 | stage=2.5 | agent=master | round=- | signal=CHECKPOINT | CP2 State History 갈림길 (예측 → 실제 History 실행, 이유 채움)
+2026-11-11T04:17 | stage=2.5 | agent=master | round=- | signal=CHECKPOINT | CP3 실제 React와 차이 → 2.5단계 끝, 3단계 QA로
