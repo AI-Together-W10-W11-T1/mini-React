@@ -74,7 +74,7 @@
   - **완료 근거 (Evidence)**:
     - 만든 · 고친 파일: `packages/react-dom-bindings/src/client/renderVNode.ts`(주석 분기 `createComment`, `style` 객체 → 속성 글, `renderAreaChildren`), `packages/react-dom-bindings/src/client/style.ts`(`parseStyleText` · `styleMapToText`), `packages/react-dom-bindings/src/index.ts`(내보내기), `packages/shared/src/__tests__/helpers.ts`(`comment()`)
     - 테스트: `style.test.ts` 18건 통과(쪼개기 · 다시 쓰기 · B21 경계 `!important` / 값 안 주석 `/* ; */` / 끝 `;;;` / 빈 값 `color:` / 빈 값 뒤 정상 항목), `renderVNode.test.ts` 21건 통과(기존 4+6건 유지, "객체 props 경고"는 `style` 아닌 객체(`data`)만 경고하도록 수정, 주석 · style · `renderAreaChildren` 추가). 먼저 모듈이 없는 상태에서 두 파일이 실패하는 것을 확인한 뒤 구현
-    - 실행: `npx vitest run` 3 files · 46 passed, `npx tsc --noEmit` 오류 0, 커밋: 메시지 `(Dev-1)` (`git log --oneline --grep "Dev-1)"`)
+    - 실행: `npx vitest run` 3 files · 46 passed, `npx tsc --noEmit` 오류 0, 커밋 ea9b0d8
 
 - [x] **Dev-2** (`react-dom-bindings`): `domToVNode` · `readAreaChildren` — 요소 · 텍스트(공백 포함) · 주석 · 속성 · boolean · style · 중첩을 VNode로 [P1-01 ~ P1-04 · P1-20 · P1-23 · T-01]
   - 의존: Dev-1 (`style.ts`, 되돌려 그리는 비교용 `renderVNode`)
@@ -86,7 +86,7 @@
     - 만든 · 고친 파일: `packages/react-dom-bindings/src/client/domToVNode.ts`(`domToVNode` · `readAreaChildren` · 속성 읽기, `style`은 `parseStyleText`로 StyleMap, 빈 style은 props 없음), `packages/react-dom-bindings/src/index.ts`(내보내기)
     - 테스트: `domToVNode.test.ts` 24건 통과 (태그 · 중첩 · 형제 순서 · 글자 사이 위치 · 속성 · boolean `""` · style StyleMap · 공백 텍스트 · 주석 · 번호 일치 · 영역 상자 0 · 1 · 여러 개 · 상자 자신 속성 안 읽음 · 특수문자 · DOM → VNode → DOM 왕복). 모듈이 없는 상태에서 실패하는 것을 먼저 확인
     - 샘플 HTML 읽은 VNode 요약(테스트 "샘플 HTML을 읽은 VNode (요약)"): `section{id:card,class:card}` 자식 종류 = `#text, h2, #text, #comment, #text, p{class:note, style:{color:red,font-size:16px}}, #text, ul, #text, button{disabled:""}, #text` (11개)
-    - 실행: `npx vitest run` 4 files · 70 passed, `npx tsc --noEmit` 오류 0, 커밋: 메시지 `(Dev-2)`
+    - 실행: `npx vitest run` 4 files · 70 passed, `npx tsc --noEmit` 오류 0, 커밋 7e744c4
 
 - [x] **Dev-3** (`react-reconciler`): `diff` 기본 — 글자 · 주석 글 · 속성 추가 · 수정 · 삭제 · style 항목 · 교체 · 무변경 (자식은 같은 길이까지) [P1-06 ~ P1-09 · P1-12 · P1-13 · P1-33 · T-03 · T-04]
   - 의존: 없음 (DOM 없이 VNode만)
@@ -97,7 +97,7 @@
   - **완료 근거 (Evidence)**:
     - 만든 · 고친 파일: `packages/react-reconciler/src/diff.ts`(`diff` · `diffNode` — TEXT/COMMENT 분기 SET_TEXT, 속성 · style 항목 비교, 종류 · 태그가 다르면 REPLACE, 자식은 겹치는 길이까지만), `packages/react-reconciler/src/index.ts`(새로, `diff` 내보내기), `packages/react-reconciler/src/__tests__/applyPatches.ts`(테스트 전용 검산기, MOVE 포함 7종 + `normalizeTree`)
     - 테스트: `diff.test.ts` 30건 통과 (`npx vitest run packages/react-reconciler`). 모듈이 없는 상태에서 실패하는 것을 먼저 확인. 이 Dev에서 통과한 기본 케이스: `D-01 글자가 바뀌면 SET_TEXT 한 줄`, `D-01 중첩 안의 글자`, `D-02 속성 추가 · 수정 · 삭제`, `D-05 태그가 다르면 REPLACE`, `D-05 중첩 안의 교체`, `글자 ↔ 요소 ↔ 주석 종류가 다르면 REPLACE`, `같은 입력이면 빈 목록 (P1-13)`, `입력 VNode를 고치지 않는다(깊게 얼린 입력)`, 모든 `run()` 테스트가 `applyPatches(old, diff(old, new))`가 new와 같음을 함께 확인
-    - 실행: `npx vitest run` 5 files · 100 passed, `npx tsc --noEmit` 오류 0, 커밋: 메시지 `(Dev-3)`
+    - 실행: `npx vitest run` 5 files · 100 passed, `npx tsc --noEmit` 오류 0, 커밋 d88c6e4
 
 - [x] **Dev-4** (`react-reconciler`): `diff` 자식 추가 · 삭제 · 중첩 · 복합 — 길이가 다른 자식 목록(INSERT 앞에서 · REMOVE 뒤에서) [P1-10 · P1-11 · P1-14 ~ P1-16 · T-03 · T-05 · B20]
   - 의존: Dev-3
@@ -111,7 +111,7 @@
     - 테스트 이름: `D-03 끝에 노드 추가`, `D-04 끝 노드 삭제: REMOVE의 node는 원본 VNode 통째`, `여러 형제를 한꺼번에 삭제하면 경로가 뒤에서부터`, `여러 개를 한꺼번에 추가하면 경로가 앞에서부터`, `가운데 형제를 지우면 위치 비교 결과(…)지만 최종 결과는 목표와 같다`, `삭제와 수정이 함께 있어도 다른 노드를 잘못 수정하지 않는다`, `중첩 3단계 안의 변경이 올바른 대상에 반영된다`, `복합 변경: 글자 + 속성 + 추가 + 삭제 + 교체가 한꺼번에 (P1-15 · T-05)`, `경로가 공백 글자 · 주석 번호를 센다`, `빈 목록 ↔ 여러 개`
     - 무작위 200쌍: `무작위(고정 씨앗) 트리 쌍 200개에서 applyPatches(old, diff(old, new))가 new와 같다 (T-03 · T-05)` 통과 (씨앗 20261111, 100쌍 독립 생성 + 100쌍 변형)
     - B20: `깊이 300 중첩의 맨 아래 글자 바꾸기가 스택 넘침 없이 끝난다 (B20)`(경로 길이 302), `형제 2,000개에서 끝에 추가 · 전부 삭제가 끝나고 결과가 목표와 같다 (B20)` 통과
-    - 실행: `npx vitest run` 5 files · 115 passed, `npx tsc --noEmit` 오류 0, 커밋: 메시지 `(Dev-4)`
+    - 실행: `npx vitest run` 5 files · 115 passed, `npx tsc --noEmit` 오류 0, 커밋 ca7e230
 
 - [x] **Dev-5** (`react-reconciler`): `invertPatches` — 전후 뒤집기 + 역순 (역패치) [P1-26 · T-08]
   - 의존: Dev-3 (`applyPatches` 검산기 · patch 종류)
@@ -123,7 +123,7 @@
     - 만든 · 고친 파일: `packages/react-reconciler/src/invertPatches.ts`(`invertPatches` — 종류별 전후 뒤집기 + `reverse()`), `packages/react-reconciler/src/index.ts`(내보내기)
     - 테스트: `packages/react-reconciler/src/__tests__/invertPatches.test.ts` 13건 통과 (`npx vitest run packages/react-reconciler/src/__tests__/invertPatches.test.ts`). 모듈이 없는 상태에서 실패하는 것을 먼저 확인. 종류별 뒤집기 6건(SET_TEXT · SET_ATTR · SET_STYLE · INSERT↔REMOVE · REPLACE · MOVE), 순서 뒤집힘, 두 번 뒤집으면 원래 목록, 입력을 고치지 않음(깊게 얼림), 빈 목록, 손으로 쓴 변경 왕복, MOVE 왕복
     - 무작위 200쌍 왕복: `무작위(고정 씨앗) 트리 쌍 200개에서 applyPatches(new, invert(diff(old, new)))가 old와 같다 (왕복)` 통과 (Dev-4와 같은 `randomTree.ts` 재사용, 앞으로 적용 결과가 new인 것도 함께 확인)
-    - 실행: `npx vitest run` 6 files · 128 passed, `npx tsc --noEmit` 오류 0, 커밋: 메시지 `(Dev-5)`
+    - 실행: `npx vitest run` 6 files · 128 passed, `npx tsc --noEmit` 오류 0, 커밋 f9a897e
 
 - [x] **Dev-6** (`react-dom-bindings`): `patch` — 경로 + 순서대로 하나씩 실제 DOM에 반영 (SET_TEXT · SET_ATTR · SET_STYLE · INSERT · REMOVE · REPLACE) [P1-34 · P1-13 · P1-17 · P1-18 · T-03 · T-04 · T-06 · B20]
   - 의존: Dev-1 (INSERT · REPLACE가 `renderVNode` 사용), Dev-2 (결과를 `domToVNode`로 비교), Dev-4 (diff 결과 모양 확인)
@@ -138,7 +138,7 @@
     - 참조 유지: `D-01 SET_TEXT: 글자 노드의 nodeValue만 바꾼다 (노드 참조 유지, P1-06)`, `대상 · 부모 · 형제 요소의 참조가 유지된다`, `추가 · 삭제 때도 관련 없는 형제 노드의 참조가 유지된다`, `일부 변경에서 바뀌지 않는 노드의 참조가 유지된다 (T-06)`, `D-05 REPLACE: 새 노드로 바뀌고 옛 노드는 분리된다`
     - diff 결합 검증: D-01 ~ D-05 · 복합 · 복수 루트 · 0개 · 역패치 왕복, 무작위 200쌍(실제 DOM에 적용 후 `readAreaChildren` 결과가 목표와 같고 역패치로 원래대로)
     - B20: `깊이 300 중첩의 맨 아래 글자 바꾸기가 스택 넘침 없이 끝나고 결과가 목표와 같다 (B20)`, `형제 2,000개에서 끝에 추가 · 전부 삭제가 끝나고 결과가 목표와 같다 (B20)` 통과
-    - 실행: `npx vitest run` 7 files · 159 passed, `npx tsc --noEmit` 오류 0, 커밋: 메시지 `(Dev-6)`
+    - 실행: `npx vitest run` 7 files · 159 passed, `npx tsc --noEmit` 오류 0, 커밋 0dc2b24
 
 - [ ] **Dev-7** (`react-dom-bindings`): `vnodesToHtml` — 저장한 VNode를 편집창에 채울 HTML 글로 [P1-22 · P1-30 · §5 공백 · 주석 · B18 · B19]
   - 의존: Dev-1 (`styleMapToText`), Dev-2 (왕복 검증)
