@@ -10,3 +10,4 @@ export type { DangerousFinding, DangerousKind } from './client/sanitize';
 export { checkHtml, formatProblems, PROBLEM_LABELS } from './client/checkHtml';
 export type { HtmlProblem, HtmlProblemKind } from './client/checkHtml';
 export { setEventHandler } from './client/events';
+export { applyDomProp } from './client/domProps';

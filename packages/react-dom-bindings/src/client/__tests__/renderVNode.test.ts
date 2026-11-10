@@ -53,13 +53,27 @@ describe('renderVNode props 규칙', () => {
     expect(node.attributes.length).toBe(0);
   });
 
-  it('함수 props는 속성을 설정하지 않고 console.warn을 낸다 (UT-RV-P3)', () => {
+  it('이벤트가 아닌 함수 props는 속성을 설정하지 않고 console.warn을 낸다 (UT-RV-P3, on + 대문자 함수는 이벤트라 제외)', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
-    const node = renderVNode(deepFreeze(el('button', { onClick: () => {} }))) as Element;
+    const node = renderVNode(deepFreeze(el('button', { render: () => {} }))) as Element;
     expect(node.attributes.length).toBe(0);
     expect(warn).toHaveBeenCalledTimes(1);
-    expect(String(warn.mock.calls[0][0])).toContain('onClick');
+    expect(String(warn.mock.calls[0][0])).toContain('render');
     expect(String(warn.mock.calls[0][0])).toContain('button');
+  });
+
+  it('on + 소문자 함수(onclick)는 이벤트가 아니므로 경고 후 설정하지 않는다', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const handler = vi.fn();
+    const node = renderVNode(deepFreeze(el('button', { onclick: handler }))) as Element;
+    node.dispatchEvent(new Event('click'));
+    expect(handler).not.toHaveBeenCalled();
+    expect(warn).toHaveBeenCalledTimes(1);
+  });
+
+  it('onClick 문자열 값은 이벤트가 아니라 보통 속성이다', () => {
+    const node = renderVNode(deepFreeze(el('button', { onClick: 'x' }))) as Element;
+    expect(node.getAttribute('onClick')).toBe('x');
   });
 
   it('style이 아닌 객체 props는 속성을 설정하지 않고 console.warn을 낸다 (UT-RV-P4)', () => {
@@ -166,5 +180,63 @@ describe('renderAreaChildren', () => {
     renderAreaChildren(area, [el('p')]);
     expect(area.id).toBe('area');
     expect(area.getAttribute('class')).toBe('box');
+  });
+});
+
+describe('renderVNode — 이벤트 · DOM 프로퍼티 (Phase 2)', () => {
+  it('그려진 <button>을 click하면 onClick 핸들러가 호출된다 (속성은 만들지 않음)', () => {
+    const onClick = vi.fn();
+    const button = renderVNode(deepFreeze(el('button', { onClick }, text('go')))) as HTMLButtonElement;
+    expect(button.attributes.length).toBe(0);
+    button.click();
+    expect(onClick).toHaveBeenCalledTimes(1);
+  });
+
+  it('onInput → input 이벤트', () => {
+    const onInput = vi.fn();
+    const input = renderVNode(deepFreeze(el('input', { onInput }))) as HTMLInputElement;
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    expect(onInput).toHaveBeenCalledTimes(1);
+  });
+
+  it('자식 요소의 이벤트도 붙는다', () => {
+    const onClick = vi.fn();
+    const ul = renderVNode(deepFreeze(el('ul', {}, el('li', {}, el('button', { onClick }))))) as HTMLElement;
+    (ul.querySelector('button') as HTMLButtonElement).click();
+    expect(onClick).toHaveBeenCalledTimes(1);
+  });
+
+  it('<input value="a">는 프로퍼티 .value === "a"이고 value 속성은 생기지 않는다', () => {
+    const input = renderVNode(deepFreeze(el('input', { type: 'text', value: 'a' }))) as HTMLInputElement;
+    expect(input.value).toBe('a');
+    expect(input.hasAttribute('value')).toBe(false);
+    expect(input.getAttribute('type')).toBe('text');
+  });
+
+  it('숫자 value는 문자열로', () => {
+    const input = renderVNode(deepFreeze(el('input', { value: 5 }))) as HTMLInputElement;
+    expect(input.value).toBe('5');
+  });
+
+  it('checked: true는 프로퍼티로 체크되고 checked 속성은 생기지 않는다', () => {
+    const box = renderVNode(deepFreeze(el('input', { type: 'checkbox', checked: true }))) as HTMLInputElement;
+    expect(box.checked).toBe(true);
+    expect(box.hasAttribute('checked')).toBe(false);
+    const off = renderVNode(deepFreeze(el('input', { type: 'checkbox', checked: false }))) as HTMLInputElement;
+    expect(off.checked).toBe(false);
+  });
+
+  it('type이 value · checked보다 뒤에 적혀 있어도 type을 먼저 적용한다 (프로퍼티는 속성 뒤)', () => {
+    const box = renderVNode(deepFreeze(el('input', { checked: true, type: 'checkbox' }))) as HTMLInputElement;
+    expect(box.type).toBe('checkbox');
+    expect(box.checked).toBe(true);
+  });
+
+  it('이벤트가 달린 요소가 renderAreaChildren으로 그려져도 동작한다', () => {
+    const onClick = vi.fn();
+    const area = document.createElement('div');
+    renderAreaChildren(area, deepFreeze([el('button', { onClick })]));
+    (area.firstChild as HTMLButtonElement).click();
+    expect(onClick).toHaveBeenCalledTimes(1);
   });
 });

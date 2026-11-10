@@ -179,12 +179,22 @@ describe('DOM → VNode → DOM 되돌려 그리기 (T-01 · T-02)', () => {
   });
 
   it('특수문자 · 중첩 · 주석 · boolean 왕복', () => {
-    const html = '<div a="&quot;q&quot; &amp; &lt;">x &lt; y <br><!--c--><input disabled value="1"><p>😀 &amp;amp;</p></div>';
+    const html = '<div a="&quot;q&quot; &amp; &lt;">x &lt; y <br><!--c--><input disabled name="n"><p>😀 &amp;amp;</p></div>';
     const original = area(html);
     const copy = area('');
     renderAreaChildren(copy, readAreaChildren(original));
     expect(copy.innerHTML).toBe(original.innerHTML);
     expect(readAreaChildren(copy)).toEqual(readAreaChildren(original));
+  });
+
+  it('알려진 한계 (Phase 2, 명세 4절): value · checked는 속성이 아니라 프로퍼티로 그려져 다시 읽어도 속성 VNode가 생기지 않는다', () => {
+    // Phase 1 domToVNode는 <input value="1">의 속성을 props로 읽지만, renderVNode는 이제 value를 프로퍼티로 넣는다 (value 속성은 안 생김)
+    const read = readAreaChildren(area('<input value="1">'));
+    expect((read[0].props as { value?: string }).value).toBe('1');
+    const copy = area('');
+    renderAreaChildren(copy, read);
+    expect((copy.firstChild as HTMLInputElement).value).toBe('1');
+    expect((copy.firstChild as HTMLInputElement).hasAttribute('value')).toBe(false);
   });
 
   it('renderVNode로 만든 노드를 다시 읽으면 같은 VNode', () => {

@@ -1,5 +1,7 @@
 import { COMMENT_NODE, TEXT_NODE } from '@mini-react/shared';
-import type { AreaChildren, ElementVNode, StyleMap, VNode } from '@mini-react/shared';
+import type { AreaChildren, ElementVNode, EventHandler, StyleMap, VNode } from '@mini-react/shared';
+import { applyDomProp } from './domProps';
+import { setEventHandler } from './events';
 import { styleMapToText } from './style';
 
 // [AI Note]: VNode → 실제 DOM. 텍스트는 createTextNode만 쓰므로 `<`·`&`가 마크업으로 해석되지 않는다 (innerHTML 미사용).
@@ -31,20 +33,33 @@ export function renderAreaChildren(area: Element, children: AreaChildren): void 
 
 // [AI Note]: props 분기 — 문자열·숫자는 속성, true는 빈 속성, false·null·undefined는 생략,
 // style이 객체면 StyleMap으로 보고 속성 글로 쓴다(빈 묶음이면 속성 없음),
-// 그 밖의 함수·객체는 설정하지 않고 prop마다 warn 1회 (이벤트 처리는 phase2에서).
+// Phase 2: 이름이 `on` + 대문자이고 값이 함수면 이벤트(setEventHandler, `onClick` → `click`),
+// `value` · `checked`는 속성이 아니라 DOM 프로퍼티(applyDomProp)로 — `type`보다 먼저 적용하면 체크박스 값이 틀어질 수 있어 속성을 다 쓴 뒤 마지막에 넣는다.
+// 그 밖의 함수·객체는 설정하지 않고 prop마다 warn 1회.
 function applyProps(element: Element, vnode: ElementVNode): void {
-  for (const [name, value] of Object.entries(vnode.props)) {
-    if (name === 'style' && typeof value === 'object' && value !== null && !Array.isArray(value)) {
-      const text = styleMapToText(value as StyleMap);
+  let value: string | undefined;
+  let checked: boolean | undefined;
+  for (const [name, prop] of Object.entries(vnode.props)) {
+    if (name === 'value') {
+      if (typeof prop === 'string' || typeof prop === 'number') value = String(prop);
+    } else if (name === 'checked') {
+      if (prop === true || prop === '') checked = true;
+      else if (prop === false) checked = false;
+    } else if (name === 'style' && typeof prop === 'object' && prop !== null && !Array.isArray(prop)) {
+      const text = styleMapToText(prop as StyleMap);
       if (text !== '') element.setAttribute('style', text);
-    } else if (typeof value === 'string' || typeof value === 'number') {
-      element.setAttribute(name, String(value));
-    } else if (value === true) {
+    } else if (typeof prop === 'function' && /^on[A-Z]/.test(name)) {
+      setEventHandler(element, name.slice(2).toLowerCase(), prop as EventHandler);
+    } else if (typeof prop === 'string' || typeof prop === 'number') {
+      element.setAttribute(name, String(prop));
+    } else if (prop === true) {
       element.setAttribute(name, '');
-    } else if (value === false || value === null || value === undefined) {
+    } else if (prop === false || prop === null || prop === undefined) {
       continue;
     } else {
-      console.warn(`<${vnode.type}>의 "${name}" prop은 ${typeof value} 값이라 속성으로 설정하지 않습니다.`);
+      console.warn(`<${vnode.type}>의 "${name}" prop은 ${typeof prop} 값이라 속성으로 설정하지 않습니다.`);
     }
   }
+  if (value !== undefined) applyDomProp(element, 'value', value);
+  if (checked !== undefined) applyDomProp(element, 'checked', checked);
 }
