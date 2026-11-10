@@ -167,6 +167,20 @@ describe('setAreaHtml — 위험한 것을 빼고 그린다 (§5 실행 가능�
     expect(box.innerHTML).toBe('<p>글</p>');
   });
 
+  it('<meta http-equiv="refresh"> · <base> 제거 — http-equiv 대소문자 무시 (검수 1회차 NB-4)', () => {
+    const box = makeArea();
+    setAreaHtml(box, '<meta http-equiv="refresh" content="0;url=https://example.com"><meta http-equiv="Refresh" content="9"><base href="https://example.com/"><p>글</p>');
+    expect(box.querySelector('meta')).toBeNull();
+    expect(box.querySelector('base')).toBeNull();
+    expect(box.children.length).toBe(1);
+  });
+
+  it('다른 <meta>(charset · name · 다른 http-equiv)는 그대로 둔다 (검수 1회차 NB-4)', () => {
+    const box = makeArea();
+    setAreaHtml(box, '<meta charset="utf-8"><meta name="viewport" content="width=device-width"><meta http-equiv="content-type" content="text/html">');
+    expect(box.querySelectorAll('meta').length).toBe(3);
+  });
+
   it('<link rel="icon"> 등 다른 rel은 그대로 둔다 (C5)', () => {
     const box = makeArea();
     setAreaHtml(box, '<link rel="icon" href="a.ico"><link rel="preload" href="b">');

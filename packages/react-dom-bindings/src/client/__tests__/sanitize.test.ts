@@ -40,6 +40,15 @@ describe('scanDangerous — 미리보기에서 빼고 Patch 때 막는 단 하�
     expect(summarize('<link rel="icon" href="a.ico"><link href="a"><link rel="preload stylesheeted">')).toEqual([]);
   });
 
+  it('<meta http-equiv="refresh">(대소문자 무시)와 <base>는 차단, 다른 <meta>는 허용 (검수 1회차 NB-4)', () => {
+    expect(summarize('<meta http-equiv="refresh" content="0;url=https://example.com"><meta http-equiv="REFRESH" content="5"><base href="https://example.com/">')).toEqual([
+      '<meta>',
+      '<meta>',
+      '<base>',
+    ]);
+    expect(summarize('<meta charset="utf-8"><meta name="viewport" content="width=device-width"><meta http-equiv="content-type" content="text/html"><meta>')).toEqual([]);
+  });
+
   it('javascript: 주소 — href · src · action · formaction만', () => {
     expect(
       summarize(

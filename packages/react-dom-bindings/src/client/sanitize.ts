@@ -2,14 +2,17 @@
 // 미리보기(setAreaHtml)는 여기서 찾은 것을 빼고 그리고, Patch 때 검사(checkHtml)는 같은 목록을 문제로 알린다.
 // 두 곳이 어긋나면 "미리보기에는 있는데 Patch는 통과" 같은 틈이 생기므로 기준을 이 파일 하나에 둔다.
 
-/** 요소째 빼는 것: <script> · <iframe> · <object> · <embed> · <style> (+ <link rel="stylesheet">은 아래에서 따로 판정) */
-const BLOCKED_ELEMENTS = new Set(['script', 'iframe', 'object', 'embed', 'style']);
+/**
+ * 요소째 빼는 것: <script> · <iframe> · <object> · <embed> · <style> · <base>
+ * (+ <link rel="stylesheet"> · <meta http-equiv="refresh">는 아래에서 따로 판정)
+ */
+const BLOCKED_ELEMENTS = new Set(['script', 'iframe', 'object', 'embed', 'style', 'base']);
 
 /** 주소를 담는 속성 중 `javascript:`를 막을 것 (`xlink:href`는 SVG 링크의 한정 이름이라 따로 적는다, 검수 1회차 B-3) */
 const URL_ATTRIBUTES = new Set(['href', 'src', 'action', 'formaction', 'xlink:href']);
 
 export type DangerousKind =
-  /** 요소 자체가 막힌 종류 (`<script>` · `<iframe>` · `<object>` · `<embed>` · `<style>` · `<link rel="stylesheet">`) */
+  /** 요소 자체가 막힌 종류 (`<script>` · `<iframe>` · `<object>` · `<embed>` · `<style>` · `<link rel="stylesheet">` · `<meta http-equiv="refresh">` · `<base>`) */
   | 'ELEMENT'
   /** `on…` 이벤트 핸들러 속성 */
   | 'EVENT_ATTRIBUTE'
@@ -80,6 +83,9 @@ function isBlockedElement(element: Element): boolean {
       .split(/\s+/)
       .some((word) => word.toLowerCase() === 'stylesheet');
   }
+  // [AI Note]: <meta http-equiv="refresh">는 문서에 들어가면 페이지를 옮겨 C4와 같은 위험이다 (검수 1회차 NB-4). 다른 <meta>(charset 등)는 막지 않는다.
+  // http-equiv 값은 HTML 규칙처럼 대소문자만 무시해 비교한다. <base>는 BLOCKED_ELEMENTS에서 요소째 막는다 (이후 주소를 바꿔 버림).
+  if (tag === 'meta') return (element.getAttribute('http-equiv') ?? '').toLowerCase() === 'refresh';
   return false;
 }
 

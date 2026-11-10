@@ -75,6 +75,18 @@ describe('checkHtml 1 — 위험 코드', () => {
     expect(text).toContain('<link rel="stylesheet">');
   });
 
+  it('<meta http-equiv="refresh"> · <base>도 DANGEROUS이고 알림 글에 요소 이름이 들어간다 (검수 1회차 NB-4)', () => {
+    const problems = checkHtml('<meta http-equiv="Refresh" content="0;url=https://example.com"><base href="https://example.com/">');
+    expect(problems.map((p) => p.kind)).toEqual(['DANGEROUS', 'DANGEROUS']);
+    const text = formatProblems(problems);
+    expect(text).toContain('<meta http-equiv="refresh">');
+    expect(text).toContain('<base>');
+  });
+
+  it('다른 <meta>(charset · name · 다른 http-equiv)는 문제 없음 (검수 1회차 NB-4)', () => {
+    expect(checkHtml('<meta charset="utf-8"><meta name="viewport" content="width=device-width"><meta http-equiv="content-type" content="text/html">')).toEqual([]);
+  });
+
   it('<link rel="icon">은 문제 없음 (C5)', () => {
     expect(checkHtml('<link rel="icon" href="a.ico">')).toEqual([]);
   });

@@ -77,8 +77,10 @@ export function formatProblems(problems: readonly HtmlProblem[]): string {
 function describeDangerous(finding: DangerousFinding): string {
   switch (finding.kind) {
     case 'ELEMENT':
-      // <link>는 rel="stylesheet"일 때만 막히므로 그 모습 그대로 적는다
-      return finding.element === 'link' ? '<link rel="stylesheet"> 요소' : `<${finding.element}> 요소`;
+      // <link> · <meta>는 일부 모습만 막히므로 그 모습 그대로 적는다
+      if (finding.element === 'link') return '<link rel="stylesheet"> 요소';
+      if (finding.element === 'meta') return '<meta http-equiv="refresh"> 요소';
+      return `<${finding.element}> 요소`;
     case 'EVENT_ATTRIBUTE':
       return `<${finding.element}> 요소의 ${finding.attribute} 속성`;
     case 'JAVASCRIPT_URL':
