@@ -24,3 +24,5 @@
 2026-11-11T19:30 | stage=2 | agent=mr-worker | round=- | signal=UNKNOWN | Dev-11 | by=hook
 2026-11-11T19:33 | stage=2 | agent=mr-reviewer | round=2/3 | signal=UNKNOWN | Dev-9~12 | by=hook
 2026-11-11T19:33 | stage=2 | agent=master | round=2/3 | signal=APPROVE | 묶음 3 Dev-9~12 재검수 APPROVE (NB 3) — 2단계 끝
+2026-11-11T19:34 | stage=2.5 | agent=master | round=- | signal=CHECKPOINT_START | CP1 document 리스너(Q13 왜) · CP2 의존성 · cleanup · CP3 Instance swap patch
+2026-11-11T19:47 | stage=2.5 | agent=master | round=- | signal=CHECKPOINT | CP1 · CP2 (CP3 · 되묻기는 사용자 요청으로 건너뜀)
