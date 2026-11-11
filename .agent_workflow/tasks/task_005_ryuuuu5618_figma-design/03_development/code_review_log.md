@@ -15,3 +15,13 @@ BLOCKING 없음 (파일 직접 확인, 실행은 마스터 결과를 받음). �
 1. P-25 · 26 · 27 도구 막대 T 열 단언 빠짐 (`app.test.ts:693` · `:705` · `:783`). qa_todo는 P-25 · 27 `{ SET_ATTR: 1 }`, P-26 첫 input `{ SET_ATTR: 1 }` 이후 `{}` + 레이어 `{}`. 같은 경로는 P-5b 등이 증명 → `toolbarCounts` 단언 3 ~ 4줄 추가 권장
 2. 「글자색은 배경에 따라 textColorFor 규칙」 테스트가 기대값을 구현 함수에서 가져옴 (P-5 · color.test가 리터럴로 같은 내용 단언 → 실제 문제 없음)
 3. 색 입력칸 · 체크박스 포커스 표시가 브라우저 기본 (파랑 2px 포커스는 글자 칸 · 선택 상자만, `index.html:76`). FD-03 「입력칸 포커스」를 넓게 읽으면 `.color-input:focus-visible` 추가 가능 (QA-41 영향 없음)
+
+## Dev-9 경량 검수 · 회차 1/3 — APPROVE (2026-11-11T21:39)
+- 대상: `02_diff_dev9.patch` (`72263a9..07a091b`), 마스터 실행: vitest 1159 · tsc 0 · playwright 전체 324 · `packages/` diff 비어 있음 · 남은 서버 없음
+- BLOCKING 0. ① 새 규칙은 `@media (min-width: 721px)`(`index.html:94-101`)에만, mobile 쌓기 · 캔버스 최소 320px 유지, `.app` 직접 자식 4개(`App.ts:125-128`)라 `auto minmax(0, 1fr)` + border-box + body 여백 16 → 아래 끝 784 = 실측, 시작 내용이 화면 안이라 `body { overflow: hidden }`에도 포커스 이동 때 페이지 안 밀림 ② QA-43 · 44 · 45 CSS 전 실패 확인(355.9 / 3012 / rgb(16,16,16)), 20px = 여백 16 + 4, L로 올린 이유 근거와 맞음, QA-45는 색 + 2px 함께 단언 ③ NB 1 · 3 기록대로 ④ `<style>` · 테스트 · 문서만, TS 앱 로직 · `packages/` 변경 없음
+
+[NON-BLOCKING]
+1. desktop 가로 스크롤 검사가 약해짐: 세 패널 `overflow-y: auto` → `overflow-x`도 계산상 auto(`index.html:99`) → 패널 안 가로 넘침이 `documentElement.scrollWidth`에 안 잡혀 desktop `noHorizontalScroll`(QA-2 · 42 · A2 · 44)로 못 찾음. mobile은 그대로 잡힘 → QA-44 desktop 분기에 세 패널 `scrollWidth <= clientWidth` 단언 권장
+2. 아주 낮은 desktop(예 721x300)에선 도구 막대 · 패널 일부가 잘리고 스크롤바 없음 (명세 · 테스트 크기 1280x800에선 해당 없음, 기록만)
+3. 폭 720 ~ 721 사이 소수점(배율 조정)이면 두 media query 모두 안 걸려 3열 + 전체 높이 없음 (동작 문제 없음, 기록만)
+- 처리 계획 (마스터): 1은 QA 전에 테스트만 보강, 2 · 3은 README 「알려진 한계」 후보
