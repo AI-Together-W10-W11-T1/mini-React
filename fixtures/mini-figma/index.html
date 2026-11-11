@@ -66,15 +66,19 @@
       /* 영역 제목 (캔버스 안 「테스트 영역」) */
       .area-title { margin: 0 0 12px; font-size: 1.125rem; font-weight: 600; line-height: 1.33; color: var(--ink); }
 
-      /* 실제 영역 구역: 머리글(제목 + 버튼 3개) + 상자. 깜빡임 층은 상자와 같은 크기로 겹치고 마우스를 안 받는다. 박스는 흐름에 끼지 않는다(absolute) */
+      /* 실제 영역 구역: 카드(.app > * 규칙 재사용) = 머리글(제목 + 버튼 3개, 좁으면 줄바꿈) + 상자. [Patch]는 .btn-primary(파랑 알약), [뒤로] · [앞으로]는 .btn-secondary.
+         상자 모양은 캔버스와 같다(어두운 점무늬 · 1px 테두리 · 24px 안쪽 여백). 깜빡임 층은 상자와 같은 크기로 겹치고 마우스를 안 받는다. */
       .real-section { display: flex; flex-direction: column; gap: 12px; }
       .real-header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; }
       .real-header .panel-title { margin: 0; }
       .real-actions { display: flex; flex-wrap: wrap; gap: 8px; }
-      .real-frame { position: relative; flex: 1 1 auto; min-height: 0; }
-      .real-area { min-height: 120px; }
-      .real-overlay { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
-      .viz-box { position: absolute; }
+      .real-frame { position: relative; display: flex; flex: 1 1 auto; min-height: 0; }
+      .real-area { flex: 1 1 auto; min-width: 0; min-height: 120px; padding: 24px; background-color: var(--bg); background-image: radial-gradient(circle, #3a3f47 1.5px, transparent 1.6px); background-size: 24px 24px; border: 1px solid var(--line); border-radius: 24px; }
+      .real-area .figma-button { cursor: default; }
+      .real-overlay { position: absolute; inset: 0; pointer-events: none; overflow: hidden; border-radius: 24px; }
+      /* 깜빡임 박스: 바뀐 노드 위에 잠깐 뜨고 옅어져 사라진다. 파랑 버튼 위에서도 보이게 흰 테두리 + 파랑 바깥선 + 연한 흰 바탕. 그림자 · 주황 없음 (Phase 1 overlay.ts가 .viz-box를 만든다) */
+      .viz-box { position: absolute; box-sizing: border-box; border: 2px solid var(--ink); outline: 2px solid var(--accent); border-radius: 12px; background: rgba(255, 255, 255, 0.22); animation: viz-flash 0.7s ease-out forwards; }
+      @keyframes viz-flash { 0% { opacity: 1; } 100% { opacity: 0; } }
 
       .property-empty { margin: 0; color: var(--ink-soft); }
       /* 속성 칸: 이름 + 입력 부품. 긴 글자도 칸 안에서 줄어들게 min-width: 0 */
