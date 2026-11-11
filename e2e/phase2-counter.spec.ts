@@ -1,4 +1,4 @@
-import { test, expect, URL, holdNodes, sameNode, watchApp, renderCount, counterText } from './phase2-helpers';
+import { test, expect, URL, holdNodes, sameNode, watchApp, renderCount, effectCount, counterText } from './phase2-helpers';
 
 // [AI Note]: QA-2 · QA-3 · QA-4. 칸이 늘 때마다(이름 입력창 · 안내 <p> · 기록판 · 탭 제목) 붙잡는 노드와 단언을 늘린다.
 
@@ -49,11 +49,13 @@ test('QA-3 [+3]을 누르면 카운터가 3이 되고(함수형 setter 세 번) 
   await page.getByTestId('counter-plus3').click();
 
   expect(await counterText(page)).toBe('3');
+  await expect(page).toHaveTitle('카운터 3 - Phase 2');
   // 즉시 동기 정책: setter 하나에 렌더 하나 (PRD §4.2 "렌더링 횟수는 스케줄링 정책과 함께 기록")
   expect(await renderCount(page)).toBe(4);
 
   await page.getByTestId('counter-plus1').click();
   expect(await counterText(page)).toBe('4');
+  await expect(page).toHaveTitle('카운터 4 - Phase 2');
 });
 
 test('QA-4 [그대로]를 누르면 렌더 횟수 · 카운터가 그대로이고 DOM 변경이 0건이다', async ({ page }) => {
@@ -62,12 +64,16 @@ test('QA-4 [그대로]를 누르면 렌더 횟수 · 카운터가 그대로이�
   await page.getByTestId('counter-plus1').click();
   expect(await counterText(page)).toBe('2');
   expect(await renderCount(page)).toBe(3);
+  const effects = await effectCount(page);
+  const title = await page.title();
 
   const watcher = await watchApp(page);
   await page.getByTestId('counter-same').click();
 
   expect(await renderCount(page)).toBe(3);
   expect(await counterText(page)).toBe('2');
+  expect(await effectCount(page)).toBe(effects);
+  expect(await page.title()).toBe(title);
   const m = await watcher.take();
   expect(m.body.total).toBe(0);
   expect(m.log.total).toBe(0);

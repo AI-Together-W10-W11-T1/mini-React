@@ -1,6 +1,6 @@
-import { test, expect, URL, expectNoConsoleWarnings, noHorizontalScroll, renderCount, counterText } from './phase2-helpers';
+import { test, expect, URL, expectNoConsoleWarnings, noHorizontalScroll, renderCount, effectCount, memoCount, patchCount, patchEventCount, counterText } from './phase2-helpers';
 
-// [AI Note]: QA-1(처음 화면)은 칸이 하나씩 생길 때마다(Dev-17 ① 카운터 → Dev-18 ② → Dev-19 ③ → Dev-21 ④) 확인을 늘린다. 테스트 이름은 그대로다.
+// [AI Note]: QA-1(처음 화면)은 칸이 하나씩 생길 때마다(Dev-17 ① 카운터 → Dev-18 ② → Dev-19 ③ → Dev-21 ④) 확인을 늘렸고, 지금은 칸 네 개 전부 본다. 테스트 이름은 그대로다.
 
 test('QA-1 페이지를 처음 연다: 칸 · 버튼 · 렌더/Patch 버튼 없음 · 최상위 <main> 하나 · 콘솔 오류 · 경고 없음 · mobile 가로 스크롤 없음', async ({ page }, testInfo) => {
   await page.goto(URL);
@@ -11,7 +11,6 @@ test('QA-1 페이지를 처음 연다: 칸 · 버튼 · 렌더/Patch 버튼 없�
   await expect(page.getByTestId('counter-plus3')).toHaveText('+3');
   await expect(page.getByTestId('counter-same')).toHaveText('그대로');
   expect(await counterText(page)).toBe('0');
-  expect(await renderCount(page)).toBe(1);
 
   // ② 이름 입력창(비어 있음)과 인사 글
   await expect(page.getByTestId('name-input')).toHaveValue('');
@@ -22,6 +21,10 @@ test('QA-1 페이지를 처음 연다: 칸 · 버튼 · 렌더/Patch 버튼 없�
   await expect(page.getByTestId('todo-add')).toHaveText('추가');
   await expect(page.getByTestId('todo-empty')).toHaveText('할 일이 없어요');
   await expect(page.getByTestId('todo-summary')).toHaveText('전체 0개 · 완료 0개');
+
+  // ④ 기록판: 로드 직후 render 1 · effect 1 · memo 1 · patch 0 · patch-events 0, 탭 제목 `카운터 0 - Phase 2`
+  expect([await renderCount(page), await effectCount(page), await memoCount(page), await patchCount(page), await patchEventCount(page)]).toEqual([1, 1, 1, 0, 0]);
+  await expect(page).toHaveTitle('카운터 0 - Phase 2');
 
   // 페이지 어디에도 "렌더" · "Patch" 버튼이 없다: 버튼은 [+1] · [+3] · [그대로] · [추가] 네 개뿐이다 (상태를 바꾸면 화면이 저절로 갱신된다)
   const buttonTexts = await page.getByRole('button').allTextContents();

@@ -92,25 +92,40 @@ export function noHorizontalScroll(page: Page): Promise<boolean> {
   return page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth);
 }
 
-/**
- * 지금까지 `App()`이 실행된 횟수. Dev-17 ~ Dev-20은 페이지가 노출한 `window.__renderCount`(바깥 변수)로 읽고,
- * Dev-21에서 기록판 `log-render` 칸을 읽도록 바꾼다.
- */
-export async function renderCount(page: Page): Promise<number> {
-  return page.evaluate(() => (window as unknown as { __renderCount: number }).__renderCount);
+/** 기록판 칸(`log-*`)의 숫자. 칸에는 숫자만 들어 있다 */
+export async function logNumber(page: Page, id: 'log-render' | 'log-effect' | 'log-memo' | 'log-patch' | 'log-patch-events'): Promise<number> {
+  const text = (await page.getByTestId(id).textContent()) ?? '';
+  return Number(text);
+}
+
+/** 지금까지 `App()`이 실행된 횟수 (기록판 `log-render` 칸) */
+export function renderCount(page: Page): Promise<number> {
+  return logNumber(page, 'log-render');
+}
+
+/** `[count]` effect가 실행된 횟수 (기록판 `log-effect` 칸) */
+export function effectCount(page: Page): Promise<number> {
+  return logNumber(page, 'log-effect');
+}
+
+/** ③ 목록의 `useMemo`가 다시 계산한 횟수 (기록판 `log-memo` 칸) */
+export function memoCount(page: Page): Promise<number> {
+  return logNumber(page, 'log-memo');
+}
+
+/** 마지막 update의 patch 전체 줄 수 (`log-patch`) */
+export function patchCount(page: Page): Promise<number> {
+  return logNumber(page, 'log-patch');
+}
+
+/** 마지막 update의 patch 중 이벤트 교체(`SET_EVENT`) 줄 수 (`log-patch-events`) */
+export function patchEventCount(page: Page): Promise<number> {
+  return logNumber(page, 'log-patch-events');
 }
 
 /** `counter-value` 칸의 글 (숫자만 들어 있다) */
 export async function counterText(page: Page): Promise<string> {
   return (await page.getByTestId('counter-value').textContent()) ?? '';
-}
-
-/**
- * 지금까지 ③ 목록의 `useMemo`가 다시 계산한 횟수. Dev-19 ~ Dev-20은 페이지가 노출한 `window.__memoCount`(바깥 변수)로 읽고,
- * Dev-21에서 기록판 `log-memo` 칸을 읽도록 바꾼다.
- */
-export async function memoCount(page: Page): Promise<number> {
-  return page.evaluate(() => (window as unknown as { __memoCount: number }).__memoCount);
 }
 
 /** 할 일 입력창에 글을 쓰고 [추가]를 누른다 */

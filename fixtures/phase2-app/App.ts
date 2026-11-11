@@ -1,13 +1,20 @@
-import { h, useMemo, useState } from '@mini-react/react';
+import { h, useEffect, useMemo, useState } from '@mini-react/react';
 import type { VNode } from '@mini-react/shared';
 import { CounterPanel } from './components/CounterPanel';
 import { GreetingPanel } from './components/GreetingPanel';
+import { LogPanel } from './components/LogPanel';
 import { TodoPanel } from './components/TodoPanel';
-import { counts } from './counts';
+import { counts, engine } from './counts';
 import { addTodo, moveTodo, removeTodo, toggleTodo } from './todoOps';
 import type { TodoList } from './todoOps';
 
 const EMPTY_LIST: TodoList = { items: [], nextId: 1 };
+
+// 기록판의 빈 <span>(effect · patch 칸)에 글자를 직접 쓴다. 이 칸들은 VNode 자식이 없어서 diff와 충돌하지 않는다.
+function writeLog(testId: string, value: number): void {
+  const cell = document.querySelector(`[data-testid="${testId}"]`);
+  if (cell !== null) cell.textContent = String(value);
+}
 
 // [AI Note]: 루트 컴포넌트. 모든 useState · useEffect · useMemo는 이 파일에서만 부른다 (P2-07 · P2-08).
 // 자식은 props만 받는 순수 함수이고, 버튼을 누르면 루트가 내려 준 함수를 불러 루트가 setter로 상태를 바꾼다 (Lifting State Up).
@@ -23,6 +30,21 @@ export function App(): VNode {
     counts.memoRuns += 1;
     return { total: todoList.items.length, done: todoList.items.filter((t) => t.done).length };
   }, [todoList.items]);
+
+  // 탭 제목: 카운터가 바뀔 때만(의존성 [count]) patch 직후에 실행된다. 이 effect가 도는 횟수가 기록판의 effect 횟수다.
+  useEffect(() => {
+    counts.effectRuns += 1;
+    document.title = `카운터 ${count} - Phase 2`;
+  }, [count]);
+
+  // 의존성 생략 = 매 렌더 뒤(patch 직후) 실행: 렌더가 끝난 뒤에야 알 수 있는 값(effect 횟수 · 마지막 update의 patch 줄 수)을 기록판 칸에 쓴다.
+  // 위 effect가 먼저 선언돼 있어서 이 effect가 읽는 effectRuns는 이미 이번 렌더 값이다.
+  useEffect(() => {
+    const patches = engine.lastPatches();
+    writeLog('log-effect', counts.effectRuns);
+    writeLog('log-patch', patches.length);
+    writeLog('log-patch-events', patches.filter((p) => p.kind === 'SET_EVENT').length);
+  });
 
   const onAdd = () => {
     const text = draft.trim();
@@ -68,6 +90,7 @@ export function App(): VNode {
         onMove: (id: string, delta: -1 | 1) => setTodoList((list) => moveTodo(list, id, delta)),
         onRemove: (id: string) => setTodoList((list) => removeTodo(list, id)),
       }),
+      h(LogPanel, { renderRuns: counts.renderRuns, memoRuns: counts.memoRuns }),
     ),
   );
 }
