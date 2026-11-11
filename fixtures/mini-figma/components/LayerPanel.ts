@@ -8,13 +8,15 @@ interface LayerPanelProps {
   instances: readonly Instance[];
   selectedId: string | null;
   onSelect: (id: string) => void;
+  /** [+ 인스턴스]: 끝에 새 인스턴스를 붙인다 */
+  onAdd: () => void;
 }
 
 // [AI Note]: 레이어 창 — props만 받는 순수 함수. 메인 행 + 인스턴스 행들(이름 = 지금 글자, 빈 글자면 id, ④-3).
 // 인스턴스 행의 <ul>에는 `key: it.id`가 있는 <li>만 둔다 (메인 행은 ul 밖 별도 상자 — 형제 전부 key, dev_todo 공통 주의 1).
-// 행을 누르면 고른다(고른 행은 클래스 selected). [↑] [↓] · [+ 인스턴스]는 Dev-9 · 10에서 더한다.
+// 행을 누르면 고른다(고른 행은 클래스 selected). [+ 인스턴스]는 맨 끝에 둔다 (Dev-9). [↑] [↓]는 Dev-10에서 더한다.
 export function LayerPanel(props: Props): VNode {
-  const { main, instances, selectedId, onSelect } = props as unknown as LayerPanelProps;
+  const { main, instances, selectedId, onSelect, onAdd } = props as unknown as LayerPanelProps;
   return h(
     'section',
     { class: 'layer-panel', 'data-testid': 'layer-panel' },
@@ -46,5 +48,7 @@ export function LayerPanel(props: Props): VNode {
         ),
       ),
     ),
+    // [AI Note]: 추가 버튼은 <ul> 밖(섹션 맨 끝)에 둔다 — 인스턴스 <ul>에는 key 있는 <li>만 두는 규칙(공통 주의 1)을 지키려고
+    h('button', { type: 'button', class: 'layer-add', 'data-testid': 'add-instance', onClick: () => onAdd() }, '+ 인스턴스'),
   );
 }

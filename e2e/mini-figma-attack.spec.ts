@@ -23,7 +23,6 @@ test('QA-A1 특수문자 라벨: 마크업이 아니라 글자 그대로 그려�
 
   // <b> · <img> 요소가 생기지 않았고 onerror도 실행되지 않았다
   await expect(page.locator('[data-testid="app-root"] b, [data-testid="app-root"] img')).toHaveCount(0);
-  await page.waitForTimeout(100);
   expect(await page.evaluate(() => (window as unknown as { __pwned?: number }).__pwned)).toBeUndefined();
 });
 
@@ -111,4 +110,19 @@ test('QA-A5 ↻ 뒤 메인 변경: b3가 메인을 다시 따라가고 `undefine
   expect(await canvasLabels(page)).toEqual(['', '', '취소', '']);
   const texts = await page.getByTestId('figma-button').evaluateAll((els) => els.map((el) => el.className + '|' + el.textContent));
   for (const t of texts) expect(t).not.toContain('undefined');
+});
+
+// ---------------------------------------------------------------------------
+// Dev-9: 고른 것 삭제 (A6 앞부분). Delete 키 · Undo · Redo까지 이은 전체 시나리오는 Dev-11에서 이 테스트를 대체한다
+// ---------------------------------------------------------------------------
+
+test('QA-A6 (앞부분) 고른 것을 [삭제]로 지우면 선택이 풀리고 속성 패널이 빈 상태이며, 존재하지 않는 id가 골라진 채 남지 않는다', async ({ page }) => {
+  await page.goto(URL);
+  await selectOnCanvas(page, 'b2');
+  await page.getByTestId('delete-instance').click();
+
+  await expect(page.getByTestId('property-empty')).toHaveCount(1);
+  await expect(page.getByTestId('property-title')).toHaveCount(0);
+  await expect(page.getByTestId('figma-button')).toHaveCount(3);
+  expect(await page.locator('[data-testid="figma-button"].selected, [data-testid="layer-item"].selected').count()).toBe(0);
 });

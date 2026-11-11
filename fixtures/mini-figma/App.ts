@@ -3,7 +3,7 @@ import type { VNode } from '@mini-react/shared';
 import { Canvas } from './components/Canvas';
 import { LayerPanel } from './components/LayerPanel';
 import { PropertyPanel } from './components/PropertyPanel';
-import { INITIAL_DOC, resetInstanceField, setInstanceField, setMainField } from './model';
+import { INITIAL_DOC, addInstance, reconcileSelection, removeInstance, resetInstanceField, setInstanceField, setMainField } from './model';
 import type { Doc, Field, MainProps } from './model';
 import { EMPTY_UNDO, recordEdit } from './undo';
 import type { UndoGroup, UndoState } from './undo';
@@ -20,7 +20,6 @@ export function App(): VNode {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [history, setHistory] = useState<UndoState>(EMPTY_UNDO);
   const [nextId, setNextId] = useState(4);
-  // nextId는 아직 쓰이지 않는다 (추가는 Dev-9에서 연결한다).
 
   // [AI Note]: 모든 편집은 이 함수 하나를 거친다 — doc과 history를 같이 바꾼다 (한 동작의 setter 두 번 = 모아서 렌더 한 번, 결정 9 B).
   // next가 지금 doc과 같은 객체면(바뀐 것 없음) 어느 setter도 새 값을 못 받아 렌더 · 기록이 모두 안 일어난다.
@@ -49,11 +48,29 @@ export function App(): VNode {
     applyEdit(resetInstanceField(doc, selectedId, field), null);
   };
 
+  // [AI Note]: [+ 인스턴스] = 번호 nextId로 끝에 붙이고(addInstance) nextId를 하나 올린다. 번호 칸은 doc 밖이라 Undo가 되돌리지 않는다 (Q17-3).
+  // 한 동작의 setter 값은 모두 이 렌더의 doc · nextId에서 계산한다 (묶음 2 검수 NON-BLOCKING 4) → 렌더는 한 번.
+  const onAdd = (): void => {
+    applyEdit(addInstance(doc, nextId), null);
+    setNextId(nextId + 1);
+  };
+
+  // [AI Note]: 고른 인스턴스 삭제 = 문서 · 선택 · 기록을 이 렌더의 doc 하나에서 계산해 한 번에 바꾼다 (setter 3개 → 렌더 1번, 결정 9 B).
+  // 메인 · 선택 없음 · 이미 없는 id는 아무것도 안 함 (removeInstance가 같은 Doc을 돌려줌 → 렌더 · 기록 없음, MF-24).
+  // 지운 것이 고른 것이므로 reconcileSelection이 null로 정리한다 (MF-23).
+  const deleteSelected = (): void => {
+    if (selectedId === null || selectedId === 'main') return;
+    const next = removeInstance(doc, selectedId);
+    if (next === doc) return;
+    applyEdit(next, null);
+    setSelectedId(reconcileSelection(selectedId, next));
+  };
+
   return h(
     'div',
     { class: 'app' },
-    h(LayerPanel, { main: doc.main, instances: doc.instances, selectedId, onSelect }),
+    h(LayerPanel, { main: doc.main, instances: doc.instances, selectedId, onSelect, onAdd }),
     h(Canvas, { main: doc.main, instances: doc.instances, selectedId, onSelect }),
-    h(PropertyPanel, { main: doc.main, instances: doc.instances, selectedId, onEdit, onReset }),
+    h(PropertyPanel, { main: doc.main, instances: doc.instances, selectedId, onEdit, onReset, onDelete: deleteSelected }),
   );
 }

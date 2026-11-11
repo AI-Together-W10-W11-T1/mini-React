@@ -11,6 +11,8 @@ interface PropertyPanelProps {
   onEdit: (field: Field, value: MainProps[Field]) => void;
   /** 인스턴스의 그 칸 override를 지운다 (↻). 메인에는 ↻가 없다 */
   onReset: (field: Field) => void;
+  /** 고른 인스턴스를 지운다 ([삭제]). 메인에는 버튼이 없다 */
+  onDelete: () => void;
 }
 
 const SIZE_OPTIONS: readonly (readonly [Size, string])[] = [['S', 'S'], ['M', 'M'], ['L', 'L']];
@@ -96,7 +98,7 @@ function propRows(values: MainProps, onEdit: PropertyPanelProps['onEdit'], overr
 // 인스턴스 이름은 그 인스턴스의 지금 글자이고 빈 글자면 id (④-3). 인스턴스를 골랐을 때 칸에 보이는 값은 mergeProps(메인 값 위에 인스턴스 값) 결과다.
 // 메인 · 인스턴스가 같은 5칸 부품을 쓰고, 인스턴스일 때만 칸마다 override 표시 + ↻가 붙는다.
 export function PropertyPanel(props: Props): VNode {
-  const { main, instances, selectedId, onEdit, onReset } = props as unknown as PropertyPanelProps;
+  const { main, instances, selectedId, onEdit, onReset, onDelete } = props as unknown as PropertyPanelProps;
   const target = selectedId === 'main' ? null : instances.find((it) => it.id === selectedId);
   const title = selectedId === 'main' ? '메인 Button' : target === undefined || target === null ? null : `인스턴스 · ${instanceName(main, target)}`;
   return h(
@@ -110,5 +112,9 @@ export function PropertyPanel(props: Props): VNode {
       : target === undefined || target === null
         ? null
         : h('div', { class: 'prop-rows', 'data-testid': 'prop-rows' }, propRows(mergeProps(main, target), onEdit, { instance: target, onReset })),
+    // [AI Note]: [삭제]는 인스턴스를 골랐을 때만 그린다 — 메인에는 버튼 자체가 없다 (MF-24, 메인은 못 지움)
+    target === undefined || target === null || selectedId === 'main'
+      ? null
+      : h('button', { type: 'button', class: 'delete-instance', 'data-testid': 'delete-instance', onClick: () => onDelete() }, '삭제'),
   );
 }

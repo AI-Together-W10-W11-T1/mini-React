@@ -546,3 +546,82 @@ describe('인스턴스 속성 편집 · override 표시 · ↻ (MF-12 ~ 15 · MF
     expect((slot(2) as UndoState).group).toBeNull();
   });
 });
+
+// ---------------------------------------------------------------------------
+// Dev-9: 인스턴스 추가 · 삭제 · 메인 삭제 불가 (P-16 · P-17, MF-22 ~ 24)
+// ---------------------------------------------------------------------------
+
+describe('인스턴스 추가 · 삭제 (Dev-9)', () => {
+  const addButton = (): HTMLElement => byId('add-instance');
+  const deleteButton = (): HTMLElement => byId('delete-instance');
+
+  it('P-16 [+ 인스턴스] 한 번 = 캔버스 { INSERT: 1 } · 레이어 { INSERT: 1 }, 렌더 1번, 끝에 b4, 선택은 그대로', async () => {
+    const before = renders;
+    await click(addButton());
+    expect(canvasCounts(instance.lastPatches)).toEqual({ INSERT: 1 });
+    expect(layerCounts(instance.lastPatches)).toEqual({ INSERT: 1 });
+    expect(renders - before).toBe(1);
+    expect(buttons().map((b) => b.getAttribute('data-id'))).toEqual(['main', 'b1', 'b2', 'b3', 'b4']);
+    expect(layerNames()).toEqual(['버튼', '취소', '삭제', '버튼']);
+    expect(slot(1)).toBeNull();
+  });
+
+  it('새 인스턴스는 override가 없다 (doc에 { id: b4 }만 있고 메인을 따른다)', async () => {
+    await click(addButton());
+    const doc = slot(0) as typeof INITIAL_DOC;
+    expect(doc.instances[3]).toEqual({ id: 'b4' });
+    expect(Object.keys(doc.instances[3])).toEqual(['id']);
+    expect(Object.keys(doc)).toEqual(['main', 'instances']);
+    expect(doc.instances.slice(0, 3)).toEqual(INITIAL_DOC.instances);
+    // 추가는 새 단계(묶음 없음)
+    expect((slot(2) as UndoState).past).toHaveLength(1);
+    expect((slot(2) as UndoState).group).toBeNull();
+  });
+
+  it('P-17 b2를 고르고 [삭제] = 캔버스 { REMOVE: 1 } · 레이어 { REMOVE: 1 } + 속성 패널 REPLACE 1줄 이상(머리 <h2> → 빈 <p>, D-05), 렌더 1번, 선택 풀림', async () => {
+    await click(buttonOf('b2'));
+    const heading = byId('property-title');
+    const before = renders;
+    await click(deleteButton());
+    expect(canvasCounts(instance.lastPatches)).toEqual({ REMOVE: 1 });
+    expect(layerCounts(instance.lastPatches)).toEqual({ REMOVE: 1 });
+    const panelReplaces = instance.lastPatches.filter((p) => p.kind === 'REPLACE' && startsWith(p.path, [0, 2]));
+    expect(panelReplaces.length).toBeGreaterThanOrEqual(1);
+    expect(heading.isConnected).toBe(false);
+    expect(byId('property-empty').localName).toBe('p');
+    expect(renders - before, '삭제 한 동작 = 렌더 1번 (doc · selectedId · history 세 setter가 한 번으로 합쳐짐)').toBe(1);
+    expect(slot(1)).toBeNull();
+    expect(buttons().map((b) => b.getAttribute('data-id'))).toEqual(['main', 'b1', 'b3']);
+    expect(layerNames()).toEqual(['버튼', '삭제']);
+    // 삭제는 새 단계 하나
+    expect((slot(2) as UndoState).past).toHaveLength(1);
+  });
+
+  it('메인을 골랐을 때는 [삭제] 버튼이 없다. 인스턴스를 고르면 생기고 선택이 풀리면 사라진다', async () => {
+    expect(root.querySelector('[data-testid="delete-instance"]')).toBeNull();
+    await click(buttonOf('main'));
+    expect(root.querySelector('[data-testid="delete-instance"]')).toBeNull();
+    await click(buttonOf('b1'));
+    expect(root.querySelector('[data-testid="delete-instance"]')).not.toBeNull();
+    await click(deleteButton());
+    expect(root.querySelector('[data-testid="delete-instance"]')).toBeNull();
+  });
+
+  it('지운 번호를 다시 쓰지 않는다: b3를 지우고 추가하면 b4, 또 추가하면 b5 (nextId는 doc 밖의 칸)', async () => {
+    await click(buttonOf('b3'));
+    await click(deleteButton());
+    await click(addButton());
+    expect((slot(0) as typeof INITIAL_DOC).instances.map((it) => it.id)).toEqual(['b1', 'b2', 'b4']);
+    await click(addButton());
+    expect((slot(0) as typeof INITIAL_DOC).instances.map((it) => it.id)).toEqual(['b1', 'b2', 'b4', 'b5']);
+    expect(slot(3)).toBe(6);
+  });
+
+  it('b1을 지운 뒤 b2를 고르면 b2가 골라진다 (선택은 위치가 아니라 id)', async () => {
+    await click(buttonOf('b1'));
+    await click(deleteButton());
+    await click(buttonOf('b2'));
+    expect(slot(1)).toBe('b2');
+    expect((slot(0) as typeof INITIAL_DOC).instances.map((it) => it.id)).toEqual(['b2', 'b3']);
+  });
+});
