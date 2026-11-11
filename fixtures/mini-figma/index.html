@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" href="data:," />
+    <title>mini-figma</title>
+    <style>
+      :root {
+        --line: #c9ced6;
+        --label: #3b4252;
+        --select: #f6ad55;
+        --select-bg: #fffaf0;
+        --blue: #2b6cb0;
+        --red: #c53030;
+        --green: #2f855a;
+      }
+      * { box-sizing: border-box; }
+      body { margin: 0; padding: 16px; font-family: system-ui, sans-serif; color: #1f2430; background: #fff; }
+      /* 세 영역: desktop은 가로 3칸(레이어 · 캔버스 · 속성), mobile은 위아래로 쌓인다 (DOM 순서는 그대로, CSS만 바뀜). 가로 스크롤 없음 */
+      .app { display: grid; grid-template-columns: 220px minmax(0, 1fr) 300px; gap: 16px; align-items: start; }
+      .app > * { min-width: 0; border: 2px solid var(--line); border-radius: 8px; padding: 12px; }
+      .panel-title, .property-title { margin: 0 0 8px; font-size: 1rem; color: var(--label); }
+
+      /* 레이어 창 */
+      .layer-list { margin: 8px 0 0; padding: 0; list-style: none; }
+      .layer-row { display: flex; align-items: center; gap: 6px; padding: 4px 6px; border-radius: 4px; cursor: pointer; }
+      .layer-name { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
+      .layer-move { flex: 0 0 auto; padding: 2px 8px; font: inherit; cursor: pointer; }
+      .layer-add, .delete-instance { margin-top: 8px; padding: 6px 12px; font: inherit; cursor: pointer; }
+      .layer-row.selected { background: var(--select-bg); outline: 2px solid var(--select); }
+
+      /* 캔버스: 메인 버튼 상자 + 인스턴스 버튼 줄. 인스턴스가 많아지면 줄바꿈 (mobile 가로 스크롤 방지, Q17-5) */
+      .canvas-main { margin-bottom: 16px; padding-bottom: 16px; border-bottom: 1px dashed var(--line); }
+      .canvas-instances { display: flex; flex-wrap: wrap; gap: 12px; }
+
+      /* 버튼: 크기 S/M/L · 색 blue/red/green은 클래스로 (인라인 style 안 씀, ④-9). 버튼은 flex 항목이라 max-width: 100% + 라벨 overflow-wrap: anywhere로
+         공백 없는 긴 글자도 영역 안에서 줄바꿈된다 (word-break: break-word만으로는 flex 항목의 최소 너비가 안 줄어 가로 스크롤이 남음, QA-A2) */
+      .figma-button { display: inline-flex; align-items: center; gap: 6px; max-width: 100%; min-width: 0; border: 0; border-radius: 6px; color: #fff; font: inherit; cursor: pointer; text-align: left; }
+      .btn-label { min-width: 0; overflow-wrap: anywhere; }
+      .btn-S { padding: 4px 8px; font-size: 0.75rem; }
+      .btn-M { padding: 8px 16px; font-size: 1rem; }
+      .btn-L { padding: 12px 24px; font-size: 1.25rem; }
+      .btn-blue { background: var(--blue); }
+      .btn-red { background: var(--red); }
+      .btn-green { background: var(--green); }
+      .figma-button.selected { outline: 3px solid var(--select); outline-offset: 2px; }
+
+      .property-empty { margin: 0; color: var(--label); }
+      /* 속성 칸: 이름 + 입력 부품. 긴 글자도 칸 안에서 줄어들게 min-width: 0 */
+      .prop-row { display: flex; align-items: center; gap: 8px; margin: 8px 0; }
+      .prop-name { flex: 0 0 6rem; color: var(--label); font-size: 0.875rem; }
+      /* override 칸: 색으로 구분 + ↻. 아닌 칸은 「메인 따름」 */
+      .prop-row.override { padding: 2px 6px; margin-left: -6px; margin-right: -6px; border-left: 4px solid var(--select); background: var(--select-bg); border-radius: 4px; }
+      .prop-follow { flex: 0 0 auto; color: #8a93a3; font-size: 0.75rem; }
+      .prop-reset { flex: 0 0 auto; padding: 2px 8px; font: inherit; cursor: pointer; }
+      .prop-row input[type='text'], .prop-row select { flex: 1 1 auto; min-width: 0; padding: 6px 8px; font: inherit; }
+
+      @media (max-width: 720px) {
+        .app { grid-template-columns: minmax(0, 1fr); }
+      }
+    </style>
+  </head>
+  <body>
+    <!-- 영역 상자: 보이지 않는 감싸개. 안에 App() 결과 <div class="app"> 하나가 그려진다 -->
+    <div data-testid="app-root"></div>
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>
