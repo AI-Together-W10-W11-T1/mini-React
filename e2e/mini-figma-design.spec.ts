@@ -59,6 +59,11 @@ test('QA-40 어두운 바탕 · 한 단계 밝은 카드 24px(desktop 사이드�
   expect(cv['background-image']).toBe('none');
   expect(cv['background-color']).toBe('rgba(0, 0, 0, 0)');
   expect(cv['border-top-width']).toBe('0px');
+  // 실제 영역도 캔버스와 같은 모양 (점무늬 · 테두리 · 자체 배경 없음)
+  const ra = await styleOf(page, tid('real-area'), ['background-image', 'background-color', 'border-top-width']);
+  expect(ra['background-image'], '실제 영역 점무늬 없음').toBe('none');
+  expect(ra['background-color'], '실제 영역 자체 배경 없음').toBe('rgba(0, 0, 0, 0)');
+  expect(ra['border-top-width'], '실제 영역 테두리 없음').toBe('0px');
 
   // 알약 버튼: [+ 인스턴스] 파랑 배경 · 흰 글자 · 100px, [실행 취소] [다시 실행]도 100px
   const add = await styleOf(page, tid('add-instance'), ['background-color', 'border-radius', 'color']);
