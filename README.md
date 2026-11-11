@@ -148,7 +148,7 @@ wiki/                  설계 · QnA 위키
 - **단위 테스트** (Vitest + jsdom): 패키지별 `packages/<pkg>/src/__tests__/` (diff · patch · History · FunctionComponent · Hook · scheduler 등), 앱별 `fixtures/*/__tests__/`
 - **화면 기능 테스트** (Playwright): `e2e/*.spec.ts`, desktop · mobile 두 화면
 - **주요 경계 사례**: 무변경 Patch, 여러 형제 삭제 + 수정 동시, 공백 · 주석 노드, 같은 값 setter, 같은 틱 setter 여러 번(렌더 1번), 이력 처음 · 끝 · 분기 · 한도 50, 입력창 포커스 유지, 위험 HTML 차단
-- **실제 실행 결과** (최종, 2026-11-12): `npx vitest run` 47 files · **1250 passed**, `npx playwright test` **376 passed** (desktop 188 · mobile 188), `npx tsc --noEmit` 오류 0. QA 실패 0건
+- **실제 실행 결과** (최종, 2026-11-12): `npx vitest run` 47 files · **1251 passed**, `npx playwright test` **378 passed** (desktop 189 · mobile 189), `npx tsc --noEmit` 오류 0. QA 실패 0건
 - **부분 갱신 근거**: 노드 참조 유지 단언(T-06, B-01 ~ 06에서 507 / 507 노드 유지), MutationObserver 기록 수와 patch 줄 수 비교
 - **측정** (성능 대시보드, Playwright 헤드리스 Chromium · Windows · 1280×800 · Vite dev 서버, 준비 5 + 측정 30회, p50 / p95, 한 번 잰 값):
 
@@ -188,7 +188,7 @@ wiki/                  설계 · QnA 위키
 | --- | --- |
 | task | 7개 (Phase 1 · Phase 2 · Batching · mini-figma · 디자인 · 실제 영역 · 변수) |
 | QA 실패 분류 (구현 · 테스트 · 명세) | QA 실패 0건 (task_001 ~ 007). 개발 검수 BLOCKING은 모두 작업자 재작업으로 해결 |
-| 자동 테스트 (최종) | vitest 1250 · playwright 376 · tsc 오류 0 |
+| 자동 테스트 (최종) | vitest 1251 · playwright 378 · tsc 오류 0 |
 
 - 워크플로 기록: `.agent_workflow/tasks/` · 위키: [wiki/index.md](wiki/index.md)
 
