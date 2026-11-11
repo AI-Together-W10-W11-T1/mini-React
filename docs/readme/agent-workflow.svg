@@ -1,0 +1,119 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1010 560" width="1010" height="560" font-family="'Malgun Gothic','Apple SD Gothic Neo','Noto Sans KR',sans-serif">
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#374151"/>
+    </marker>
+    <marker id="r" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#dc2626"/>
+    </marker>
+  </defs>
+  <rect width="1010" height="560" fill="#ffffff"/>
+  <text x="24" y="32" font-size="19" font-weight="700" fill="#111827">AI 에이전트 워크플로 — task 하나가 지나가는 길</text>
+
+  <!-- Legend: roles -->
+  <g font-size="12">
+    <rect x="24" y="48" width="118" height="26" rx="13" fill="#111827"/>
+    <text x="83" y="66" text-anchor="middle" fill="#ffffff" font-weight="700">나 (결정 · 확인)</text>
+    <rect x="152" y="48" width="150" height="26" rx="13" fill="#ede9fe" stroke="#7c3aed"/>
+    <text x="227" y="66" text-anchor="middle" fill="#5b21b6" font-weight="700">마스터 · Opus</text>
+    <rect x="312" y="48" width="160" height="26" rx="13" fill="#dbeafe" stroke="#2563eb"/>
+    <text x="392" y="66" text-anchor="middle" fill="#1d4ed8" font-weight="700">mr-worker · Sonnet</text>
+    <rect x="482" y="48" width="200" height="26" rx="13" fill="#ffedd5" stroke="#ea580c"/>
+    <text x="582" y="66" text-anchor="middle" fill="#c2410c" font-weight="700">mr-reviewer · Opus (읽기만)</text>
+    <rect x="692" y="48" width="140" height="26" rx="13" fill="#dcfce7" stroke="#16a34a"/>
+    <text x="762" y="66" text-anchor="middle" fill="#15803d" font-weight="700">mr-qa · Sonnet</text>
+    <rect x="842" y="48" width="144" height="26" rx="13" fill="#fef9c3" stroke="#ca8a04"/>
+    <text x="914" y="66" text-anchor="middle" fill="#a16207" font-weight="700">mr-wiki · Haiku</text>
+  </g>
+
+  <!-- Row 1 -->
+  <g font-size="12">
+    <rect x="24" y="100" width="226" height="150" rx="10" fill="#faf5ff" stroke="#7c3aed" stroke-width="1.5"/>
+    <text x="40" y="126" font-size="15" font-weight="700" fill="#111827">0 명세</text>
+    <text x="40" y="150" fill="#374151">grill-me 인터뷰로 요구사항 ·</text>
+    <text x="40" y="168" fill="#374151">범위 · 알고리즘 결정</text>
+    <text x="40" y="186" fill="#374151">(내가 말로 먼저 답한 뒤 후보 비교)</text>
+    <text x="40" y="212" font-size="11" fill="#6b7280">01_request_spec.md</text>
+    <rect x="40" y="222" width="96" height="20" rx="10" fill="#111827"/>
+    <text x="88" y="236" text-anchor="middle" font-size="11" fill="#ffffff" font-weight="700">내가 명세 승인</text>
+
+    <rect x="268" y="100" width="226" height="150" rx="10" fill="#faf5ff" stroke="#7c3aed" stroke-width="1.5"/>
+    <text x="284" y="126" font-size="15" font-weight="700" fill="#111827">0.5 코어 타입</text>
+    <text x="284" y="150" fill="#374151">packages/shared/src/types.ts</text>
+    <text x="284" y="168" fill="#374151">를 마스터만 고침</text>
+    <text x="284" y="186" fill="#374151">(작업자는 못 바꿈)</text>
+    <text x="284" y="212" font-size="11" fill="#6b7280">types_changelog.md</text>
+
+    <rect x="512" y="100" width="226" height="150" rx="10" fill="#eff6ff" stroke="#2563eb" stroke-width="1.5"/>
+    <text x="528" y="126" font-size="15" font-weight="700" fill="#111827">1 기획</text>
+    <text x="528" y="150" fill="#374151">작업자: dev_todo · qa_todo 작성</text>
+    <text x="528" y="168" fill="#374151">검수자: 기획 검수</text>
+    <text x="528" y="186" fill="#374151">(가벼운 모드는 검수 생략)</text>
+    <text x="528" y="212" font-size="11" fill="#6b7280">dev_todo.md · qa_todo.md</text>
+    <rect x="528" y="222" width="132" height="20" rx="10" fill="#111827"/>
+    <text x="594" y="236" text-anchor="middle" font-size="11" fill="#ffffff" font-weight="700">내가 테스트 케이스 확인</text>
+
+    <rect x="756" y="100" width="230" height="150" rx="10" fill="#eff6ff" stroke="#2563eb" stroke-width="1.5"/>
+    <text x="772" y="126" font-size="15" font-weight="700" fill="#111827">2 개발</text>
+    <text x="772" y="150" fill="#374151">작업자: Dev 항목 구현</text>
+    <text x="772" y="168" fill="#374151">(인수 → 단위 테스트 순서)</text>
+    <text x="772" y="186" fill="#374151">검수자: diff · 완료 근거 검수</text>
+    <text x="772" y="212" font-size="11" fill="#6b7280">NN_diff.patch · code_review_log.md</text>
+    <text x="772" y="238" font-size="11.5" font-weight="700" fill="#dc2626">REJECT → 재작업 (최대 3회차)</text>
+  </g>
+  <path d="M250,175 H266" stroke="#374151" stroke-width="1.6" fill="none" marker-end="url(#a)"/>
+  <path d="M494,175 H510" stroke="#374151" stroke-width="1.6" fill="none" marker-end="url(#a)"/>
+  <path d="M738,175 H754" stroke="#374151" stroke-width="1.6" fill="none" marker-end="url(#a)"/>
+  <!-- Row connector -->
+  <path d="M871,250 V280 H137 V306" stroke="#374151" stroke-width="1.6" fill="none" marker-end="url(#a)"/>
+  <text x="430" y="274" font-size="11.5" fill="#6b7280">APPROVE</text>
+
+  <!-- Row 2 -->
+  <g font-size="12">
+    <rect x="24" y="308" width="226" height="150" rx="10" fill="#faf5ff" stroke="#7c3aed" stroke-width="1.5"/>
+    <text x="40" y="334" font-size="15" font-weight="700" fill="#111827">2.5 이해 체크포인트</text>
+    <text x="40" y="358" fill="#374151">마스터가 핵심 개념 2~3개 질문</text>
+    <text x="40" y="376" fill="#374151">→ 내가 내 말로 답하기</text>
+    <text x="40" y="394" fill="#374151">(실제 React 차이는 여기서)</text>
+    <text x="40" y="420" font-size="11" fill="#6b7280">00_master_dialogue.md [CheckPoint]</text>
+    <rect x="40" y="430" width="96" height="20" rx="10" fill="#111827"/>
+    <text x="88" y="444" text-anchor="middle" font-size="11" fill="#ffffff" font-weight="700">내가 설명하기</text>
+
+    <rect x="268" y="308" width="226" height="150" rx="10" fill="#f0fdf4" stroke="#16a34a" stroke-width="1.5"/>
+    <text x="284" y="334" font-size="15" font-weight="700" fill="#111827">3 QA</text>
+    <text x="284" y="358" fill="#374151">QA: qa_todo 시나리오를</text>
+    <text x="284" y="376" fill="#374151">desktop · mobile로 실행 + 캡처</text>
+    <text x="284" y="394" font-weight="700" fill="#dc2626">실패 → 구현 · 테스트 · 명세 3갈래</text>
+    <text x="284" y="420" font-size="11" fill="#6b7280">qa_todo_result.md · screenshot_*.png</text>
+    <rect x="284" y="430" width="120" height="20" rx="10" fill="#111827"/>
+    <text x="344" y="444" text-anchor="middle" font-size="11" fill="#ffffff" font-weight="700">내가 캡처 직접 확인</text>
+
+    <rect x="512" y="308" width="226" height="150" rx="10" fill="#fefce8" stroke="#ca8a04" stroke-width="1.5"/>
+    <text x="528" y="334" font-size="15" font-weight="700" fill="#111827">4 위키 · README</text>
+    <text x="528" y="358" fill="#374151">위키: 기록에 있는 것만 정리,</text>
+    <text x="528" y="376" fill="#374151">출처 표시 · 없으면 [확인 필요]</text>
+    <text x="528" y="394" fill="#374151">마스터가 출처 확인</text>
+    <text x="528" y="420" font-size="11" fill="#6b7280">wiki/*.md · README.md</text>
+    <rect x="528" y="430" width="70" height="20" rx="10" fill="#111827"/>
+    <text x="563" y="444" text-anchor="middle" font-size="11" fill="#ffffff" font-weight="700">내가 승인</text>
+
+    <rect x="756" y="308" width="230" height="150" rx="10" fill="#faf5ff" stroke="#7c3aed" stroke-width="1.5"/>
+    <text x="772" y="334" font-size="15" font-weight="700" fill="#111827">마무리 · 병합</text>
+    <text x="772" y="358" fill="#374151">변경 요약 · 검증 결과 · 남은 일</text>
+    <text x="772" y="376" fill="#374151">feature/&lt;작업명&gt; → main</text>
+    <text x="772" y="394" fill="#374151">push · 원격은 매번 승인</text>
+    <text x="772" y="420" font-size="11" fill="#6b7280">07_pr_body.md</text>
+    <rect x="772" y="430" width="70" height="20" rx="10" fill="#111827"/>
+    <text x="807" y="444" text-anchor="middle" font-size="11" fill="#ffffff" font-weight="700">내가 승인</text>
+  </g>
+  <path d="M250,383 H266" stroke="#374151" stroke-width="1.6" fill="none" marker-end="url(#a)"/>
+  <path d="M494,383 H510" stroke="#374151" stroke-width="1.6" fill="none" marker-end="url(#a)"/>
+  <path d="M738,383 H754" stroke="#374151" stroke-width="1.6" fill="none" marker-end="url(#a)"/>
+
+  <!-- Footer -->
+  <g font-size="12">
+    <rect x="24" y="478" width="962" height="66" rx="10" fill="#f9fafb" stroke="#d1d5db"/>
+    <text x="40" y="502" fill="#374151"><tspan font-weight="700" fill="#111827">기록:</tspan> 서브에이전트가 끝날 때마다 훅이 05_execution_timeline.log에 한 줄씩 자동 기록, 모든 산출물은 .agent_workflow/tasks/&lt;task&gt;/</text>
+    <text x="40" y="526" fill="#374151"><tspan font-weight="700" fill="#111827">역할 분리:</tspan> 코드는 작업자만 고치고, 검수자는 읽기만, QA는 앱 · 테스트 코드를 고치지 않음, 위키는 기록에 없는 내용을 만들지 않음</text>
+  </g>
+</svg>
