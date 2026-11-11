@@ -15,8 +15,11 @@ import type { UndoState } from '../undo';
 // ② document.addEventListener spy는 render() 호출 전에 건다 (Dev-11) ③ 준비 동작마다 `await Promise.resolve()`로 렌더를 끝낸 뒤
 // 센 동작을 한다 (Batching, 결정 9 B — 같은 틱에 보내면 렌더가 합쳐져 lastPatches에 준비 동작의 줄이 섞인다).
 
-const CANVAS_PREFIX: Path = [0, 1];
-const LAYER_PREFIX: Path = [0, 0];
+// 경로 접두 (FD-10): 도구 막대 [0,0] · 레이어 [0,1] · 캔버스 [0,2] · 속성 패널 [0,3] — div.app의 자식 순서 0 ~ 3
+const TOOLBAR_PREFIX: Path = [0, 0];
+const LAYER_PREFIX: Path = [0, 1];
+const CANVAS_PREFIX: Path = [0, 2];
+const PANEL_PREFIX_ALL: Path = [0, 3];
 
 const startsWith = (path: Path, prefix: Path): boolean => prefix.every((n, i) => path[i] === n);
 /** patch가 가리키는 경로 (MOVE는 parent) */
@@ -25,7 +28,7 @@ const pathOf = (patch: Patch): Path => (patch.kind === 'MOVE' ? patch.parent : p
 /**
  * patch 중 그 영역(접두 경로)의 줄만 모아 `SET_EVENT`를 빼고 종류별 개수로 센다 (qa_todo 「patch 기대 표」 · 공통 주의 13).
  * 렌더마다 핸들러가 새 함수라 SET_EVENT 줄이 생기는 것은 task_002의 알려진 한계라 센 값에서 뺀다.
- * 속성 패널(`[0, 2]`)은 value · checked 때문에 SET_PROP이 섞여서 세지 않는다.
+ * 속성 패널(`[0, 3]`)은 value · checked 때문에 SET_PROP이 섞여서 세지 않는다.
  */
 function countsUnder(patches: readonly Patch[], prefix: Path): Record<string, number> {
   const out: Record<string, number> = {};
@@ -35,6 +38,7 @@ function countsUnder(patches: readonly Patch[], prefix: Path): Record<string, nu
   }
   return out;
 }
+const toolbarCounts = (patches: readonly Patch[]): Record<string, number> => countsUnder(patches, TOOLBAR_PREFIX);
 const canvasCounts = (patches: readonly Patch[]): Record<string, number> => countsUnder(patches, CANVAS_PREFIX);
 const layerCounts = (patches: readonly Patch[]): Record<string, number> => countsUnder(patches, LAYER_PREFIX);
 
@@ -144,40 +148,45 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-describe('patch 세는 도우미 (canvasCounts · layerCounts)', () => {
+describe('patch 세는 도우미 (toolbarCounts · canvasCounts · layerCounts)', () => {
   const p = (path: Path): Patch => ({ kind: 'SET_TEXT', path, before: 'a', after: 'b' });
   const patches: Patch[] = [
-    p([0, 1, 1, 0, 0]),
-    p([0, 1, 0, 0, 0]),
-    p([0, 0, 1, 2, 0]),
-    { kind: 'SET_EVENT', path: [0, 1, 1, 0], event: 'click', before: null, after: () => {} },
-    { kind: 'SET_PROP', path: [0, 2, 1], name: 'value', before: 'a', after: 'b' },
+    p([0, 2, 1, 0, 0]),
+    p([0, 2, 0, 0, 0]),
+    p([0, 1, 1, 2, 0]),
+    p([0, 0, 2]),
+    { kind: 'SET_ATTR', path: [0, 0, 2], name: 'disabled', before: '', after: null },
+    { kind: 'SET_EVENT', path: [0, 2, 1, 0], event: 'click', before: null, after: () => {} },
+    { kind: 'SET_PROP', path: [0, 3, 1], name: 'value', before: 'a', after: 'b' },
+    { kind: 'MOVE', parent: [0, 2, 1], from: 0, to: 1 },
     { kind: 'MOVE', parent: [0, 1, 1], from: 0, to: 1 },
-    { kind: 'MOVE', parent: [0, 0, 1], from: 0, to: 1 },
   ];
 
-  it('캔버스(접두 [0, 1]) 줄만 종류별로 세고 SET_EVENT는 뺀다. MOVE는 parent 경로로 본다', () => {
+  it('캔버스(접두 [0, 2]) 줄만 종류별로 세고 SET_EVENT는 뺀다. MOVE는 parent 경로로 본다', () => {
     expect(canvasCounts(patches)).toEqual({ SET_TEXT: 2, MOVE: 1 });
   });
 
-  it('레이어(접두 [0, 0]) 줄만 센다. 속성 패널 줄은 어느 쪽에도 안 들어간다', () => {
+  it('레이어(접두 [0, 1]) 줄만 센다. 속성 패널 줄은 어느 쪽에도 안 들어간다', () => {
     expect(layerCounts(patches)).toEqual({ SET_TEXT: 1, MOVE: 1 });
+  });
+
+  it('도구 막대(접두 [0, 0]) 줄만 센다', () => {
+    expect(toolbarCounts(patches)).toEqual({ SET_TEXT: 1, SET_ATTR: 1 });
   });
 });
 
 describe('시작 화면 (MF-16 · MF-04)', () => {
-  it('영역 상자 안 최상위는 <div class="app"> 하나이고 자식 순서는 레이어 · 캔버스 · 속성 패널이다 (경로 접두 [0,0] · [0,1] · [0,2])', () => {
+  it('영역 상자 안 최상위는 <div class="app"> 하나이고 자식 순서는 도구 막대 · 레이어 · 캔버스 · 속성 패널이다 (경로 접두 [0,0] · [0,1] · [0,2] · [0,3])', () => {
     expect(root.children).toHaveLength(1);
     expect(area().localName).toBe('div');
     expect(area().className).toBe('app');
-    expect(Array.from(area().children).map(testId)).toEqual(['layer-panel', 'canvas', 'property-panel']);
-    // canvasCounts의 접두 [0, 1]이 정말 캔버스를 가리키는지 한 줄로 지킨다
-    expect(testId(root.firstElementChild?.children[1])).toBe('canvas');
-    expect(testId(root.firstElementChild?.children[0])).toBe('layer-panel');
+    expect(Array.from(area().children).map(testId)).toEqual(['toolbar', 'layer-panel', 'canvas', 'property-panel']);
+    // 접두 [0, 0 ~ 3]이 정말 그 영역을 가리키는지 한 줄씩 지킨다 (qa_todo 「접두 맞는지 한 줄 단언」)
+    expect(['toolbar', 'layer-panel', 'canvas', 'property-panel']).toEqual([0, 1, 2, 3].map((i) => testId(root.firstElementChild?.children[i])));
   });
 
   it('캔버스에 메인 버튼 1개 + 인스턴스 버튼 3개, 글자는 버튼 · 버튼 · 취소 · 삭제', () => {
-    const canvas = area().children[1];
+    const canvas = area().children[2];
     expect(canvas.querySelectorAll('[data-testid="canvas-main"] [data-testid="figma-button"]')).toHaveLength(1);
     expect(canvas.querySelectorAll('[data-testid="canvas-instances"] [data-testid="figma-button"]')).toHaveLength(3);
     expect(buttons().map((b) => b.getAttribute('data-id'))).toEqual(['main', 'b1', 'b2', 'b3']);
@@ -233,7 +242,8 @@ describe('고르기 (MF-20 · D-05)', () => {
     await click(buttonOf('b2'));
     expect(canvasCounts(instance.lastPatches)).toEqual({ SET_ATTR: 1 });
     expect(layerCounts(instance.lastPatches)).toEqual({ SET_ATTR: 1 });
-    const panelReplaces = instance.lastPatches.filter((p) => p.kind === 'REPLACE' && startsWith(p.path, [0, 2]));
+    expect(toolbarCounts(instance.lastPatches)).toEqual({});
+    const panelReplaces = instance.lastPatches.filter((p) => p.kind === 'REPLACE' && startsWith(p.path, PANEL_PREFIX_ALL));
     expect(panelReplaces.length).toBeGreaterThanOrEqual(1);
     // 화면: 머리 <h2> 「인스턴스 · 취소」, 빈 안내 <p>는 DOM에서 빠짐
     expect(root.querySelector('[data-testid="property-title"]')?.textContent).toBe('인스턴스 · 취소');
@@ -430,8 +440,8 @@ const followRows = (): string[] =>
   Array.from(root.querySelectorAll('[data-testid="prop-row"]'))
     .filter((r) => r.querySelector('[data-testid="prop-follow"]') !== null)
     .map((r) => r.getAttribute('data-field') ?? '');
-/** b2 버튼 안 경로 접두: 캔버스 [0, 1] → 인스턴스 줄(1번 자식) → 위치 1 */
-const B2_PATH: Path = [0, 1, 1, 1];
+/** b2 버튼 안 경로 접두: 캔버스 [0, 2] → 인스턴스 줄(1번 자식) → 위치 1 */
+const B2_PATH: Path = [0, 2, 1, 1];
 
 describe('인스턴스 속성 편집 · override 표시 · ↻ (MF-12 ~ 15 · MF-21) — patch 기대 표 P-9 ~ P-14 · P-21 · P-22', () => {
   it('인스턴스를 고르면 5칸이 합쳐진 값(메인 값 위에 인스턴스 값)으로 뜨고 override 칸은 색 구분 + ↻, 아닌 칸은 「메인 따름」이다 (b2 · b3 · b1)', async () => {
@@ -619,7 +629,7 @@ describe('인스턴스 속성 편집 · override 표시 · ↻ (MF-12 ~ 15 · MF
 // ---------------------------------------------------------------------------
 
 describe('팔레트 판 (Dev-3)', () => {
-  const PANEL_PREFIX: Path = [0, 2];
+  const PANEL_PREFIX: Path = PANEL_PREFIX_ALL;
   /** 속성 패널 줄을 SET_EVENT만 빼고 종류별로 센다 (P-25만 팔레트 구조가 정해져 있어 센다) */
   const panelCounts = (patches: readonly Patch[]): Record<string, number> => countsUnder(patches, PANEL_PREFIX);
 
@@ -778,13 +788,36 @@ describe('팔레트 판 (Dev-3)', () => {
 
 describe('인스턴스 추가 · 삭제 (Dev-9)', () => {
   const addButton = (): HTMLElement => byId('add-instance');
+
+  it('[+ 인스턴스]는 도구 막대에만 있고 레이어 창 안에는 없다', () => {
+    expect(root.querySelectorAll('[data-testid="add-instance"]')).toHaveLength(1);
+    expect(addButton().closest('[data-testid="toolbar"]')).not.toBeNull();
+    expect(root.querySelector('[data-testid="layer-panel"] [data-testid="add-instance"]')).toBeNull();
+  });
+
+  it('도구 막대 안 자식 순서는 앱 이름 → [+ 인스턴스]이고 앱 이름 글자는 mini-figma다', () => {
+    const toolbar = byId('toolbar');
+    expect(Array.from(toolbar.children).map(testId).slice(0, 2)).toEqual(['app-name', 'add-instance']);
+    expect(byId('app-name').textContent).toBe('mini-figma');
+    expect(toolbar.localName).toBe('header');
+    expect(addButton().getAttribute('type')).toBe('button');
+  });
+
+  it('도구 막대의 [+ 인스턴스]도 새 단계 · 번호 nextId를 같은 규칙으로 쓴다 (b4 → 다음은 b5)', async () => {
+    await click(addButton());
+    expect(slot(3)).toBe(5);
+    expect((slot(2) as UndoState).past).toHaveLength(1);
+    await click(addButton());
+    expect((slot(0) as typeof INITIAL_DOC).instances.map((it) => it.id)).toEqual(['b1', 'b2', 'b3', 'b4', 'b5']);
+  });
   const deleteButton = (): HTMLElement => byId('delete-instance');
 
-  it('P-16 [+ 인스턴스] 한 번 = 캔버스 { INSERT: 1 } · 레이어 { INSERT: 1 }, 렌더 1번, 끝에 b4, 선택은 그대로', async () => {
+  it('P-16 도구 막대의 [+ 인스턴스] 한 번 = 캔버스 { INSERT: 1 } · 레이어 { INSERT: 1 }, 렌더 1번, 끝에 b4, 선택은 그대로 (동작은 MF-22 그대로)', async () => {
     const before = renders;
     await click(addButton());
     expect(canvasCounts(instance.lastPatches)).toEqual({ INSERT: 1 });
     expect(layerCounts(instance.lastPatches)).toEqual({ INSERT: 1 });
+    expect(toolbarCounts(instance.lastPatches)).toEqual({});
     expect(renders - before).toBe(1);
     expect(buttons().map((b) => b.getAttribute('data-id'))).toEqual(['main', 'b1', 'b2', 'b3', 'b4']);
     expect(layerNames()).toEqual(['버튼', '취소', '삭제', '버튼']);
@@ -810,7 +843,7 @@ describe('인스턴스 추가 · 삭제 (Dev-9)', () => {
     await click(deleteButton());
     expect(canvasCounts(instance.lastPatches)).toEqual({ REMOVE: 1 });
     expect(layerCounts(instance.lastPatches)).toEqual({ REMOVE: 1 });
-    const panelReplaces = instance.lastPatches.filter((p) => p.kind === 'REPLACE' && startsWith(p.path, [0, 2]));
+    const panelReplaces = instance.lastPatches.filter((p) => p.kind === 'REPLACE' && startsWith(p.path, PANEL_PREFIX_ALL));
     expect(panelReplaces.length).toBeGreaterThanOrEqual(1);
     expect(heading.isConnected).toBe(false);
     expect(byId('property-empty').localName).toBe('p');
@@ -996,9 +1029,9 @@ describe('키보드 · Undo/Redo (Dev-11)', () => {
     await press('Delete');
     expect(canvasCounts(instance.lastPatches)).toEqual({ REMOVE: 1 });
     expect(layerCounts(instance.lastPatches)).toEqual({ REMOVE: 1 });
-    expect(instance.lastPatches.filter((p) => p.kind === 'REPLACE' && startsWith(p.path, [0, 2])).length).toBeGreaterThanOrEqual(1);
+    expect(instance.lastPatches.filter((p) => p.kind === 'REPLACE' && startsWith(p.path, PANEL_PREFIX_ALL)).length).toBeGreaterThanOrEqual(1);
     expect(renders - before, '삭제 한 동작 = 렌더 1번').toBe(1);
-    console.log(`[P-17 키] 캔버스 ${JSON.stringify(canvasCounts(instance.lastPatches))} 레이어 ${JSON.stringify(layerCounts(instance.lastPatches))} 속성 패널 REPLACE ${instance.lastPatches.filter((p) => p.kind === 'REPLACE' && startsWith(p.path, [0, 2])).length}줄 렌더 +${renders - before}`);
+    console.log(`[P-17 키] 캔버스 ${JSON.stringify(canvasCounts(instance.lastPatches))} 레이어 ${JSON.stringify(layerCounts(instance.lastPatches))} 속성 패널 REPLACE ${instance.lastPatches.filter((p) => p.kind === 'REPLACE' && startsWith(p.path, PANEL_PREFIX_ALL)).length}줄 렌더 +${renders - before}`);
     expect(slot(1)).toBeNull();
     expect(ids()).toEqual(['b1', 'b3']);
     await click(buttonOf('b3'));

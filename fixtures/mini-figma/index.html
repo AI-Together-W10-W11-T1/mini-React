@@ -16,6 +16,9 @@
       body { margin: 0; padding: 16px; font-family: system-ui, sans-serif; color: #1f2430; background: #fff; }
       /* 세 영역: desktop은 가로 3칸(레이어 · 캔버스 · 속성), mobile은 위아래로 쌓인다 (DOM 순서는 그대로, CSS만 바뀜). 가로 스크롤 없음 */
       .app { display: grid; grid-template-columns: 220px minmax(0, 1fr) 300px; gap: 16px; align-items: start; }
+      /* 도구 막대(첫 자식)는 세 영역 위에서 가로 전체를 쓴다 (임시 스타일, 전면 개편은 Dev-7) */
+      .toolbar { grid-column: 1 / -1; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+      .app-name { font-weight: 700; }
       .app > * { min-width: 0; border: 2px solid var(--line); border-radius: 8px; padding: 12px; }
       .panel-title, .property-title { margin: 0 0 8px; font-size: 1rem; color: var(--label); }
 
@@ -24,7 +27,7 @@
       .layer-row { display: flex; align-items: center; gap: 6px; padding: 4px 6px; border-radius: 4px; cursor: pointer; }
       .layer-name { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
       .layer-move { flex: 0 0 auto; padding: 2px 8px; font: inherit; cursor: pointer; }
-      .layer-add, .delete-instance { margin-top: 8px; padding: 6px 12px; font: inherit; cursor: pointer; }
+      .btn-primary, .delete-instance { margin-top: 8px; padding: 6px 12px; font: inherit; cursor: pointer; }
       .layer-row.selected { background: var(--select-bg); outline: 2px solid var(--select); }
 
       /* 캔버스: 메인 버튼 상자 + 인스턴스 버튼 줄. 인스턴스가 많아지면 줄바꿈 (mobile 가로 스크롤 방지, Q17-5) */

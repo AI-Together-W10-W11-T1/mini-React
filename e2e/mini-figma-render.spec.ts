@@ -1,6 +1,6 @@
 import { test, expect, URL, expectNoConsoleWarnings, noHorizontalScroll, canvasLabels, layerOrder, rgb, colorsOf, textOf } from './mini-figma-helpers';
 
-// [AI Note]: QA-1(시작 화면) · QA-2(세 영역 배치). 이 스펙의 테스트는 desktop · mobile 두 프로젝트에서 모두 돈다.
+// [AI Note]: QA-1(시작 화면) · QA-2(도구 막대 + 세 영역 배치). 이 스펙의 테스트는 desktop · mobile 두 프로젝트에서 모두 돈다.
 
 test('QA-1 처음 연다: 레이어 행 · 캔버스 버튼 · 글자 · 색 · 빈 속성 패널 · patch 표시 없음', async ({ page }) => {
   await page.goto(URL);
@@ -34,23 +34,24 @@ test('QA-1 처음 연다: 레이어 행 · 캔버스 버튼 · 글자 · 색 · 
   await expect(page.locator('[data-testid^="log-"]')).toHaveCount(0);
   expect(((await page.getByTestId('app-root').textContent()) ?? '').toLowerCase()).not.toContain('patch');
 
-  // 영역 상자 안 최상위는 <div class="app"> 하나, 자식 순서 레이어 · 캔버스 · 속성
+  // 영역 상자 안 최상위는 <div class="app"> 하나, 자식 순서 도구 막대 · 레이어 · 캔버스 · 속성 (경로 접두 [0,0] ~ [0,3])
   const top = await page.getByTestId('app-root').evaluate((el) =>
     Array.from(el.children).map((c) => ({ tag: c.localName, cls: c.className, kids: Array.from(c.children).map((k) => k.getAttribute('data-testid')) })),
   );
-  expect(top).toEqual([{ tag: 'div', cls: 'app', kids: ['layer-panel', 'canvas', 'property-panel'] }]);
+  expect(top).toEqual([{ tag: 'div', cls: 'app', kids: ['toolbar', 'layer-panel', 'canvas', 'property-panel'] }]);
 
   expect(await noHorizontalScroll(page)).toBe(true);
   expectNoConsoleWarnings(page);
 });
 
-test('QA-2 세 영역 배치: desktop은 가로로 나란히, mobile은 위아래로 쌓이고 가로 스크롤이 없다', async ({ page }, testInfo) => {
+test('QA-2 배치: 도구 막대가 세 영역 위(가로 전체)에 있고, 그 아래 desktop은 레이어 · 캔버스 · 속성이 가로로 나란히, mobile은 위아래로 쌓이며 가로 스크롤이 없다', async ({ page }, testInfo) => {
   await page.goto(URL);
   const box = async (id: string) => {
     const b = await page.getByTestId(id).boundingBox();
     if (b === null) throw new Error(`${id}가 안 보인다`);
     return b;
   };
+  const toolbar = await box('toolbar');
   const layer = await box('layer-panel');
   const canvas = await box('canvas');
   const prop = await box('property-panel');
@@ -61,8 +62,13 @@ test('QA-2 세 영역 배치: desktop은 가로로 나란히, mobile은 위아�
     expect(canvas.x + canvas.width).toBeLessThanOrEqual(prop.x + 1);
     expect(Math.abs(layer.y - canvas.y)).toBeLessThanOrEqual(1);
     expect(Math.abs(canvas.y - prop.y)).toBeLessThanOrEqual(1);
+    // 도구 막대는 세 영역 위, 가로 전체 (왼쪽 = 레이어 왼쪽, 오른쪽 = 속성 오른쪽)
+    expect(toolbar.y + toolbar.height).toBeLessThanOrEqual(layer.y + 1);
+    expect(Math.abs(toolbar.x - layer.x)).toBeLessThanOrEqual(1);
+    expect(Math.abs(toolbar.x + toolbar.width - (prop.x + prop.width))).toBeLessThanOrEqual(1);
   } else {
-    // 레이어 → 캔버스 → 속성 순으로 쌓임
+    // 도구 막대 → 레이어 → 캔버스 → 속성 순으로 쌓임
+    expect(toolbar.y + toolbar.height).toBeLessThanOrEqual(layer.y + 1);
     expect(layer.y + layer.height).toBeLessThanOrEqual(canvas.y + 1);
     expect(canvas.y + canvas.height).toBeLessThanOrEqual(prop.y + 1);
   }

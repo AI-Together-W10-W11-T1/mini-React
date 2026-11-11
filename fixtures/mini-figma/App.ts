@@ -3,6 +3,7 @@ import type { VNode } from '@mini-react/shared';
 import { Canvas } from './components/Canvas';
 import { LayerPanel } from './components/LayerPanel';
 import { PropertyPanel } from './components/PropertyPanel';
+import { Toolbar } from './components/Toolbar';
 import { INITIAL_DOC, addInstance, moveInstance, reconcileSelection, removeInstance, resetInstanceField, setInstanceField, setMainField } from './model';
 import type { Doc, Field, MainProps } from './model';
 import { keyAction } from './keys';
@@ -10,7 +11,7 @@ import { EMPTY_UNDO, recordEdit, redo, undo } from './undo';
 import type { UndoGroup, UndoResult, UndoState } from './undo';
 
 // [AI Note]: 루트 컴포넌트. 모든 useState · useEffect는 이 파일에서만 부른다 (MF-04 · P2-07 · P2-08).
-// 자식(LayerPanel · Canvas · PropertyPanel)은 props만 받는 순수 함수이고, 바꾸고 싶은 것은 루트가 내려 주는 콜백 props로 알린다 (Lifting State Up).
+// 자식(Toolbar · LayerPanel · Canvas · PropertyPanel)은 props만 받는 순수 함수이고, 바꾸고 싶은 것은 루트가 내려 주는 콜백 props로 알린다 (Lifting State Up).
 // 상태 칸은 4개고 렌더마다 같은 순서로 부른다 (Hook 개수가 달라지면 엔진이 오류, dev_todo 공통 주의 9):
 //   doc        = { main, instances } 한 칸 — Undo가 기록하는 것은 이것뿐
 //   selectedId = 'main' | 인스턴스 id | null — 고르기는 Undo 기록 밖 (처음은 null, ④-2)
@@ -116,7 +117,9 @@ export function App(): VNode {
   return h(
     'div',
     { class: 'app' },
-    h(LayerPanel, { main: doc.main, instances: doc.instances, selectedId, onSelect, onAdd, onMove }),
+    // [AI Note]: 자식 순서 = 도구 막대(0) · 레이어(1) · 캔버스(2) · 속성(3). 이 순서가 엔진 patch 경로 접두 [0,0] ~ [0,3]이 된다 (FD-10)
+    h(Toolbar, { onAdd }),
+    h(LayerPanel, { main: doc.main, instances: doc.instances, selectedId, onSelect, onMove }),
     h(Canvas, { main: doc.main, instances: doc.instances, selectedId, onSelect }),
     h(PropertyPanel, { main: doc.main, instances: doc.instances, selectedId, onEdit, onReset, onDelete: deleteSelected }),
   );
