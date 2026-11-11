@@ -78,11 +78,11 @@
 
 - [x] **Dev-4** (`react-dom-bindings`): 이벤트 핸들러 저장 + 리스너 하나 — `setEventHandler(element, event, handler | null)` [§4.3 이벤트 등록 · 변경 · 제거 · §6.2 핸들러 교체 후 중복 호출 방지]
   - 의존: -
-  - 만들 · 고칠 파일: `packages/react-dom-bindings/src/client/events.ts`(요소별 핸들러 저장소는 `WeakMap<Element, Map<이벤트 이름, EventHandler | null>>` — 요소가 빠지면 함께 사라지고 엔진이 따로 치우지 않음. 그 요소 · 이벤트에서 처음 `handler`가 올 때만 리스너를 **한 번** 등록하고, 리스너는 저장된 핸들러를 꺼내 부름. 교체 = 저장된 값만 바꿈, `null` = 값만 비움(리스너 남김), 지원 밖 이벤트 이름은 `console.warn` 1회 후 무시 — 초안 ④-6 작은 정책, 확정), `packages/react-dom-bindings/src/index.ts`에 내보내기
+  - 만들 · 고칠 파일: `packages/react-dom-bindings/src/client/events.ts`(요소별 핸들러 저장소는 `WeakMap<Element, Map<이벤트 이름, EventHandler | null>>` — 요소가 빠지면 함께 사라지고 엔진이 따로 치우지 않음. 그 요소 · 이벤트에서 처음 `handler`가 올 때만 리스너를 **한 번** 등록하고, 리스너는 저장된 핸들러를 꺼내 부름. 교체 = 저장된 값만 바꿈, `null` = 값만 비움(리스너 남김), 지원 밖 이벤트 이름은 붙이려는 호출마다 `console.warn` 후 무시(호출마다 경고, 검수 NB-6) — 초안 ④-6 작은 정책, 확정), `packages/react-dom-bindings/src/index.ts`에 내보내기
   - 테스트(먼저 실패 확인): `packages/react-dom-bindings/src/client/__tests__/events.test.ts` — 등록 뒤 `dispatchEvent` 1번에 핸들러 1번 호출, 핸들러를 여러 번 교체해도 한 번 눌렀을 때 **마지막 핸들러만 1번** 호출(중복 없음), `addEventListener` 호출 횟수가 요소 · 이벤트당 1번(`vi.spyOn`), `null`이면 눌러도 아무 일 없고 오류도 없음, `null` 뒤 다시 핸들러를 붙이면 호출됨(리스너 한 번만 등록됨), `click` · `input`이 서로 독립, 요소 둘이 서로 독립, 핸들러가 던진 예외는 그대로 위로, 지원 밖 이벤트 경고
   - 알고리즘: 결정 8 B (리스너 하나 + 핸들러 교체), 정책 「§4.3 이벤트 · 핸들러 저장 위치 · 핸들러 해제」
   - 완료 근거로 남길 것: 통과 개수, `addEventListener` 호출 횟수 단언, 전체 vitest · tsc, 커밋 해시
-  - **완료 근거 (Evidence)**: `packages/react-dom-bindings/src/client/events.ts`의 `setEventHandler(element, event, handler | null)` 신규 (`WeakMap<Element, Map<이벤트, 핸들러 | null>>`, 처음 non-null 핸들러가 올 때만 `addEventListener` 1번, 리스너가 저장된 핸들러를 꺼내 부름, null = 값만 비움, 리스너 등록 전 null은 기록하지 않음, 지원 밖 이름은 `console.warn` 1회 후 무시(null은 조용히)), `packages/react-dom-bindings/src/index.ts`에 내보내기
+  - **완료 근거 (Evidence)**: `packages/react-dom-bindings/src/client/events.ts`의 `setEventHandler(element, event, handler | null)` 신규 (`WeakMap<Element, Map<이벤트, 핸들러 | null>>`, 처음 non-null 핸들러가 올 때만 `addEventListener` 1번, 리스너가 저장된 핸들러를 꺼내 부름, null = 값만 비움, 리스너 등록 전 null은 기록하지 않음, 지원 밖 이름은 붙이려는 호출마다 `console.warn` 후 무시(null은 조용히, 검수 NB-6으로 "1회" → "호출마다" 정정)), `packages/react-dom-bindings/src/index.ts`에 내보내기
     - 새 테스트 `packages/react-dom-bindings/src/client/__tests__/events.test.ts` 13건 (구현 전: 모듈 없음으로 실행 불가 → 13 passed): 등록 뒤 1번 호출 · 20번 교체해도 마지막 핸들러만 1번 · **`addEventListener` 호출 횟수 1(`vi.spyOn`), `removeEventListener` 0** · null 뒤 눌러도 오류 없음 · null 뒤 재등록 호출됨(리스너 1번) · 등록 전 null은 리스너 안 만듦 · 다른 이벤트 null 뒤 click 등록 · click / input 독립 · 요소 둘 독립 · 핸들러 예외는 리스너에서 그대로 던짐 · 지원 밖 이벤트 경고 · 요소가 빠져도 다른 곳에 새지 않음
     - `npx vitest run` 전체 476 passed (463 + 13), `npx tsc --noEmit` 오류 0건. 커밋 036d354
 

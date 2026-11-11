@@ -118,13 +118,15 @@ describe('setEventHandler — 리스너 하나 + 핸들러 교체 (결정 8 B)',
     expect(() => listener(new Event('click'))).toThrow('핸들러 오류');
   });
 
-  it('지원 밖 이벤트 이름은 경고 1회 후 무시 (리스너를 만들지 않음)', () => {
+  it('지원 밖 이벤트 이름은 붙이려는 호출마다 경고하고 무시 (리스너를 만들지 않음, 검수 NB-6)', () => {
     const div = document.createElement('div');
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const spy = vi.spyOn(div, 'addEventListener');
     const handler = vi.fn();
     setEventHandler(div, 'mousedown', handler);
     expect(warn).toHaveBeenCalledTimes(1);
+    setEventHandler(div, 'mousedown', handler); // 다시 렌더돼 같은 prop이 또 오면 경고도 또 한 번 (호출마다)
+    expect(warn).toHaveBeenCalledTimes(2);
     expect(spy).not.toHaveBeenCalled();
     div.dispatchEvent(new Event('mousedown'));
     expect(handler).not.toHaveBeenCalled();

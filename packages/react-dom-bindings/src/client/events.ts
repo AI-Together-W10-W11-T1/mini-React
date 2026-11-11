@@ -14,7 +14,7 @@ const handlerStore = new WeakMap<Element, Map<string, EventHandler | null>>();
 
 export function setEventHandler(element: Element, event: string, handler: EventHandler | null): void {
   if (!SUPPORTED_EVENTS.has(event)) {
-    // 지원 밖 이벤트: 비우는 호출(null)은 할 일이 없으므로 조용히, 붙이려는 호출만 경고 1회 후 무시
+    // 지원 밖 이벤트: 비우는 호출(null)은 할 일이 없으므로 조용히, 붙이려는 호출만 경고하고 무시 (호출마다 경고 — 다시 렌더돼 같은 prop이 오면 또 경고. 상태를 두지 않아 단순하다)
     if (handler !== null) console.warn(`"${event}" 이벤트는 지원하지 않습니다 (click · input만). 핸들러를 무시합니다.`);
     return;
   }

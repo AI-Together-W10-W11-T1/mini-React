@@ -39,7 +39,7 @@ export function renderAreaChildren(area: Element, children: AreaChildren): void 
 // Phase 2: 이름이 `on` + 대문자이고 값이 함수면 이벤트(setEventHandler, `onClick` → `click`),
 // `input` · `textarea` · `select`의 `value` · `checked`는 속성이 아니라 DOM 프로퍼티(applyDomProp)로 — `type`보다 먼저 적용하면 체크박스 값이 틀어질 수 있어 속성 · 자식을 다 쓴 뒤 마지막에 넣는다
 // (이 함수는 값만 모아 돌려주고 renderVNode가 마지막에 적용한다). 그 밖의 요소(`div` · `li` · `option` …)의 `value` · `checked`는 보통 속성이다 (검수 NB-4, Phase 1과 같음).
-// 그 밖의 함수·객체는 설정하지 않고 prop마다 warn 1회.
+// 그 밖의 함수·객체는 설정하지 않고 그리는 호출마다 prop당 console.warn 한 번.
 function applyProps(element: Element, vnode: ElementVNode): { value?: string; checked?: boolean } {
   const asProperty = DOM_PROP_ELEMENTS.has(vnode.type.toLowerCase());
   let value: string | undefined;
