@@ -268,10 +268,12 @@ test('QA-43 전체 높이: desktop은 레이어 · 캔버스 · 속성이 화면
     // 캔버스는 도구 막대 바로 아래(칸 사이 간격 16px)에서 시작하고 아래 끝은 실제 영역 위
     expect(canvas.y - toolbar.bottom, '도구 막대와 캔버스 사이 간격').toBeLessThanOrEqual(20);
     expect(canvas.bottom, '캔버스 아래 끝이 실제 영역 시작 위').toBeLessThanOrEqual(real.y);
-    // 두 영역이 남은 높이를 반반 (각각 250px 이상, 차이 40px 이내)
+    // 캔버스는 위 칸을 채우고(250px 이상), 실제 영역 카드는 내용 높이만큼(허그) 아래 칸의 아래 끝에 붙는다 — 카드 안에 남는 빈 높이 · 스크롤 없음
     expect(canvas.height).toBeGreaterThanOrEqual(250);
-    expect(real.height).toBeGreaterThanOrEqual(250);
-    expect(Math.abs(canvas.height - real.height), '두 영역 높이 차이').toBeLessThanOrEqual(40);
+    const realInner = await page.getByTestId('real-section').evaluate((el) => ({ scrollHeight: el.scrollHeight, clientHeight: el.clientHeight }));
+    expect(realInner.scrollHeight, '실제 영역 카드 = 내용 높이').toBeLessThanOrEqual(realInner.clientHeight + 1);
+    const realLast = await page.locator('[data-testid="real-area"] [data-testid="real-canvas-instances"]').boundingBox();
+    expect(real.bottom - ((realLast?.y ?? 0) + (realLast?.height ?? 0)), '카드 아래 여백 = 24px (테두리 1 + 여백 23)').toBeLessThanOrEqual(25);
     expect(scrollHeight, '페이지 세로 스크롤 없음').toBeLessThanOrEqual(innerHeight);
   } else {
     // mobile: 위아래 쌓기 그대로 — 캔버스는 지금처럼 내용 높이(최소 320px)이고 패널 안 스크롤이 없다
