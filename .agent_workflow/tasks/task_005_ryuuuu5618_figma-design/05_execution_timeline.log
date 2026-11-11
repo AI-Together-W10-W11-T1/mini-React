@@ -6,3 +6,4 @@
 2026-11-11T21:24 | stage=2 | agent=mr-worker | round=- | signal=UNKNOWN | Dev-1~8 | by=hook
 2026-11-11T21:28 | stage=2 | agent=mr-reviewer | round=1/3 | signal=UNKNOWN | Dev-1~8 | by=hook
 2026-11-11T21:29 | stage=2 | agent=master | round=1/3 | signal=APPROVE | Dev-1~8 검수 APPROVE (NB 3)
+2026-11-11T21:31 | stage=2 | agent=master | round=- | signal=DECISION | NB 1 · 3 반영 + FD-08 전체 높이 (사용자 "둘 다 해")
