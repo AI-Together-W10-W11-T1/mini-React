@@ -1,3 +1,6 @@
 2026-11-11T14:09 | stage=0 | agent=master | round=- | signal=START | task_003 생성 (ryuuuu5618, batching), 가벼운 모드, task_002 Dev-27 · 28 · QA-21 범위
 2026-11-11T14:11 | stage=0 | agent=master | round=- | signal=APPROVE | 추천안 표 "응", 결정 9 A → B 이유 기록, 01_request_spec.md 승인
 2026-11-11T14:11 | stage=0.5 | agent=master | round=- | signal=PASS | feature/batching, types.ts NESTED_RENDER_LIMIT 주석 의미 변경, CLAUDE.md 결정 9 B
+2026-11-11T14:16 | stage=1 | agent=mr-worker | round=- | signal=UNKNOWN | - | by=hook
+2026-11-11T14:16 | stage=1 | agent=master | round=- | signal=SKIP_REVIEW | 가벼운 모드: 기획 검수 생략, 테스트 케이스 확인으로 (Dev 4, QA 인수 5 · 공격 4 · 회귀 3, 바뀌는 단언 22)
+2026-11-11T14:17 | stage=1 | agent=master | round=- | signal=APPROVE | 테스트 케이스 확인 "바로 시작해줘": 결정 1 setRenderErrorHandler · 2 scheduleRender(owner, task) 추천대로 → 2단계

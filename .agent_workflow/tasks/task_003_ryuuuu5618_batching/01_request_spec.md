@@ -45,12 +45,14 @@ Phase 2 재렌더 시점을 알고리즘 결정 9 **A 즉시 동기 → B 마이
 | §4.2 같은 값 | 예약 시점에 값이 같으면 예약하지 않음, 모은 결과가 처음과 같아도 diff가 무변경 | 추천안 수용 ("응") |
 | §4.2 effect 시점 | 모은 렌더의 patch 직후 한 번 | 추천안 수용 |
 | §4.2 무한 렌더 안전장치 | effect → setter → 렌더가 연달아 50번 넘으면 오류 | 추천안 수용 |
+| 렌더 예외 (테스트 케이스 확인 1) | 마이크로태스크에서 그대로 다시 던짐(삼키지 않음), 예약 표시 · 연달아 횟수는 finally로 되돌려 큐가 막히지 않음. scheduler에 `setRenderErrorHandler`(기본 = 다시 던지기) 자리 | "바로 시작해줘" (추천안 수용) |
+| 예약 단위 (테스트 케이스 확인 2) | `scheduleRender(owner, task)` — scheduler가 컴포넌트(owner)별로 예약 1번을 기억 | 추천안 수용 |
 | 그대로 | 렌더 중 setter 오류 · 함수형 setter · 지연 초기화 · Hook 순서 · 이벤트(결정 8 B) | 추천안 수용 |
 
 ## 6. 수용 기준 연결
 - 인수: task_002 QA-21 (+ 렌더 · effect 횟수를 세는 QA-3 · QA-14 · QA-A2 등 기대값 갱신) → `e2e/phase2-*.spec.ts` desktop · mobile, Phase 1 e2e 회귀
 - 단위: scheduler · useState · useEffect · hookErrors · render 테스트 (Batching 동작 + 기존 동작 await 형태)
-- 테스트 케이스 확인: <!-- 1단계 끝 -->
+- 테스트 케이스 확인: 2026-11-11 사용자 "바로 시작해줘" — 결정 1 · 2 추천대로, 작업자 제안 3~6 그대로 (`00_master_dialogue.md`)
 
 ## 7. [고정] 필수 제약
 - task_002와 같음 (`01_request_spec.md` 7절). DOM은 `react-dom-bindings` · fixture에서만, Fiber · 우선순위 스케줄러 금지
