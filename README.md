@@ -64,25 +64,7 @@
 | task 수 · 검수 회차 | task 7개 · task_001 검수 2회 (둘 다 REJECT, 2회차 뒤 마스터 확인) · task_002 검수 3회 (개발 1회 APPROVE · 경량 2회: REJECT → APPROVE) · task_003 검수 1회 (가벼운 모드, 기획 검수 생략 · 개발 1회 APPROVE) · task_004 검수 6회 (기본 모드, 기획 2회: REJECT → APPROVE · 개발 묶음 3개 4회: 묶음 1 · 2 APPROVE, 묶음 3 REJECT → APPROVE) · task_005 검수 2회 (가벼운 모드, 개발 1회 APPROVE(Dev-1 ~ 8) · 경량 Dev-9 1회 APPROVE) · task_006 검수 3회 (가벼운 모드, Dev-1 ~ 7 REJECT → 재작업 → APPROVE · Dev-8 APPROVE) · task_007 검수 1회 (가벼운 모드, APPROVE, NB 4 반영) |
 | QA 실패 분류 (구현 · 테스트 · 명세) | QA 실패 0건 (task_001 ~ 007) — 3갈래 분류 대상 없음. 개발 검수 BLOCKING은 모두 작업자 재작업으로 해결: task_001 4 · task_002 1 · task_004 1 (묶음 3, Undo 키 겹침, Q18) · task_006 1 (`qa_todo.md`가 최신 명세 · e2e와 어긋남) (`code_review_log.md`). task_003 · 005 · 007 BLOCKING 0 |
 | 자동 테스트 (최종) | task_001: vitest 432 · playwright 96 / task_002: vitest 776 · playwright 154 / task_003: vitest 801 · playwright 172 / task_004: vitest 1064 · playwright 272 / task_005: vitest 1159 · playwright 324 (QA 시점) / task_006: vitest 1195 · playwright 330 / task_007: vitest 1250 · playwright 376 (레포 최종) / tsc 오류 0 |
-| 구현에 쓴 토큰량 | 아래 표 (`/usage` 전후 비교는 하지 않음). task_005 · 006 · 007 구간은 측정값이 없어 `[확인 필요]` |
 
 - 위키 · 상세 기록: [wiki/index.md](wiki/index.md) · [wiki/qna_prep.md](wiki/qna_prep.md)
-
-
-### 구현에 쓴 토큰량
-
-세션 · 서브에이전트 기록(`~/.claude/projects/…/<세션>.jsonl` · `subagents/*.jsonl`)의 `usage`를 메시지마다 한 번씩 더한 값. 구간은 각 task 타임라인의 시작 ~ 병합 시각(KST). task_004는 QA 끝까지(4단계 · 병합 제외). task_003은 세션이 한 번 다시 시작돼 두 세션 기록을 함께 셌다(같은 메시지는 한 번만). 합계의 약 97%는 캐시 읽기(이미 읽은 맥락을 다시 쓰는 것)다. task_004 숫자는 마스터가 세션 · 서브에이전트 jsonl을 메시지마다 한 번씩 더해 잰 값이다. task_005 · 006 · 007 구간은 `/usage` 측정값이 전달되지 않아 `[확인 필요: 마스터 측정값 전달]`로 둔다.
-
-| 구간 | 마스터 (Opus) | 작업자 (Sonnet) | 검수자 (Opus) | QA (Sonnet) | 위키 (Haiku) | 합계 | 그중 출력 |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| task_001 Phase 1 (11-10 18:39 ~ 11-11 04:28) | 8,701만 | 4,359만 | 177만 | 101만 | - | **1억 3,338만** | 70.3만 |
-| task_002 Phase 2 (11-11 04:30 ~ 13:48) | 5,195만 | 5,283만 | 603만 | 78만 | - | **1억 1,160만** | 51.8만 |
-| 4단계 위키 · README (11-11 13:49 ~ 14:09) | 1,518만 | - | - | - | 310만 | **1,828만** | 12.5만 |
-| task_003 Batching (11-11 14:09 ~ 15:03) | 2,418만 | 2,475만 | 350만 | 152만 | - | **5,395만** | 12.6만 |
-| task_004 mini-figma (11-11 16:15 ~ 19:52, QA까지) | 4,596만 | 3,746만 | 640만 | 105만 | - | **9,087만** | 56.3만 |
-| task_005 figma-design | [확인 필요] | [확인 필요] | [확인 필요] | [확인 필요] | - | [확인 필요] | [확인 필요] |
-| task_006 patch-preview | [확인 필요] | [확인 필요] | [확인 필요] | [확인 필요] | - | [확인 필요] | [확인 필요] |
-| task_007 variables | [확인 필요] | [확인 필요] | [확인 필요] | [확인 필요] | - | [확인 필요] | [확인 필요] |
-| 위키 · README (task_005 ~ 007 정리) | - | - | - | - | [확인 필요] | [확인 필요] | [확인 필요] |
 
 <!-- mini-react-kit:readme:end -->
