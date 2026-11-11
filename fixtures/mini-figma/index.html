@@ -59,6 +59,15 @@
       .layer-toggle:hover { background: rgba(255, 255, 255, 0.08); color: var(--ink); }
       .layer-list .layer-row { padding-left: 44px; }
       .layer-list.collapsed { display: none; }
+      /* 변수 구역(task_007): 레이어 창 맨 끝 블록 (목록을 접어도 안 접힘). 위 선은 패널 가로 전체, 줄은 [칩 | 이름 · hex 두 줄 | 색 입력칸] 3칸이라 180px 폭에서도 안 넘친다 */
+      .variable-panel { margin: 16px -20px 0; padding: 16px 20px 0; border-top: 1px solid var(--line); }
+      .variable-title { margin: 0 0 8px; font-size: 1rem; font-weight: 600; line-height: 1.5; color: var(--ink); }
+      .variable-list { display: flex; flex-direction: column; gap: 4px; margin: 0; padding: 0; list-style: none; }
+      .variable-row { display: grid; grid-template-columns: 20px minmax(0, 1fr) 44px; grid-template-areas: 'chip name input' 'chip hex input'; column-gap: 10px; align-items: center; min-height: 48px; padding: 4px 0; }
+      .variable-chip { grid-area: chip; width: 20px; height: 20px; border: 1px solid var(--line); border-radius: 50%; }
+      .variable-name { grid-area: name; min-width: 0; overflow-wrap: anywhere; font-size: 0.875rem; }
+      .variable-hex { grid-area: hex; min-width: 0; color: var(--ink-soft); font-size: 0.75rem; }
+      .variable-color { grid-area: input; width: 44px; height: 36px; }
 
       /* 캔버스: 테두리 · 점무늬 · 자체 배경 없이 카드 바탕 그대로. 메인 버튼 상자 + 인스턴스 버튼 줄. 인스턴스가 많아지면 줄바꿈 (mobile 가로 스크롤 방지, Q17-5) */
       .canvas { min-height: 320px; padding: 24px; background: transparent; border: 0; border-radius: 0; } /* 테두리 · 자체 배경 없음 — 페이지 바탕이 그대로 보인다 */

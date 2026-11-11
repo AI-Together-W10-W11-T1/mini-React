@@ -1,7 +1,8 @@
 import { h } from '@mini-react/react';
 import type { Props, VNode } from '@mini-react/shared';
 import { instanceName } from '../model';
-import type { Instance, MainProps } from '../model';
+import type { Instance, MainProps, Variable } from '../model';
+import { VariablePanel } from './VariablePanel';
 
 interface LayerPanelProps {
   main: MainProps;
@@ -14,6 +15,9 @@ interface LayerPanelProps {
   onSelect: (id: string) => void;
   /** [↑] (-1) · [↓] (+1): 그 인스턴스를 한 칸 옮긴다 */
   onMove: (id: string, delta: -1 | 1) => void;
+  /** 변수 구역 (task_007): 처음 3개, 값 하나가 바뀌면 알린다 */
+  variables: readonly Variable[];
+  onVariableChange: (id: string, value: string) => void;
 }
 
 // [AI Note]: 레이어 창 — props만 받는 순수 함수. 메인 행 + 인스턴스 행들(이름 = 지금 글자, 빈 글자면 id, ④-3).
@@ -23,7 +27,7 @@ interface LayerPanelProps {
 // 레이어 창 DOM 구조(제목 · 메인 행 · ul > li)와 경로는 그대로라 행이 몇 개든 ul 한 곳만 고친다 (+ 버튼 글자 · aria-expanded).
 // [▾] 버튼은 메인 행 안 이름 뒤에 두고(이름 span이 0번 자식 그대로) CSS order로 앞에 보인다.
 export function LayerPanel(props: Props): VNode {
-  const { main, instances, selectedId, open, onToggle, onSelect, onMove } = props as unknown as LayerPanelProps;
+  const { main, instances, selectedId, open, onToggle, onSelect, onMove, variables, onVariableChange } = props as unknown as LayerPanelProps;
   return h(
     'section',
     { class: 'layer-panel', 'data-testid': 'layer-panel' },
@@ -76,5 +80,7 @@ export function LayerPanel(props: Props): VNode {
         ),
       ),
     ),
+    // [AI Note]: 변수 구역(task_007) = 레이어 창 맨 끝 자식. 위 목록(<ul>)만 접히고 변수 구역은 접히지 않는다. 앞 자식 경로(제목 · 메인 행 · ul)는 그대로다.
+    h(VariablePanel, { variables, onChange: onVariableChange }),
   );
 }

@@ -5,7 +5,7 @@ import { LayerPanel } from './components/LayerPanel';
 import { PreviewPanel } from './components/PreviewPanel';
 import { PropertyPanel } from './components/PropertyPanel';
 import { Toolbar } from './components/Toolbar';
-import { INITIAL_DOC, addInstance, moveInstance, reconcileSelection, removeInstance, resetInstanceField, setInstanceField, setMainField } from './model';
+import { INITIAL_DOC, addInstance, moveInstance, reconcileSelection, removeInstance, resetInstanceField, setInstanceField, setMainField, setVariableValue } from './model';
 import type { Doc, Field, MainProps } from './model';
 import { keyAction } from './keys';
 import { createPreview } from './preview';
@@ -45,6 +45,9 @@ export function App(): VNode {
     const next = selectedId === 'main' ? setMainField(doc, field, value) : setInstanceField(doc, selectedId, field, value);
     applyEdit(next);
   };
+
+  // [AI Note]: 변수 값 바꾸기(task_007) = setVariableValue → applyEdit. 새 Hook 칸 없이 doc 안의 variables만 바뀐다. 같은 값 · 없는 id면 같은 Doc이라 렌더 없음. 한 동작 = setter 하나 = 렌더 1번.
+  const onVariableChange = (id: string, value: string): void => applyEdit(setVariableValue(doc, id, value));
 
   // [AI Note]: ↻ = 그 인스턴스의 그 칸 키를 지운다 (undefined를 넣지 않음) → 메인 값을 다시 따라간다.
   const onReset = (field: Field): void => {
@@ -175,7 +178,7 @@ export function App(): VNode {
     { class: 'app' },
     // [AI Note]: 자식 순서 = 도구 막대(0) · 레이어(1) · 캔버스(2) · 속성(3). 이 순서가 엔진 patch 경로 접두 [0,0] ~ [0,3]이 된다 (FD-10)
     h(Toolbar, { canBack: canBack(nav), canForward: canForward(nav), onBack: onPreviewBack, onForward: onPreviewForward, onPatch: onPreviewPatch }),
-    h(LayerPanel, { main: doc.main, instances: doc.instances, selectedId, open: layersOpen, onToggle: onToggleLayers, onSelect: selectAndReveal, onMove }),
+    h(LayerPanel, { main: doc.main, instances: doc.instances, selectedId, open: layersOpen, onToggle: onToggleLayers, onSelect: selectAndReveal, onMove, variables: doc.variables, onVariableChange }),
     h(Canvas, { main: doc.main, instances: doc.instances, variables: doc.variables, selectedId, onSelect: selectAndReveal }),
     // [인스턴스 생성]은 속성 패널 오른쪽 아래(메인을 골랐을 때)에 있다 — [삭제]와 같은 자리
     h(PropertyPanel, { main: doc.main, instances: doc.instances, selectedId, onEdit, onReset, onDelete: deleteSelected, onAdd: addAndReveal }),

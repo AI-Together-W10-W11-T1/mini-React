@@ -1805,3 +1805,86 @@ describe('실제 영역 (patch-preview, PP-01 ~ 10 · Dev-7)', () => {
     sameAreas();
   });
 });
+
+// ---------------------------------------------------------------------------
+// task_007 색 변수 Variables — 변수 구역 (Dev-3: VR-04 · 06, VP-10 · 11 · 12)
+// ---------------------------------------------------------------------------
+describe('변수 구역 (VR-04 · 06)', () => {
+  const rows = (): HTMLElement[] => Array.from(root.querySelectorAll<HTMLElement>('[data-testid="variable-row"]'));
+  const rowOf = (id: string): HTMLElement => {
+    const found = rows().find((r) => r.getAttribute('data-id') === id);
+    if (found === undefined) throw new Error(`변수 줄 ${id}가 없다`);
+    return found;
+  };
+  const inputOf = (id: string): HTMLInputElement => rowOf(id).querySelector<HTMLInputElement>('[data-testid="variable-color"]')!;
+  const input = async (id: string, value: string): Promise<void> => {
+    const el = inputOf(id);
+    el.value = value;
+    el.dispatchEvent(new Event('input'));
+    await Promise.resolve();
+  };
+  const variablesOf = () => (slot(0) as typeof INITIAL_DOC).variables;
+  /** 렌더마다 새로 생기는 SET_EVENT를 뺀 줄 (task_002 알려진 한계) */
+  const meaningful = (): Patch[] => instance.lastPatches.filter((p) => p.kind !== 'SET_EVENT');
+
+  it('처음: layer-panel의 끝 자식 variable-panel 안에 변수 줄 3개 · 순서 · 값 · hex 글자', () => {
+    const panel = byId('layer-panel');
+    expect(panel.lastElementChild).toBe(byId('variable-panel'));
+    expect(byId('variable-title').textContent).toBe('변수');
+    expect(rows().map((r) => r.getAttribute('data-id'))).toEqual(['primary', 'danger', 'success']);
+    expect(rows().map((r) => r.querySelector('[data-testid="variable-name"]')?.textContent)).toEqual(['Primary', 'Danger', 'Success']);
+    expect(rows().map((r) => r.querySelector('[data-testid="variable-hex"]')?.textContent)).toEqual(['#0052ff', '#cf202f', '#05b169']);
+    expect(rows().map((r) => r.querySelector('input')!.type)).toEqual(['color', 'color', 'color']);
+    expect(['primary', 'danger', 'success'].map((id) => inputOf(id).value)).toEqual(['#0052ff', '#cf202f', '#05b169']);
+    expect(rows().map((r) => (r.querySelector<HTMLElement>('[data-testid="variable-chip"]')!).style.backgroundColor)).toEqual([rgb('#0052ff'), rgb('#cf202f'), rgb('#05b169')]);
+    // 처음 화면 버튼 색 그대로 (VR-08) · div.app 자식 5개 그대로
+    expect(bgs()).toEqual([rgb('#0052ff'), rgb('#0052ff'), rgb('#0052ff'), rgb('#cf202f')]);
+    expect(area().children).toHaveLength(5);
+  });
+
+  it('VP-11 input → slot(0).variables 해당 변수만 바뀜, 캔버스 0줄 · 변수 구역 SET_STYLE 1 + SET_PROP 1 + SET_TEXT 1, 렌더 1번', async () => {
+    const before = variablesOf();
+    const mainButton = buttonOf('main');
+    const rendersBefore = renders;
+    await input('primary', '#f4b000');
+    expect(renders - rendersBefore).toBe(1);
+    const after = variablesOf();
+    expect(after[0]).toEqual({ id: 'primary', name: 'Primary', value: '#f4b000' });
+    expect(after[1]).toBe(before[1]);
+    expect(after[2]).toBe(before[2]);
+    const meaningfulLines = meaningful();
+    expect(canvasCounts(meaningfulLines)).toEqual({});
+    expect(layerCounts(meaningfulLines)).toEqual({ SET_STYLE: 1, SET_PROP: 1, SET_TEXT: 1 });
+    expect(meaningfulLines).toHaveLength(3);
+    expect(buttonOf('main')).toBe(mainButton);
+    expect(bgs()).toEqual([rgb('#0052ff'), rgb('#0052ff'), rgb('#0052ff'), rgb('#cf202f')]);
+    expect(rowOf('primary').querySelector('[data-testid="variable-hex"]')?.textContent).toBe('#f4b000');
+  });
+
+  it('VP-10 같은 값으로 input → 렌더 0번, lastPatches 그대로', async () => {
+    await input('primary', '#f4b000');
+    const patches = instance.lastPatches;
+    const rendersBefore = renders;
+    await input('primary', '#f4b000');
+    expect(renders - rendersBefore).toBe(0);
+    expect(instance.lastPatches).toBe(patches);
+    await input('danger', '#cf202f');
+    expect(renders - rendersBefore).toBe(0);
+  });
+
+  it('VP-12 같은 틱에 input 4번 연속 → 이벤트마다 렌더 1번, 마지막 값만 남고, 입력칸 노드는 같은 참조', async () => {
+    const el = inputOf('primary');
+    const rendersBefore = renders;
+    for (const hex of ['#111111', '#222222', '#333333', '#f4b000']) await input('primary', hex);
+    expect(renders - rendersBefore).toBe(4);
+    expect(inputOf('primary')).toBe(el);
+    expect(variablesOf()[0].value).toBe('#f4b000');
+    expect(rowOf('primary').querySelector('[data-testid="variable-hex"]')?.textContent).toBe('#f4b000');
+    expect(el.value).toBe('#f4b000');
+  });
+
+  it('변수 구역에 patch 글자가 없다 (MF-05) · Hook 칸은 8칸 그대로 (새 칸 없음)', () => {
+    expect(byId('variable-panel').textContent).not.toMatch(/patch/i);
+    expect(instance.hooks).toHaveLength(8);
+  });
+});
