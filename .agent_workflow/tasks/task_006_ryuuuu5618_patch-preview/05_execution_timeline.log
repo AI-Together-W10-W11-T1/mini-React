@@ -12,3 +12,6 @@
 2026-11-11T23:43 | stage=2 | agent=master | round=- | signal=PAUSE | 버튼 글자 변경 0654f66, compact 전 멈춤. 다음 = 개발 검수(diff 969edc4..HEAD, 가벼운 1회) → QA → 사람 확인 → task_005 사람 확인 → 위키 · 병합(005 → 006)
 2026-11-11T23:50 | stage=2 | agent=mr-reviewer | round=1/3 | signal=UNKNOWN | Dev-1~7 | by=hook
 2026-11-11T23:50 | stage=2 | agent=master | round=1 | signal=REJECT | 개발 검수 1/3 REJECT: BLOCKING = qa_todo.md 문서만(코드 없음). 1·2·3·5 → mr-worker, 4 → 마스터(명세 §5 · CLAUDE.md 표시)
+2026-11-11T23:54 | stage=2 | agent=mr-worker | round=- | signal=UNKNOWN | Dev-7 | by=hook
+2026-11-11T23:56 | stage=2 | agent=mr-reviewer | round=2/3 | signal=UNKNOWN | Dev-7 | by=hook
+2026-11-11T23:56 | stage=2 | agent=master | round=2 | signal=APPROVE | 개발 검수 2/3 APPROVE (47b6478), vitest 1178 마스터 확인. 다음 = QA
