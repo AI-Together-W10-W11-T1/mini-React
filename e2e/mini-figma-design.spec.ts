@@ -1,5 +1,5 @@
 import type { Page } from '@playwright/test';
-import { test, expect, URL, selectOnCanvas, selectInLayer, noHorizontalScroll, pickColor, textOf, rgb, buttonSel } from './mini-figma-helpers';
+import { test, expect, URL, selectOnCanvas, selectInLayer, noHorizontalScroll, pickColor, textOf, rgb, buttonSel, layerSel, selectedOnCanvas, selectedInLayer } from './mini-figma-helpers';
 
 // [AI Note]: QA-40 ~ 42 (디자인 개편: 어두운 카드 · 점무늬 · 알약 · 글꼴 · 도구 막대 배치) · QA-A26 (좁은 화면 도구 막대) · QA-A29 (밝은 색 위 선택 표시).
 // 값은 computed style로 읽는다 — CSS 변수 이름이 아니라 실제 화면에 적용된 값이 문서 값(#0a0b0d · #16181c · #a8acb3 · #0052ff)인지 증명한다.
@@ -191,5 +191,113 @@ test('QA-A29 밝은 색 · 어두운 색 위의 선택 표시: 파랑 outline(�
     expect(parseFloat(s['outline-offset']), `${hex} outline offset`).toBeGreaterThanOrEqual(2);
     expect(await textOf(page, 'main'), `${hex} 글자`).toBe(text);
     expect(rgb(hex)).not.toBe(text);
+  }
+});
+
+// ---------------------------------------------------------------------------
+// FD-08 전체 높이 (Dev-9): desktop은 도구 막대 아래 세 영역이 화면 아래까지 차고 페이지는 세로로 안 넘친다. 넘치면 패널 · 캔버스 안에서 스크롤.
+// 여백 허용 범위: 아래 끝은 뷰포트 아래 끝에서 body 여백(16px) + 반올림 여유 4px = 최대 20px 위까지 (`BOTTOM_GAP`).
+// ---------------------------------------------------------------------------
+const BOTTOM_GAP = 20;
+
+async function boxOf(page: Page, id: string): Promise<{ y: number; height: number; bottom: number }> {
+  const b = await page.getByTestId(id).boundingBox();
+  if (b === null) throw new Error(`${id}가 안 보인다`);
+  return { y: b.y, height: b.height, bottom: b.y + b.height };
+}
+const pageScrollHeights = (page: Page): Promise<{ scrollHeight: number; innerHeight: number }> =>
+  page.evaluate(() => ({ scrollHeight: (document.scrollingElement ?? document.documentElement).scrollHeight, innerHeight: window.innerHeight }));
+
+test('QA-43 전체 높이: desktop은 레이어 · 캔버스 · 속성이 화면 아래까지 차고 캔버스가 남은 높이를 모두 쓰며 페이지 세로 스크롤이 없다 (mobile은 쌓기 그대로)', async ({ page }, testInfo) => {
+  await page.goto(URL);
+  const { scrollHeight, innerHeight } = await pageScrollHeights(page);
+  const toolbar = await boxOf(page, 'toolbar');
+  const canvas = await boxOf(page, 'canvas');
+
+  if (testInfo.project.name === 'desktop') {
+    for (const id of ['layer-panel', 'canvas', 'property-panel']) {
+      const b = await boxOf(page, id);
+      expect(b.bottom, `${id} 아래 끝`).toBeLessThanOrEqual(innerHeight);
+      expect(b.bottom, `${id} 아래 끝이 화면 아래 끝에서 ${BOTTOM_GAP}px 안`).toBeGreaterThanOrEqual(innerHeight - BOTTOM_GAP);
+    }
+    // 캔버스가 남은 높이를 모두 씀: 도구 막대 바로 아래(칸 사이 간격 16px)에서 시작해 화면 아래까지 (전에는 320px쯤)
+    expect(canvas.y - toolbar.bottom, '도구 막대와 캔버스 사이 간격').toBeLessThanOrEqual(20);
+    expect(canvas.height).toBeGreaterThanOrEqual(innerHeight - canvas.y - BOTTOM_GAP);
+    expect(canvas.height).toBeGreaterThan(500);
+    expect(scrollHeight, '페이지 세로 스크롤 없음').toBeLessThanOrEqual(innerHeight);
+  } else {
+    // mobile: 위아래 쌓기 그대로 — 캔버스는 지금처럼 내용 높이(최소 320px)이고 패널 안 스크롤이 없다
+    const inner = await page.getByTestId('canvas').evaluate((el) => ({ scrollHeight: el.scrollHeight, clientHeight: el.clientHeight, overflowY: getComputedStyle(el).overflowY }));
+    expect(inner.scrollHeight).toBeLessThanOrEqual(inner.clientHeight + 1);
+    expect(canvas.height).toBeGreaterThanOrEqual(320);
+    expect(await noHorizontalScroll(page)).toBe(true);
+  }
+});
+
+test('QA-44 넘침: 인스턴스를 많이 추가해도 desktop 페이지는 세로로 안 늘고 레이어 · 캔버스 안에서 스크롤되며, 맨 끝 버튼 · 행이 안 스크롤로 닿는다 (mobile은 페이지 스크롤 허용 + 가로 스크롤 없음)', async ({ page }, testInfo) => {
+  await page.goto(URL);
+  // 메인 크기를 L로 키워(인스턴스가 따라 커짐) 캔버스도 넘치게 한다 — 인스턴스 버튼은 줄바꿈으로 여러 줄이 됨
+  await selectOnCanvas(page, 'main');
+  await page.getByTestId('prop-size').selectOption('L');
+  const COUNT = 60;
+  for (let i = 0; i < COUNT; i += 1) await page.getByTestId('add-instance').click();
+  await expect(page.getByTestId('layer-item')).toHaveCount(3 + COUNT);
+  const lastId = `b${3 + COUNT}`;
+
+  if (testInfo.project.name === 'desktop') {
+    const { scrollHeight, innerHeight } = await pageScrollHeights(page);
+    expect(scrollHeight, '60개 추가 뒤에도 페이지 세로 스크롤 없음').toBeLessThanOrEqual(innerHeight);
+    expect(await noHorizontalScroll(page)).toBe(true);
+    // 세 영역은 여전히 화면 아래까지 (늘어나지 않음)
+    for (const id of ['layer-panel', 'canvas', 'property-panel']) {
+      const b = await boxOf(page, id);
+      expect(b.bottom, `${id} 아래 끝`).toBeLessThanOrEqual(innerHeight);
+      expect(b.bottom).toBeGreaterThanOrEqual(innerHeight - BOTTOM_GAP);
+    }
+    // 레이어 · 캔버스 둘 다 안쪽에서 스크롤
+    const inner = (id: string) => page.getByTestId(id).evaluate((el) => ({ scrollHeight: el.scrollHeight, clientHeight: el.clientHeight, scrollTop: el.scrollTop, overflowY: getComputedStyle(el).overflowY }));
+    for (const id of ['layer-panel', 'canvas']) {
+      const s = await inner(id);
+      expect(['auto', 'scroll'], `${id} overflow-y`).toContain(s.overflowY);
+      expect(s.scrollHeight, `${id} 안쪽 높이가 보이는 높이보다 큼`).toBeGreaterThan(s.clientHeight);
+      expect(s.scrollTop).toBe(0);
+    }
+    // 맨 끝 캔버스 버튼 누르기 = 캔버스 안이 스크롤돼서 닿는다 (페이지는 그대로)
+    await page.locator(buttonSel(lastId)).click();
+    expect(await selectedOnCanvas(page)).toEqual([lastId]);
+    expect((await inner('canvas')).scrollTop, '캔버스가 안쪽에서 스크롤됨').toBeGreaterThan(0);
+    expect((await pageScrollHeights(page)).scrollHeight).toBeLessThanOrEqual(innerHeight);
+    expect(await page.evaluate(() => window.scrollY)).toBe(0);
+    // 맨 끝 레이어 행 누르기 = 레이어 창 안이 스크롤
+    await page.locator(layerSel(`b${2 + COUNT}`)).click();
+    expect((await inner('layer-panel')).scrollTop, '레이어 창이 안쪽에서 스크롤됨').toBeGreaterThan(0);
+    expect(await selectedInLayer(page)).toEqual([`b${2 + COUNT}`]);
+    expect(await page.evaluate(() => window.scrollY)).toBe(0);
+    // 도구 막대는 계속 맨 위
+    expect((await boxOf(page, 'toolbar')).y).toBeLessThanOrEqual(24);
+  } else {
+    // mobile: 위아래 쌓기, 페이지 세로 스크롤 허용, 가로 스크롤 없음, 맨 끝 버튼이 눌러짐
+    expect(await noHorizontalScroll(page)).toBe(true);
+    await page.locator(buttonSel(lastId)).click();
+    expect(await selectedOnCanvas(page)).toEqual([lastId]);
+    expect(await noHorizontalScroll(page)).toBe(true);
+  }
+});
+
+test('QA-45 키보드 포커스: 색 입력칸 · 아이콘 보이기 체크박스도 글자 칸처럼 파랑 2px 표시가 나온다', async ({ page }) => {
+  await page.goto(URL);
+  await selectOnCanvas(page, 'b2');
+  // Tab으로 차례로 온다(:focus-visible은 키보드 이동에서만 켜짐). 라벨 칸에서 시작해 목표를 만날 때까지 최대 30번
+  for (const id of ['prop-hasicon', 'prop-color']) {
+    await page.getByTestId('prop-label').focus();
+    for (let i = 0; i < 30; i += 1) {
+      if ((await page.evaluate(() => document.activeElement?.getAttribute('data-testid') ?? '')) === id) break;
+      await page.keyboard.press('Tab');
+    }
+    await expect(page.getByTestId(id), `${id}에 Tab으로 닿음`).toBeFocused();
+    const s = await styleOf(page, tid(id), ['outline-color', 'outline-width', 'outline-style']);
+    expect(s['outline-color'], `${id} 포커스 색`).toBe(BLUE);
+    expect(s['outline-width'], `${id} 포커스 너비`).toBe('2px');
+    expect(s['outline-style'], `${id} 포커스 모양`).not.toBe('none');
   }
 });
