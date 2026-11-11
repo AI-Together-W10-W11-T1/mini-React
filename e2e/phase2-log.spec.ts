@@ -47,7 +47,7 @@ test('QA-12 목록이 안 바뀌면 memo를 다시 계산하지 않고(a), 목�
   expect(await memoCount(page)).toBe(m + 3);
   await expect(summary).toHaveText('전체 1개 · 완료 1개');
 
-  // (c) [추가] 한 번에 memo 횟수가 정확히 1 늘고(렌더 2번 중 목록이 바뀐 한 번만 다시 계산) 요약이 맞다
+  // (c) [추가] 한 번에 memo 횟수가 정확히 1 늘고(렌더 1번 — setter 2번을 모은 것 — 에서 한 번만 다시 계산) 요약이 맞다
   m = await memoCount(page);
   await addTodo(page, '감');
   expect(await memoCount(page)).toBe(m + 1);
@@ -59,7 +59,7 @@ async function triple(page: Page): Promise<[number, number, number]> {
   return [await renderCount(page), await effectCount(page), await memoCount(page)];
 }
 
-test('QA-14 기록판 (render · effect · memo): 로드 1·1·1 → [+1] 2·2·1 → 이름 3·2·1 → [그대로] 3·2·1 → [+3] 6·5·1 → 할 일 입력 + [추가] 9·5·2', async ({ page }) => {
+test('QA-14 기록판 (render · effect · memo): 로드 1·1·1 → [+1] 2·2·1 → 이름 3·2·1 → [그대로] 3·2·1 → [+3] 4·3·1 → 할 일 입력 + [추가] 6·3·2', async ({ page }) => {
   await page.goto(URL);
   expect(await triple(page)).toEqual([1, 1, 1]); // (1) 로드 직후
 
@@ -72,12 +72,12 @@ test('QA-14 기록판 (render · effect · memo): 로드 1·1·1 → [+1] 2·2·
   await page.getByTestId('counter-same').click(); // (4) 같은 값, 렌더 0번
   expect(await triple(page)).toEqual([3, 2, 1]);
 
-  await page.getByTestId('counter-plus3').click(); // (5) 렌더 3번 · 카운터가 3번 바뀌어 effect도 3번
-  expect(await triple(page)).toEqual([6, 5, 1]);
+  await page.getByTestId('counter-plus3').click(); // (5) setter 3번을 모아 렌더 1번 · 카운터가 한 번에 +3이라 effect도 1번 (task_002 즉시 동기 때는 6·5·1)
+  expect(await triple(page)).toEqual([4, 3, 1]);
 
-  await page.getByTestId('todo-input').fill('나'); // (6) 글자 입력 렌더 1번 + [추가] 렌더 2번, memo는 목록이 바뀐 한 번만
+  await page.getByTestId('todo-input').fill('나'); // (6) 글자 입력 렌더 1번 + [추가] 렌더 1번(setter 2번을 모음), memo는 목록이 바뀐 한 번만 (task_002 즉시 동기 때는 9·5·2)
   await page.getByTestId('todo-add').click();
-  expect(await triple(page)).toEqual([9, 5, 2]);
+  expect(await triple(page)).toEqual([6, 3, 2]);
 });
 
 test('QA-15 patch 줄 수: 이벤트 교체 줄 = 핸들러 달린 요소 수(6 → 14), 전체 − 이벤트 = DOM을 바꾸는 줄 2(카운터 글자 · 렌더 횟수 글자)로 항목이 늘어도 같다', async ({ page }) => {
@@ -132,11 +132,10 @@ test('QA-16 탭 제목: `카운터 N - Phase 2`, 이름 입력에는 그대로(e
   expect(await page.title()).toBe('카운터 4 - Phase 2');
 
   const writes = await page.evaluate(() => (window as unknown as { __titleWrites: string[] }).__titleWrites);
+  // [+3]은 setter 3번을 모아 렌더 1번이라 제목을 쓰는 effect도 1번이고, 그때 화면 카운터는 이미 4다 (task_002 즉시 동기 때는 2 · 3 · 4로 3번 썼다)
   expect(writes).toEqual([
     '카운터 0 - Phase 2 | 화면 카운터 0',
     '카운터 1 - Phase 2 | 화면 카운터 1',
-    '카운터 2 - Phase 2 | 화면 카운터 2',
-    '카운터 3 - Phase 2 | 화면 카운터 3',
     '카운터 4 - Phase 2 | 화면 카운터 4',
   ]);
 });
@@ -174,7 +173,8 @@ test('QA-17 렌더를 20번 넘게 일으킨 뒤에도 [+1] 한 번은 정확히
   await page.locator(inItem('todo-1', 'todo-check')).click();
   await page.locator(inItem('todo-3', 'todo-up')).click();
   await page.locator(inItem('todo-3', 'todo-down')).click();
-  expect(await renderCount(page)).toBeGreaterThan(20);
+  // task_002 즉시 동기 때는 23번(> 20). Batching으로 [추가] 한 번이 렌더 1번이 되어 20번이 됐다
+  expect(await renderCount(page)).toBeGreaterThanOrEqual(20);
   expect(await counterText(page)).toBe('0');
 
   await page.getByTestId('counter-plus1').click(); // 한 번

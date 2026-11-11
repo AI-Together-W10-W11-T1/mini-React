@@ -88,3 +88,21 @@ test('QA-20 다시 실행해도 행이 쌓이지 않고 7개로 바뀐다 (실�
   await expect(page.getByTestId('bench-table').locator('tbody tr')).toHaveCount(7);
   await expect(page.getByTestId('bench-run')).toBeEnabled();
 });
+
+// [AI Note]: task_003 QA-5. Batching(결정 9 B) 기준의 렌더 횟수 칸: setter를 한 번에 10번 부르면 렌더 1번(B-06), 이벤트 13번은 각자 다른 틱이라 렌더 13번(B-07).
+// 시간 숫자는 기기마다 달라 단언하지 않는다. task_002 즉시 동기 때는 B-06 렌더 10번 · B-07 렌더 16번이었다.
+test('QA-5 B-06 행은 `setter 10번 → 렌더 1번`, B-07 행은 `동작 13번 → 렌더 13번`이고 두 행 모두 최종 화면 = 상태 `일치` · 오류 0이다', async ({ page }) => {
+  await page.goto(URL);
+  await page.getByTestId('bench-run').click();
+  await expect(page.getByTestId('bench-status')).toHaveAttribute('data-state', 'done', { timeout: 60_000 });
+
+  const b06 = page.getByTestId('bench-row-B-06');
+  await expect(b06.locator('[data-col="extra"]')).toContainText('setter 10번 → 렌더 1번');
+  await expect(b06.locator('[data-col="correct"]')).toHaveText('일치');
+  await expect(b06.locator('[data-col="errors"]')).toHaveText('0');
+
+  const b07 = page.getByTestId('bench-row-B-07');
+  await expect(b07.locator('[data-col="extra"]')).toContainText('동작 13번 → 렌더 13번');
+  await expect(b07.locator('[data-col="correct"]')).toHaveText('일치');
+  await expect(b07.locator('[data-col="errors"]')).toHaveText('0');
+});

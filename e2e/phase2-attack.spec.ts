@@ -140,7 +140,7 @@ test('QA-A9 이동 뒤 핸들러: `다`의 [위로]를 두 번 → `다` [삭제
   expect(await sameNode(page, 'na', itemSel('todo-2'))).toBe(true);
 });
 
-test('QA-A2 연타: [+1] 30번 · [+3] 10번 연타 뒤 카운터 60(30 + 10 × 3) · 렌더 61(중복 실행 없음) · 제목 `카운터 60 - Phase 2`, 이어서 `다`의 [위로] 5번 연타는 맨 위에서 멈추고 세 `<li>`는 같은 참조다', async ({ page }) => {
+test('QA-A2 연타: [+1] 30번 · [+3] 10번 연타 뒤 카운터 60(30 + 10 × 3) · 렌더 41(중복 실행 없음) · 제목 `카운터 60 - Phase 2`, 이어서 `다`의 [위로] 5번 연타는 맨 위에서 멈추고 세 `<li>`는 같은 참조다', async ({ page }) => {
   await page.goto(URL);
 
   for (let i = 0; i < 30; i += 1) await page.getByTestId('counter-plus1').click();
@@ -148,8 +148,8 @@ test('QA-A2 연타: [+1] 30번 · [+3] 10번 연타 뒤 카운터 60(30 + 10 × 
 
   // 카운터 = [+1] 30번 + [+3] 10번 × 3 = 60 (qa_todo 표의 `40`은 계산 착오라 60으로 쓴다)
   expect(await counterText(page)).toBe('60');
-  // 렌더 횟수 = 처음 1 + [+1] 30 + [+3] 10 × 3 = 61: 한 번 누르면 정확히 그만큼만 실행된다
-  expect(await renderCount(page)).toBe(61);
+  // 렌더 횟수 = 처음 1 + [+1] 30 + [+3] 10 × 1(setter 3번을 모음) = 41: 한 번 누르면 정확히 그만큼만 실행된다 (task_002 즉시 동기 때는 61)
+  expect(await renderCount(page)).toBe(41);
   await expect(page).toHaveTitle('카운터 60 - Phase 2');
 
   await addTodo(page, '가');
