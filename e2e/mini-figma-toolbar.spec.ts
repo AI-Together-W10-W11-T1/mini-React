@@ -22,25 +22,25 @@ import {
   noHorizontalScroll,
 } from './mini-figma-helpers';
 
-// [AI Note]: QA-31 · QA-34 (도구 막대 구성 · [+ 인스턴스] 자리 이동) · (task_006에서 Undo/Redo 버튼 · QA-32 · 33 · A20 · A21은 없앴다. [뒤로] [앞으로]는 mini-figma-preview.spec.ts).
+// [AI Note]: QA-31 · QA-34 (도구 막대 구성 · [+ 인스턴스] 자리 이동) · (task_006에서 Undo/Redo 버튼 · QA-32 · 33 · A20 · A21은 없앴다. [실행 취소] [다시 실행]는 mini-figma-preview.spec.ts).
 // 이 스펙의 테스트는 desktop · mobile 두 프로젝트에서 모두 돈다.
 
 const backBtn = (page: Page) => page.getByTestId('back-button');
 const forwardBtn = (page: Page) => page.getByTestId('forward-button');
 
-test('QA-31 도구 막대가 영역 최상위 첫 자식이고 안에 앱 이름 · [+ 인스턴스] · [뒤로] · [앞으로] · [Patch]가 그 순서로 있다. [뒤로] [앞으로]는 꺼져 있고 [Patch]는 켜져 있으며 [↶] [↷]는 없다', async ({ page }) => {
+test('QA-31 도구 막대가 영역 최상위 첫 자식이고 안에 앱 이름 · [+ 인스턴스] · [실행 취소] · [다시 실행] · [Patch]가 그 순서로 있다. [실행 취소] [다시 실행]는 꺼져 있고 [Patch]는 켜져 있으며 [↶] [↷]는 없다', async ({ page }) => {
   await page.goto(URL);
 
   // 최상위 <div class="app">의 첫 자식 = toolbar
   const kids = await page.locator('[data-testid="app-root"] > .app').evaluate((app) => Array.from(app.children).map((c) => c.getAttribute('data-testid')));
   expect(kids[0]).toBe('toolbar');
-  // 도구 막대 안 자식 순서 (patch-preview PP-07 변경): 앱 이름 → [+ 인스턴스] → [뒤로] → [앞으로] → [Patch]
+  // 도구 막대 안 자식 순서 (patch-preview PP-07 변경): 앱 이름 → [+ 인스턴스] → [실행 취소] → [다시 실행] → [Patch]
   const inside = await page.getByTestId('toolbar').evaluate((el) => Array.from(el.children).map((c) => c.getAttribute('data-testid')));
   expect(inside).toEqual(['app-name', 'add-instance', 'back-button', 'forward-button', 'patch-button']);
   await expect(page.getByTestId('app-name')).toHaveText('mini-figma');
   await expect(page.getByTestId('toolbar').getByTestId('add-instance')).toBeEnabled();
-  await expect(backBtn(page)).toHaveText('뒤로');
-  await expect(forwardBtn(page)).toHaveText('앞으로');
+  await expect(backBtn(page)).toHaveText('실행 취소');
+  await expect(forwardBtn(page)).toHaveText('다시 실행');
   await expect(page.getByTestId('patch-button')).toHaveText('Patch');
   await expect(backBtn(page)).toBeDisabled();
   await expect(forwardBtn(page)).toBeDisabled();

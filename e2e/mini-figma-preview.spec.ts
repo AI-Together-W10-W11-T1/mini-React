@@ -72,7 +72,7 @@ test('QA-46 두 영역 배치: 머리글이 있고 desktop은 가운데 열 위 
   expect(await noHorizontalScroll(page)).toBe(true);
 });
 
-test('QA-47 처음 모습: 실제 영역 = 테스트 영역(버튼 4개), 테스트 영역 testid가 실제 영역에 없고, 실제 영역은 inert이며, 도구 막대의 [Patch]는 켜짐 · [뒤로] [앞으로]는 꺼짐이고 모양이 맞다 (PP-07 변경)', async ({ page }) => {
+test('QA-47 처음 모습: 실제 영역 = 테스트 영역(버튼 4개), 테스트 영역 testid가 실제 영역에 없고, 실제 영역은 inert이며, 도구 막대의 [Patch]는 켜짐 · [실행 취소] [다시 실행]는 꺼짐이고 모양이 맞다 (PP-07 변경)', async ({ page }) => {
   await page.goto(URL);
   const real = page.getByTestId('real-area');
   await expect(real.getByTestId('real-figma-button')).toHaveCount(4);
@@ -93,7 +93,7 @@ test('QA-47 처음 모습: 실제 영역 = 테스트 영역(버튼 4개), 테스
   expect(await real.locator('.selected').count()).toBe(0);
   expect(await real.evaluate((el) => el.hasAttribute('inert'))).toBe(true);
 
-  // 버튼 3개: 켜짐 · 꺼짐 + 모양. PP-07 변경: [뒤로] [앞으로] [Patch]가 도구 막대에 있고 순서는 앱 이름 · [+ 인스턴스] · [뒤로] · [앞으로] · [Patch], [↶] [↷]는 없다. 실제 영역 머리글에는 제목만
+  // 버튼 3개: 켜짐 · 꺼짐 + 모양. PP-07 변경: [실행 취소] [다시 실행] [Patch]가 도구 막대에 있고 순서는 앱 이름 · [+ 인스턴스] · [실행 취소] · [다시 실행] · [Patch], [↶] [↷]는 없다. 실제 영역 머리글에는 제목만
   expect(await page.getByTestId('toolbar').evaluate((el) => Array.from(el.children).map((c) => c.getAttribute('data-testid')))).toEqual(['app-name', 'add-instance', 'back-button', 'forward-button', 'patch-button']);
   await expect(page.getByTestId('undo-button')).toHaveCount(0);
   await expect(page.getByTestId('redo-button')).toHaveCount(0);
@@ -244,7 +244,7 @@ test('QA-50 인스턴스 추가 → 아이콘 켜기 → 끄기 → 삭제를 [P
   expect((await navState(page)).back).toBe(true);
 });
 
-test('QA-51 고르기만 하고 [Patch]를 6번 눌러도 기록이 안 쌓인다: 실제 영역 변경 0 · 박스 0 · [뒤로] 꺼짐, 선택 · 속성 패널은 그대로', async ({ page }) => {
+test('QA-51 고르기만 하고 [Patch]를 6번 눌러도 기록이 안 쌓인다: 실제 영역 변경 0 · 박스 0 · [실행 취소] 꺼짐, 선택 · 속성 패널은 그대로', async ({ page }) => {
   await page.goto(URL);
   const mut = await watchSel(page, 'real', '[data-testid="real-area"]');
   const flash = await watchFlash(page);
@@ -263,7 +263,7 @@ test('QA-51 고르기만 하고 [Patch]를 6번 눌러도 기록이 안 쌓인�
   expect(await overlayCounts(page)).toEqual({ patch: null, flash: null });
 });
 
-test('QA-52 History 동기화: 라벨 → [Patch] → 크기 → [Patch] 뒤 [뒤로] ×2 · [앞으로] ×2가 매번 실제 영역만 그 기록 모습으로 움직이고 테스트 영역 · 앱 상태는 그대로다', async ({ page }) => {
+test('QA-52 History 동기화: 라벨 → [Patch] → 크기 → [Patch] 뒤 [실행 취소] ×2 · [다시 실행] ×2가 매번 실제 영역만 그 기록 모습으로 움직이고 테스트 영역 · 앱 상태는 그대로다', async ({ page }) => {
   await page.goto(URL);
   const initial = await areaSnapshot(page, 'real');
   await holdRealButtons(page);
@@ -298,10 +298,10 @@ test('QA-52 History 동기화: 라벨 → [Patch] → 크기 → [Patch] 뒤 [�
   };
 
   expect(await navState(page)).toEqual({ patch: true, back: true, forward: false });
-  await step(() => back(page), A, { back: true, forward: true }, '[뒤로] 1');
-  await step(() => back(page), initial, { back: false, forward: true }, '[뒤로] 2');
-  await step(() => forward(page), A, { back: true, forward: true }, '[앞으로] 1');
-  await step(() => forward(page), B, { back: true, forward: false }, '[앞으로] 2');
+  await step(() => back(page), A, { back: true, forward: true }, '[실행 취소] 1');
+  await step(() => back(page), initial, { back: false, forward: true }, '[실행 취소] 2');
+  await step(() => forward(page), A, { back: true, forward: true }, '[다시 실행] 1');
+  await step(() => forward(page), B, { back: true, forward: false }, '[다시 실행] 2');
 
   // 같은 기록을 단축키로도 움직인다: Ctrl+Z ×2 → 처음, Ctrl+Shift+Z ×2 → B (버튼과 같은 모습 · 같은 버튼 상태)
   await step(() => pressBack(page), A, { back: true, forward: true }, 'Ctrl+Z 1');
@@ -310,7 +310,7 @@ test('QA-52 History 동기화: 라벨 → [Patch] → 크기 → [Patch] 뒤 [�
   await step(() => pressForward(page), B, { back: true, forward: false }, 'Ctrl+Shift+Z 2');
 });
 
-test('QA-53 뒤로 간 뒤 [Patch]하면 앞쪽 기록을 버린다: 실제 영역이 B가 되고 [앞으로]는 꺼지며, [뒤로] 두 번이면 처음까지(기록 3칸)', async ({ page }) => {
+test('QA-53 실행 취소한 뒤 [Patch]하면 앞쪽 기록을 버린다: 실제 영역이 B가 되고 [다시 실행]은 꺼지며, [실행 취소] 두 번이면 처음까지(기록 3칸)', async ({ page }) => {
   await page.goto(URL);
   const initial = await areaSnapshot(page, 'real');
   await setMainLabel(page, '확인');
@@ -337,7 +337,7 @@ test('QA-53 뒤로 간 뒤 [Patch]하면 앞쪽 기록을 버린다: 실제 영�
   expect(await navState(page)).toEqual({ patch: true, back: false, forward: true });
 });
 
-test('QA-54 실제 영역은 눌러도 키를 받아도 반응이 없고, Ctrl+Z · Ctrl+Shift+Z는 실제 영역 [뒤로] · [앞으로]와 같은 기록을 움직이며 테스트 영역 · 앱 상태는 안 건드린다', async ({ page }) => {
+test('QA-54 실제 영역은 눌러도 키를 받아도 반응이 없고, Ctrl+Z · Ctrl+Shift+Z는 실제 영역 [실행 취소] · [다시 실행]와 같은 기록을 움직이며 테스트 영역 · 앱 상태는 안 건드린다', async ({ page }) => {
   await page.goto(URL);
   await selectOnCanvas(page, 'b1');
   const title = await titleText(page);
@@ -358,7 +358,7 @@ test('QA-54 실제 영역은 눌러도 키를 받아도 반응이 없고, Ctrl+Z
   expect(await page.locator('[data-testid="layer-item"].selected').getAttribute('data-id')).toBe('b1');
   expect(await page.locator('[data-testid="figma-button"].selected').getAttribute('data-id')).toBe('b1');
 
-  // ② 편집(색) → [Patch] → 단축키 Ctrl+Z = [뒤로], Ctrl+Shift+Z = [앞으로]: 실제 영역만 움직이고 테스트 영역 · 선택 · 속성 패널은 그대로 (앱 편집 Undo는 없다)
+  // ② 편집(색) → [Patch] → 단축키 Ctrl+Z = [실행 취소], Ctrl+Shift+Z = [다시 실행]: 실제 영역만 움직이고 테스트 영역 · 선택 · 속성 패널은 그대로 (앱 편집 Undo는 없다)
   await pickColor(page, '#cf202f');
   await patch(page);
   const afterEdit = await areaSnapshot(page, 'real');
@@ -367,17 +367,17 @@ test('QA-54 실제 영역은 눌러도 키를 받아도 반응이 없고, Ctrl+Z
   const propTitle = await titleText(page);
 
   await pressBack(page);
-  expect((await areaSnapshot(page, 'real'))[1].bg, 'Ctrl+Z → 실제 영역 [뒤로]').toBe(BLUE);
+  expect((await areaSnapshot(page, 'real'))[1].bg, 'Ctrl+Z → 실제 영역 [실행 취소]').toBe(BLUE);
   expect(await navState(page)).toEqual({ patch: true, back: false, forward: true });
   expect(await areaSnapshot(page, 'test'), '테스트 영역은 그대로').toEqual(testBefore);
   expect(await titleText(page)).toBe(propTitle);
   expect(await page.locator('[data-testid="figma-button"].selected').getAttribute('data-id')).toBe('b1');
 
   await pressForward(page);
-  expect(await areaSnapshot(page, 'real'), 'Ctrl+Shift+Z → [앞으로]').toEqual(afterEdit);
+  expect(await areaSnapshot(page, 'real'), 'Ctrl+Shift+Z → [다시 실행]').toEqual(afterEdit);
   expect(await navState(page)).toEqual({ patch: true, back: true, forward: false });
 
-  // 버튼으로도 같은 기록: [뒤로] 버튼 → 단축키 [앞으로]
+  // 버튼으로도 같은 기록: [실행 취소] 버튼 → 단축키 [다시 실행]
   await back(page);
   expect((await areaSnapshot(page, 'real'))[1].bg).toBe(BLUE);
   await pressForward(page);
@@ -414,14 +414,14 @@ test('QA-A30 [Patch] 연타: 편집 없이 20번은 기록 0칸, 라벨을 바�
   expect(state.back).toBe(true);
   expect(state.forward).toBe(false);
 
-  // 기록은 1칸만: [뒤로] 한 번이면 처음 모습, 그 뒤 [뒤로]는 꺼짐
+  // 기록은 1칸만: [실행 취소] 한 번이면 처음 모습, 그 뒤 [실행 취소]는 꺼짐
   await back(page);
   expect(await areaSnapshot(page, 'real')).toEqual(initial);
   expect((await navState(page)).back).toBe(false);
   expect((await navState(page)).forward).toBe(true);
 });
 
-test('QA-A31 [뒤로] · [앞으로] 연타: 한 번에 한 칸만 움직이고 처음 · 끝에서 멈추며(꺼진 버튼은 변경 0 · 박스 0) 버튼 켜짐이 기록 위치와 어긋나지 않는다', async ({ page }) => {
+test('QA-A31 [실행 취소] · [다시 실행] 연타: 한 번에 한 칸만 움직이고 처음 · 끝에서 멈추며(꺼진 버튼은 변경 0 · 박스 0) 버튼 켜짐이 기록 위치와 어긋나지 않는다', async ({ page }) => {
   await page.goto(URL);
   const history: ButtonLook[][] = [await areaSnapshot(page, 'real')];
   await setMainLabel(page, '확인');
@@ -437,39 +437,39 @@ test('QA-A31 [뒤로] · [앞으로] 연타: 한 번에 한 칸만 움직이고 
   const mut = await watchSel(page, 'real', '[data-testid="real-area"]');
   const flash = await watchFlash(page);
 
-  // [뒤로] 10번: 3번째에서 disabled, 4 ~ 10번째는 force 클릭
+  // [실행 취소] 10번: 3번째에서 disabled, 4 ~ 10번째는 force 클릭
   let index = 3;
   for (let i = 1; i <= 10; i += 1) {
     if (i <= 3) await back(page);
     else await page.getByTestId('back-button').click({ force: true });
     index = Math.max(0, index - 1);
-    expect(await areaSnapshot(page, 'real'), `[뒤로] ${i}번째`).toEqual(history[index]);
-    expect(await page.getByTestId('back-button').isEnabled(), `[뒤로] ${i}번째 뒤 [뒤로] 켜짐`).toBe(index > 0);
-    expect(await page.getByTestId('forward-button').isEnabled(), `[뒤로] ${i}번째 뒤 [앞으로] 켜짐`).toBe(true);
+    expect(await areaSnapshot(page, 'real'), `[실행 취소] ${i}번째`).toEqual(history[index]);
+    expect(await page.getByTestId('back-button').isEnabled(), `[실행 취소] ${i}번째 뒤 [실행 취소] 켜짐`).toBe(index > 0);
+    expect(await page.getByTestId('forward-button').isEnabled(), `[실행 취소] ${i}번째 뒤 [다시 실행] 켜짐`).toBe(true);
     const m = await mut.take();
     const f = await flash.take();
     if (i > 3) {
-      expect(m.total, `[뒤로] ${i}번째는 DOM 변경 0`).toBe(0);
-      expect(f.boxes, `[뒤로] ${i}번째는 박스 0`).toHaveLength(0);
+      expect(m.total, `[실행 취소] ${i}번째는 DOM 변경 0`).toBe(0);
+      expect(f.boxes, `[실행 취소] ${i}번째는 박스 0`).toHaveLength(0);
     } else {
-      expect(f.boxes.length, `[뒤로] ${i}번째는 박스 ≥ 1`).toBeGreaterThanOrEqual(1);
+      expect(f.boxes.length, `[실행 취소] ${i}번째는 박스 ≥ 1`).toBeGreaterThanOrEqual(1);
     }
   }
   expect(await areaSnapshot(page, 'real')).toEqual(history[0]);
 
-  // [앞으로] 10번
+  // [다시 실행] 10번
   for (let i = 1; i <= 10; i += 1) {
     if (i <= 3) await forward(page);
     else await page.getByTestId('forward-button').click({ force: true });
     index = Math.min(3, index + 1);
-    expect(await areaSnapshot(page, 'real'), `[앞으로] ${i}번째`).toEqual(history[index]);
-    expect(await page.getByTestId('forward-button').isEnabled(), `[앞으로] ${i}번째 뒤 [앞으로] 켜짐`).toBe(index < 3);
-    expect(await page.getByTestId('back-button').isEnabled(), `[앞으로] ${i}번째 뒤 [뒤로] 켜짐`).toBe(true);
+    expect(await areaSnapshot(page, 'real'), `[다시 실행] ${i}번째`).toEqual(history[index]);
+    expect(await page.getByTestId('forward-button').isEnabled(), `[다시 실행] ${i}번째 뒤 [다시 실행] 켜짐`).toBe(index < 3);
+    expect(await page.getByTestId('back-button').isEnabled(), `[다시 실행] ${i}번째 뒤 [실행 취소] 켜짐`).toBe(true);
     const m = await mut.take();
     const f = await flash.take();
     if (i > 3) {
-      expect(m.total, `[앞으로] ${i}번째는 DOM 변경 0`).toBe(0);
-      expect(f.boxes, `[앞으로] ${i}번째는 박스 0`).toHaveLength(0);
+      expect(m.total, `[다시 실행] ${i}번째는 DOM 변경 0`).toBe(0);
+      expect(f.boxes, `[다시 실행] ${i}번째는 박스 0`).toHaveLength(0);
     }
   }
   // 단축키 연타: Ctrl+Z 10번 · Ctrl+Shift+Z 10번도 한 번에 한 칸, 처음 · 끝에서 멈춘다 (버튼과 같은 기록)
@@ -478,20 +478,20 @@ test('QA-A31 [뒤로] · [앞으로] 연타: 한 번에 한 칸만 움직이고 
     await pressBack(page);
     index = Math.max(0, index - 1);
     expect(await areaSnapshot(page, 'real'), `Ctrl+Z ${i}번째`).toEqual(history[index]);
-    expect(await page.getByTestId('back-button').isEnabled(), `Ctrl+Z ${i}번째 뒤 [뒤로] 켜짐`).toBe(index > 0);
+    expect(await page.getByTestId('back-button').isEnabled(), `Ctrl+Z ${i}번째 뒤 [실행 취소] 켜짐`).toBe(index > 0);
   }
   for (let i = 1; i <= 10; i += 1) {
     await pressForward(page);
     index = Math.min(3, index + 1);
     expect(await areaSnapshot(page, 'real'), `Ctrl+Shift+Z ${i}번째`).toEqual(history[index]);
-    expect(await page.getByTestId('forward-button').isEnabled(), `Ctrl+Shift+Z ${i}번째 뒤 [앞으로] 켜짐`).toBe(index < 3);
+    expect(await page.getByTestId('forward-button').isEnabled(), `Ctrl+Shift+Z ${i}번째 뒤 [다시 실행] 켜짐`).toBe(index < 3);
   }
   // 끝에서 실제 영역 = 마지막 Patch 모습 = 테스트 영역
   expect(await areaSnapshot(page, 'real')).toEqual(history[3]);
   await expectAreasSame(page, '끝');
 });
 
-test('QA-A32 특수문자 라벨 `<b>x</b> &amp; "q" \'a\' 😀`는 실제 영역에도 글자 그대로 표시되고(b 요소 0개), [뒤로]하면 `버튼`으로 돌아간다', async ({ page }) => {
+test('QA-A32 특수문자 라벨 `<b>x</b> &amp; "q" \'a\' 😀`는 실제 영역에도 글자 그대로 표시되고(b 요소 0개), [실행 취소]하면 `버튼`으로 돌아간다', async ({ page }) => {
   const label = '<b>x</b> &amp; "q" \'a\' 😀';
   await page.goto(URL);
   await setMainLabel(page, label);

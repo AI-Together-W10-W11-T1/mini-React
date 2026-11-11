@@ -179,7 +179,7 @@ test('QA-A16 (선택 없음) 아무것도 안 고른 채 [↓]를 눌러도 선�
 });
 
 // ---------------------------------------------------------------------------
-// Dev-11: 키보드 공격 (task_006: Ctrl+Z · Ctrl+Shift+Z = 실제 영역 [뒤로] · [앞으로]) (A6 · A7 · A8 · A9 · A10 · A11 · A15 · A17 · A18 · A19)
+// Dev-11: 키보드 공격 (task_006: Ctrl+Z · Ctrl+Shift+Z = 실제 영역 [실행 취소] · [다시 실행]) (A6 · A7 · A8 · A9 · A10 · A11 · A15 · A17 · A18 · A19)
 // ---------------------------------------------------------------------------
 
 const instanceCount = (page: Page) => page.getByTestId('layer-item');
@@ -221,7 +221,7 @@ test('QA-A7 메인에서 Delete · Backspace를 각각 5번 연달아 눌러도 
   expect((await watch.take()).body.total, 'DOM 변경').toBe(0);
 });
 
-test('QA-A8 라벨 글자 칸 안의 키는 앱 동작이 없고, 선택 상자 · 체크박스 안에서는 Delete · Backspace가 무시되지만 Ctrl+Z · Ctrl+Shift+Z는 실제 영역 [뒤로] · [앞으로]다 (Q18)', async ({ page }) => {
+test('QA-A8 라벨 글자 칸 안의 키는 앱 동작이 없고, 선택 상자 · 체크박스 안에서는 Delete · Backspace가 무시되지만 Ctrl+Z · Ctrl+Shift+Z는 실제 영역 [실행 취소] · [다시 실행]다 (Q18)', async ({ page }) => {
   await page.goto(URL);
   // 메인 색 빨강 → [Patch]: 실제 영역 메인이 빨강 (State History가 돌면 이 색이 파랑으로 돌아간다)
   await selectOnCanvas(page, 'main');
@@ -239,19 +239,19 @@ test('QA-A8 라벨 글자 칸 안의 키는 앱 동작이 없고, 선택 상자 
     expect((await canvasLabels(page))[2], `${where}: b2 글자`).toBe('취소');
   };
 
-  // [AI Note]: 선택 상자 · 체크박스 안에서 Delete · Backspace는 무시, Ctrl+Z는 실제 영역 [뒤로](실제 영역 메인 파랑), Ctrl+Shift+Z는 [앞으로](빨강). 테스트 영역은 계속 빨강
+  // [AI Note]: 선택 상자 · 체크박스 안에서 Delete · Backspace는 무시, Ctrl+Z는 실제 영역 [실행 취소](실제 영역 메인 파랑), Ctrl+Shift+Z는 [다시 실행](빨강). 테스트 영역은 계속 빨강
   const selectAndCheckbox = async (testId: string, where: string): Promise<void> => {
     await page.getByTestId(testId).focus();
     for (const key of ['Delete', 'Backspace']) await page.keyboard.press(key);
     await appUntouched(where);
     await page.keyboard.press('Control+KeyZ');
-    expect(await realBgOf(page, 'main'), `${where}: Ctrl+Z → 실제 영역 [뒤로]`).toBe(rgb('#0052ff'));
+    expect(await realBgOf(page, 'main'), `${where}: Ctrl+Z → 실제 영역 [실행 취소]`).toBe(rgb('#0052ff'));
     expect(await mainBg(page), `${where}: 테스트 영역은 그대로`).toBe(rgb('#cf202f'));
     await expect(page.getByTestId('figma-button'), `${where}: 버튼`).toHaveCount(4);
     expect(await selectedOnCanvas(page), `${where}: 선택`).toEqual(['b2']);
     expect((await canvasLabels(page))[2], `${where}: b2 글자`).toBe('취소');
     await page.keyboard.press('Control+Shift+KeyZ');
-    await appUntouched(`${where} [앞으로] 뒤`);
+    await appUntouched(`${where} [다시 실행] 뒤`);
   };
 
   // ② 크기 선택 상자
@@ -270,7 +270,7 @@ test('QA-A8 라벨 글자 칸 안의 키는 앱 동작이 없고, 선택 상자 
   await page.keyboard.press('Delete');
   await page.keyboard.press('Control+KeyZ');
   await page.keyboard.press('Meta+KeyZ');
-  // 이 뒤 글자는 Chromium의 글자 되돌리기라 단언하지 않는다. 실제 영역 [뒤로]가 안 일어남 = 실제 영역 메인 색 빨강 그대로
+  // 이 뒤 글자는 Chromium의 글자 되돌리기라 단언하지 않는다. 실제 영역 [실행 취소]가 안 일어남 = 실제 영역 메인 색 빨강 그대로
   expect(await mainBg(page), '라벨 칸: 메인 색').toBe(rgb('#cf202f'));
   expect(await realBgOf(page, 'main'), '라벨 칸: 실제 영역 메인 색').toBe(rgb('#cf202f'));
   await expect(page.getByTestId('figma-button'), '라벨 칸: 버튼').toHaveCount(4);
@@ -311,7 +311,7 @@ test('QA-A10 옛 state를 보는 키 핸들러 · 리스너 정리: Delete는 �
   }
   expect(await keydownListenerCount(page), '상태가 20번 넘게 바뀐 뒤 keydown 리스너').toBe(baseline);
 
-  // 보조 확인: Ctrl+Shift+Z 한 번 = [앞으로] 한 단계 (옛 렌더의 nav를 안 읽고 정확히 끝으로)
+  // 보조 확인: Ctrl+Shift+Z 한 번 = [다시 실행] 한 단계 (옛 렌더의 nav를 안 읽고 정확히 끝으로)
   await pressForward(page);
   expect((await realClassOf(page, 'main')).split(' ')).toContain('btn-L');
   expect(await keydownListenerCount(page)).toBe(baseline);
@@ -430,7 +430,7 @@ test('QA-A13 새로고침: 고치고 추가 · 삭제 · 순서까지 한 뒤 re
   expect(await colorsOf(page)).toEqual([rgb('#0052ff'), rgb('#0052ff'), rgb('#0052ff'), rgb('#cf202f')]);
   await expect(page.getByTestId('property-empty')).toHaveCount(1);
   expect(await selectedOnCanvas(page)).toEqual([]);
-  // 실제 영역 기록도 비어 있어([뒤로] 꺼짐) Ctrl+Z를 눌러도 아무 일 없다
+  // 실제 영역 기록도 비어 있어([실행 취소] 꺼짐) Ctrl+Z를 눌러도 아무 일 없다
   await expect(page.getByTestId('back-button')).toBeDisabled();
   await pressBack(page);
   expect(await canvasOrder(page)).toEqual(['b1', 'b2', 'b3']);

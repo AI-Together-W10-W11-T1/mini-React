@@ -124,13 +124,13 @@ export async function blurFocus(page: Page): Promise<void> {
   await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
 }
 
-/** Ctrl+Z = 실제 영역 State History [뒤로] (포커스를 먼저 뺀다 — 라벨 글자 칸 안의 키는 앱이 무시하므로) */
+/** Ctrl+Z = 실제 영역 State History [실행 취소] (포커스를 먼저 뺀다 — 라벨 글자 칸 안의 키는 앱이 무시하므로) */
 export async function pressBack(page: Page): Promise<void> {
   await blurFocus(page);
   await page.keyboard.press('Control+KeyZ');
 }
 
-/** Ctrl+Shift+Z = 실제 영역 [앞으로] (포커스를 먼저 뺀다) */
+/** Ctrl+Shift+Z = 실제 영역 [다시 실행] (포커스를 먼저 뺀다) */
 export async function pressForward(page: Page): Promise<void> {
   await blurFocus(page);
   await page.keyboard.press('Control+Shift+KeyZ');

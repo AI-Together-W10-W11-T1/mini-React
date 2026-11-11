@@ -269,7 +269,7 @@ test('QA-A24 같은 색 다시 누르기: 메인이 지금 색 칩을 다시 누
   expect((await layerWatch.take()).body.total, '② 레이어 DOM 변경').toBe(0);
 });
 
-test('QA-A28 색 입력칸에 포커스가 있을 때: Delete · Backspace는 아무 일 없고(고른 인스턴스가 안 지워짐), Ctrl+Z = 실제 영역 [뒤로], Ctrl+Shift+Z = [앞으로]다', async ({ page }) => {
+test('QA-A28 색 입력칸에 포커스가 있을 때: Delete · Backspace는 아무 일 없고(고른 인스턴스가 안 지워짐), Ctrl+Z = 실제 영역 [실행 취소], Ctrl+Shift+Z = [다시 실행]다', async ({ page }) => {
   await page.goto(URL);
   await selectOnCanvas(page, 'b2');
   await pickColor(page, '#05b169'); // b2만 초록
@@ -289,7 +289,7 @@ test('QA-A28 색 입력칸에 포커스가 있을 때: Delete · Backspace는 �
   expect((await watch.take()).body.total, 'Delete · Backspace = DOM 변경 0').toBe(0);
   await expect(input).toBeFocused();
 
-  // Ctrl+Z = 실제 영역 [뒤로] (포커스를 안 빼고 누른다), Ctrl+Shift+Z = [앞으로]. 테스트 영역은 그대로
+  // Ctrl+Z = 실제 영역 [실행 취소] (포커스를 안 빼고 누른다), Ctrl+Shift+Z = [다시 실행]. 테스트 영역은 그대로
   await page.keyboard.press('Control+KeyZ');
   expect(await realBgOf(page, 'b2')).toBe(rgb('#0052ff'));
   expect(await bgOf(page, 'b2')).toBe(rgb('#05b169'));

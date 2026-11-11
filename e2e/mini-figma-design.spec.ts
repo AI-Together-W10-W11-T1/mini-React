@@ -55,7 +55,7 @@ test('QA-40 어두운 바탕 · 한 단계 밝은 카드 24px · 그림자 없�
   // 캔버스: 점무늬 (radial-gradient)
   expect((await styleOf(page, tid('canvas'), ['background-image']))['background-image']).toContain('radial-gradient');
 
-  // 알약 버튼: [+ 인스턴스] 파랑 배경 · 흰 글자 · 100px, [뒤로] [앞으로]도 100px
+  // 알약 버튼: [+ 인스턴스] 파랑 배경 · 흰 글자 · 100px, [실행 취소] [다시 실행]도 100px
   const add = await styleOf(page, tid('add-instance'), ['background-color', 'border-radius', 'color']);
   expect(add['background-color']).toBe(BLUE);
   expect(add['border-radius']).toBe('100px');
@@ -165,7 +165,7 @@ test('QA-42 배치: desktop은 도구 막대가 맨 위에서 가로 전체 + �
   expect(await noHorizontalScroll(page)).toBe(true);
 });
 
-test('QA-A26 좁은 화면 도구 막대: 앱 이름 · 버튼 4개([+ 인스턴스] · [뒤로] · [앞으로] · [Patch])가 화면 밖으로 안 나가고(모자라면 줄바꿈) 눌러지는 크기이며, [+ 인스턴스] 20번 뒤에도 맨 위 첫 자식 · [Patch]가 켜져 있다', async ({ page }) => {
+test('QA-A26 좁은 화면 도구 막대: 앱 이름 · 버튼 4개([+ 인스턴스] · [실행 취소] · [다시 실행] · [Patch])가 화면 밖으로 안 나가고(모자라면 줄바꿈) 눌러지는 크기이며, [+ 인스턴스] 20번 뒤에도 맨 위 첫 자식 · [Patch]가 켜져 있다', async ({ page }) => {
   await page.goto(URL);
   const width = page.viewportSize()?.width ?? 0;
   const check = async (where: string): Promise<void> => {

@@ -46,7 +46,7 @@ test('QA-1 처음 연다: 레이어 행 · 캔버스 버튼 · 글자 · 색 · 
     Array.from(el.children).map((c) => ({ tag: c.localName, cls: c.className, kids: Array.from(c.children).map((k) => k.getAttribute('data-testid')) })),
   );
   expect(top).toEqual([{ tag: 'div', cls: 'app', kids: ['toolbar', 'layer-panel', 'canvas', 'property-panel', 'real-section'] }]);
-  // 실제 영역 기록이 없어서 [뒤로] [앞으로]는 꺼져 있다 ([↶] [↷]는 없앴다, patch-preview)
+  // 실제 영역 기록이 없어서 [실행 취소] [다시 실행]는 꺼져 있다 ([↶] [↷]는 없앴다, patch-preview)
   await expect(page.getByTestId('back-button')).toBeDisabled();
   await expect(page.getByTestId('forward-button')).toBeDisabled();
   await expect(page.getByTestId('undo-button')).toHaveCount(0);

@@ -14,7 +14,7 @@ const press = (key: string, mods: Partial<KeyInfo> = {}): KeyInfo => ({
   ...mods,
 });
 
-// [AI Note]: patch-preview(task_006)에서 앱 편집 Undo/Redo가 없어져 Ctrl/Cmd+Z = back(실제 영역 [뒤로]), +Shift = forward로 이름을 바꿨다. 키 규칙(Q18 · Q17-4)은 그대로.
+// [AI Note]: patch-preview(task_006)에서 앱 편집 Undo/Redo가 없어져 Ctrl/Cmd+Z = back(실제 영역 [실행 취소]), +Shift = forward로 이름을 바꿨다. 키 규칙(Q18 · Q17-4)은 그대로.
 describe('keyAction — 정해진 키 (MF-33)', () => {
   it.each<[string, KeyInfo, KeyAction]>([
     ['Delete (수정키 없음)', press('Delete'), 'delete'],

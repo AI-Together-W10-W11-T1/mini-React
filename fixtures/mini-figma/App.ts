@@ -19,7 +19,7 @@ import type { PreviewNav } from './previewNav';
 //   doc        = { main, instances } 한 칸
 //   selectedId = 'main' | 인스턴스 id | null (처음은 null, ④-2)
 //   nextId     = 새 인스턴스 번호 — 지운 번호를 다시 쓰지 않는다 (b4 추가 → 삭제 → 다시 추가 = b5, Q17-3)
-// patch-preview(task_006)에서 앱 편집 Undo/Redo(history 칸 · undo.ts)를 없앴다: Ctrl/Cmd+Z · Shift+Z는 이제 실제 영역 State History의 [뒤로] · [앞으로]다.
+// patch-preview(task_006)에서 앱 편집 Undo/Redo(history 칸 · undo.ts)를 없앴다: Ctrl/Cmd+Z · Shift+Z는 이제 실제 영역 State History의 [실행 취소] · [다시 실행]다.
 export function App(): VNode {
   const [doc, setDoc] = useState<Doc>(INITIAL_DOC);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -74,7 +74,7 @@ export function App(): VNode {
   // [AI Note]: 실제 영역(patch-preview, PP-09) — 칸 순서: [0] doc · [1] selectedId · [2] nextId 다음에 아래 세 칸, 맨 끝에 keydown effect (앱 Undo를 없애 history 칸이 빠져 전체 7칸).
   //   [3] useMemo = 보관함: 한 번 만들어 계속 쓰는 같은 객체. 안에 createPreview 결과를 넣어 두는 자리이고 setter가 없어 바꿔도 렌더가 안 일어난다 (엔진에 useRef가 없어서 이렇게 한다)
   //   [4] useEffect([]) = 마운트 patch 직후 한 번: DOM에서 테스트 영역 · 실제 영역 상자 · 깜빡임 층을 찾아 createPreview를 만든다 (렌더 중에는 DOM이 아직 없다). cleanup = 보관함 비움
-  //   [5] useState(nav) = 뒤로 · 앞으로 가능 여부 (App state, PP-09). 렌더 중 canBack · canForward로 계산해 Toolbar의 [뒤로] [앞으로]에 내려 준다
+  //   [5] useState(nav) = 실행 취소 · 다시 실행 가능 여부 (App state, PP-09). 렌더 중 canBack · canForward로 계산해 Toolbar의 [실행 취소] [다시 실행]에 내려 준다
   const vault = useMemo<{ preview: Preview | null }>(() => ({ preview: null }), []);
   useEffect(() => {
     const testArea = document.querySelector('[data-testid="canvas"]');
@@ -88,7 +88,7 @@ export function App(): VNode {
   }, []);
   const [nav, setNav] = useState<PreviewNav>(INITIAL_NAV);
 
-  // [AI Note]: [Patch] [뒤로] [앞으로] = 보관함의 createPreview 결과를 부르고, **기록이 실제로 움직였을 때만** nav를 바꾼다 (실제 영역 기록만 움직임, PP-06).
+  // [AI Note]: [Patch] [실행 취소] [다시 실행] = 보관함의 createPreview 결과를 부르고, **기록이 실제로 움직였을 때만** nav를 바꾼다 (실제 영역 기록만 움직임, PP-06).
   // doc · selectedId는 건드리지 않는다 — 테스트 영역 · 앱 상태는 그대로. 바뀐 게 없는 Patch · 경계 이동은 false라 setter를 안 부른다.
   // nav는 함수형 setter로 바꾼다: 같은 틱에 연타해도 낡은 nav 값을 읽지 않고 쌓인 만큼 정확히 센다. 효과가 아직 안 돈 상태(보관함 비어 있음)면 아무것도 안 한다.
   const onPreviewPatch = (): void => {
@@ -104,8 +104,8 @@ export function App(): VNode {
   // [AI Note]: 키보드 = 마운트 때 한 번이 아니라 "핸들러가 읽는 state가 바뀔 때마다" document에 다시 등록한다 (엔진 이벤트는 click · input뿐이라 keydown은 직접 등록, MF-34).
   // deps에 doc · selectedId를 넣어서 핸들러가 늘 이번 렌더의 값을 본다 — 빠지면 "b1을 고르고 b2를 고른 뒤 Delete"가 옛 선택 b1을 지운다.
   // 다시 등록하기 전 cleanup이 먼저 removeEventListener를 불러서 리스너는 항상 1개다 (등록 − 해제 = 1). unmount() 때도 cleanup이 돈다.
-  // Ctrl/Cmd+Z = 실제 영역 [뒤로], Ctrl/Cmd+Shift+Z = [앞으로] (앱 편집 Undo는 없앴다, task_006). 두 핸들러는 함수형 setter + 보관함을 써서 옛 state를 안 읽는다(deps 불필요).
-  // 뒤로 · 앞으로 키는 preventDefault로 브라우저 기본 Undo/Redo를 막는다 (Q18): 처음 · 끝이라 움직일 게 없어도 막는다. 안 막으면 브라우저 글자 되돌리기가 남은 라벨 칸에 겹쳐 적용된다.
+  // Ctrl/Cmd+Z = 실제 영역 [실행 취소], Ctrl/Cmd+Shift+Z = [다시 실행] (앱 편집 Undo는 없앴다, task_006). 두 핸들러는 함수형 setter + 보관함을 써서 옛 state를 안 읽는다(deps 불필요).
+  // 실행 취소 · 다시 실행 키는 preventDefault로 브라우저 기본 Undo/Redo를 막는다 (Q18): 처음 · 끝이라 움직일 게 없어도 막는다. 안 막으면 브라우저 글자 되돌리기가 남은 라벨 칸에 겹쳐 적용된다.
   // 라벨 글자 칸(글자 input · textarea) 안 키(action null)와 Delete · Backspace는 막지 않는다. 입력칸 안의 키 · 수정키 규칙은 keys.ts의 keyAction이 정한다.
   useEffect(() => {
     const onKey = (event: KeyboardEvent): void => {
