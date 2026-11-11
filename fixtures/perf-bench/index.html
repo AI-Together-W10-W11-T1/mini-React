@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" href="data:," />
+    <title>성능 대시보드</title>
+    <style>
+      :root {
+        --line: #c9ced6;
+        --label: #3b4252;
+        --accent: #2b6cb0;
+        --muted: #667085;
+        --bg-soft: #f5f7fa;
+      }
+      * { box-sizing: border-box; }
+      body { margin: 0; padding: 16px; font-family: system-ui, sans-serif; color: #1f2430; background: #fff; }
+      h1 { margin: 0 0 8px; font-size: 1.25rem; }
+      h2 { margin: 0 0 8px; font-size: 1rem; color: var(--label); }
+      p { margin: 0 0 8px; line-height: 1.5; }
+      .lead { color: var(--muted); }
+      section { min-width: 0; border: 2px solid var(--line); border-radius: 8px; padding: 12px; margin: 0 0 16px; overflow-wrap: anywhere; }
+      button { padding: 8px 16px; font: inherit; cursor: pointer; }
+      button:disabled { cursor: progress; opacity: 0.6; }
+      .controls { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+      #bench-status { color: var(--label); }
+      #bench-status[data-state="running"] { color: var(--accent); font-weight: 600; }
+      /* 표는 감싸개 안에서만 가로로 스크롤한다 (페이지 자체는 가로 스크롤이 없다) */
+      .table-wrap { max-width: 100%; overflow-x: auto; }
+      table { border-collapse: collapse; width: 100%; min-width: 1100px; font-size: 0.85rem; font-variant-numeric: tabular-nums; }
+      th, td { border: 1px solid var(--line); padding: 6px 8px; text-align: left; vertical-align: top; }
+      th { background: var(--bg-soft); position: sticky; top: 0; }
+      dl.cond { display: grid; grid-template-columns: max-content 1fr; gap: 6px 12px; margin: 0; }
+      dl.cond dt { color: var(--label); font-weight: 600; }
+      dl.cond dd { margin: 0; min-width: 0; }
+      input[type="text"], textarea { width: 100%; padding: 6px 8px; font: inherit; border: 1px solid var(--line); border-radius: 4px; }
+      textarea { min-height: 4.5rem; resize: vertical; }
+      ul.notes { margin: 0; padding-left: 1.2rem; line-height: 1.6; }
+      /* 측정 영역: 계측 패널(위 섹션들) 밖에 따로 있다. 측정이 끝나면 비워진다 */
+      #bench-area { max-height: 200px; overflow: auto; border: 1px dashed var(--line); border-radius: 4px; padding: 4px; min-height: 2rem; }
+      @media (max-width: 720px) {
+        dl.cond { grid-template-columns: 1fr; }
+        dl.cond dt { margin-top: 6px; }
+      }
+    </style>
+  </head>
+  <body>
+    <h1>성능 대시보드 (확장 1)</h1>
+    <p class="lead">
+      PRD §7 지표 · §8 시나리오를 작은 공통 fixture로 반복 측정합니다 (준비 5회 · 측정 30회). 결과는 이 기기 · 이 브라우저의 값이며, 서로 다른 조건의 값을 섞어 우열을 판단하지 않습니다.
+    </p>
+
+    <!-- 계측 패널: 버튼 · 상태 · 표 · 측정 조건은 모두 측정 영역(#bench-area) 밖에 있다 -->
+    <section aria-label="실행">
+      <div class="controls">
+        <button type="button" data-testid="bench-run" id="bench-run">측정 시작</button>
+        <span id="bench-status" data-testid="bench-status" data-state="idle" role="status">대기 중</span>
+      </div>
+    </section>
+
+    <section data-testid="bench-conditions" aria-label="측정 조건">
+      <h2>측정 조건 (PRD §8.2)</h2>
+      <dl class="cond">
+        <dt>브라우저 · 버전</dt>
+        <dd data-testid="bench-cond-browser"></dd>
+        <dt>화면 크기</dt>
+        <dd data-testid="bench-cond-viewport"></dd>
+        <dt>빌드 모드</dt>
+        <dd data-testid="bench-cond-build"></dd>
+        <dt>시계 해상도</dt>
+        <dd data-testid="bench-cond-timer"></dd>
+        <dt>반복</dt>
+        <dd data-testid="bench-cond-reps"></dd>
+        <dt>공통 fixture</dt>
+        <dd data-testid="bench-cond-fixture"></dd>
+        <dt>집계 단위</dt>
+        <dd data-testid="bench-cond-unit"></dd>
+        <dt>기기 (사람이 적음)</dt>
+        <dd><input type="text" data-testid="bench-cond-device" placeholder="예: 노트북 모델 · CPU · 메모리" aria-label="기기" /></dd>
+        <dt>CPU 제한 (사람이 적음)</dt>
+        <dd><input type="text" data-testid="bench-cond-cpu" placeholder="예: 제한 없음 / DevTools 4배 느리게" aria-label="CPU 제한" /></dd>
+      </dl>
+    </section>
+
+    <section aria-label="결과">
+      <h2>결과</h2>
+      <div class="table-wrap">
+        <table data-testid="bench-table">
+          <thead></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section aria-label="M-01 기능 테스트 결과">
+      <h2>M-01 기능 테스트 결과 (사람이 옮겨 적는 칸)</h2>
+      <p class="lead">필수 · 정책 · 확장별 통과 / 실패 / 미구현 수와 대상 테스트 ID를 <code>npx vitest run</code> · <code>npx playwright test</code> 결과에서 옮겨 적습니다. 이 페이지가 자동으로 채우지 않습니다.</p>
+      <textarea data-testid="bench-m01" aria-label="M-01 기능 테스트 결과"></textarea>
+    </section>
+
+    <section data-testid="bench-notes" aria-label="읽는 법">
+      <h2>읽는 법</h2>
+      <ul class="notes">
+        <li>p50 · p95 = 선형 보간 백분위(성공한 측정만, 정렬 뒤 위치 (n − 1) × p / 100). 오류가 난 반복은 빼지 않고 "오류" 칸에 개수와 메시지로 남깁니다.</li>
+        <li>M-07 전체 처리시간 = 상태 변경 처리 시작부터 DOM 반영 완료까지를 <code>performance.now()</code>로 잰 값입니다. 화면 표시(페인트) 완료 시간이 아닙니다. <code>requestAnimationFrame</code> 콜백으로 페인트 완료를 단정하지 않습니다.</li>
+        <li>M-04 · M-05 · M-06은 B-01 ~ B-05에서 단계 함수(VNode 생성 → diff → patch)를 엔진 <code>update()</code>와 같은 순서로 직접 불러 따로 잽니다. B-06 · B-07은 엔진 경로(setter · 이벤트 → 렌더)를 그대로 지나므로 단계별 시간이 없고(—) 전체 시간만 있습니다.</li>
+        <li>M-02 DOM 작업 = patch 한 줄(복합 작업 하나: INSERT는 하위 트리를 통째로 만들어 붙임)의 종류별 개수입니다. 다른 구현의 DOM API 호출 1개와 같은 단위가 아닙니다. MutationObserver 기록 수 · 추가/제거된 노드 수는 따로 적습니다 (복합 INSERT는 하위 노드까지 한 덩어리로 1개).</li>
+        <li>DOM 작업 집계 · 노드 참조 유지(M-03) · 최종 화면 정확성은 시간을 재지 않는 "집계 실행" 한 번에서만 구합니다. 시간 측정 반복에는 관찰 콜백 · MutationObserver를 붙이지 않아 patch 시간에 섞이지 않습니다.</li>
+        <li>B-07의 M-07에는 앱 자신의 effect(탭 제목 · 기록판 쓰기) 시간이 들어갑니다. 기록판에 effect가 직접 쓴 변경은 patch가 아니므로 M-02 · MutationObserver 집계에서 빼고, 비고에 "기록판 직접 쓰기 N건"으로 따로 적습니다.</li>
+        <li>B-01 ~ B-05의 이벤트 핸들러는 항상 같은 함수라 핸들러 교체(SET_EVENT) 비용은 이 측정에 들어가지 않습니다.</li>
+        <li>항목 수 ≠ 노드 수입니다 (항목 1개 = 노드 5개). 이 결과만으로 알고리즘 우열 · "Virtual DOM이 항상 빠르다"를 판단하지 않습니다. 측정하지 않은 수치는 쓰지 않습니다.</li>
+      </ul>
+    </section>
+
+    <!-- 측정 영역: 시나리오가 그리고 고치는 곳. 위의 계측 패널과 섞이지 않는다 -->
+    <section aria-label="측정 영역">
+      <h2>측정 영역 (측정 중에만 내용이 있고, 끝나면 비워집니다)</h2>
+      <div id="bench-area" data-testid="bench-area"></div>
+    </section>
+
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>

@@ -1,0 +1,10 @@
+node_modules/
+dist/
+.DS_Store
+test-results/
+playwright-report/
+coverage/
+.agent_workflow/current
+.agent_workflow/tasks/*/06_raw_transcripts.jsonl
+.playwright-mcp/
+.claude/settings.local.json
