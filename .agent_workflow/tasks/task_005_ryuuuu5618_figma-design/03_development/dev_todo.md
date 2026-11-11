@@ -161,6 +161,7 @@ fixtures/mini-figma/
     - **QA-44 설계 메모**: 인스턴스 60개를 더해도 크기 M 버튼은 줄바꿈으로 686px 안에 다 들어가 캔버스 안 스크롤이 안 생김(처음 실패: `canvas 안쪽 높이가 보이는 높이보다 큼 Expected: > 686 Received: 686`) → 시작 전에 메인 크기를 `L`로 올려 캔버스도 넘치게 함. 맨 끝 캔버스 버튼 클릭 = 캔버스 `scrollTop > 0` · `window.scrollY` 0, 맨 끝 레이어 행 클릭 = 레이어 창 `scrollTop > 0`. Playwright 클릭이 스크롤 컨테이너 안을 자동 스크롤해 흔들림 없음
     - **회귀**: `npx playwright test e2e/mini-figma-*.spec.ts` 152 passed, `npx playwright test` 전체 `324 passed (35.3s)` (QA-2 · 42 · A12 · A26 · A29 포함 기존 그대로), `npx vitest run` `Test Files 43 passed (43) · Tests 1159 passed (1159)`, `npx tsc --noEmit` exit 0, `git diff --stat main -- packages/` 출력 없음
     - 육안: 1280x800 캡처 확인 (도구 막대 아래 세 영역이 화면 아래까지 참, 점무늬 캔버스가 남은 높이 사용)
+    - **경량 검수 NB 1 반영 (테스트만)**: `e2e/mini-figma-design.spec.ts`에 도우미 `expectPanelsNoHorizontalOverflow`(레이어 · 캔버스 · 속성 `scrollWidth <= clientWidth`)를 QA-42 · QA-44 desktop 분기에 추가. 검출력: 임시로 `.layer-name`에 `overflow-wrap: normal; white-space: nowrap` + QA-44에서 라벨 `'A'.repeat(200)`을 넣자 `npx playwright test e2e/mini-figma-design.spec.ts -g QA-44 --project=desktop` 실패 `60개 추가 뒤: layer-panel 안 가로 넘침 없음 Expected: <= 220 Received: 2134` (바로 앞 `noHorizontalScroll(page)`는 통과 = 페이지 검사로는 못 잡음), 임시 변경 되돌린 뒤 `e2e/mini-figma-design.spec.ts` 16 passed, `npx playwright test` 전체 324 passed (35.6s). 앱 · CSS · `packages/` 변경 없음
 
 <!-- 완료 예시
 - [x] **Dev-3 [#12]** (`mini-figma`): 팔레트 판

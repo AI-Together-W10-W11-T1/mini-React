@@ -14,6 +14,15 @@ async function styleOf(page: Page, selector: string, props: string[]): Promise<R
 }
 const tid = (id: string): string => `[data-testid="${id}"]`;
 
+// [AI Note]: desktop은 세 패널이 overflow-y: auto라 overflow-x도 계산상 auto가 된다 → 패널 안 가로 넘침이 페이지 scrollWidth에 안 잡힌다.
+// 그래서 noHorizontalScroll(페이지) 말고 패널마다 scrollWidth <= clientWidth를 따로 본다 (Dev-9 경량 검수 NB 1).
+async function expectPanelsNoHorizontalOverflow(page: Page, where: string): Promise<void> {
+  for (const id of ['layer-panel', 'canvas', 'property-panel']) {
+    const w = await page.getByTestId(id).evaluate((el) => ({ scrollWidth: el.scrollWidth, clientWidth: el.clientWidth }));
+    expect(w.scrollWidth, `${where}: ${id} 안 가로 넘침 없음 (scrollWidth <= clientWidth)`).toBeLessThanOrEqual(w.clientWidth);
+  }
+}
+
 const BLUE = 'rgb(0, 82, 255)';
 const WHITE = 'rgb(255, 255, 255)';
 const INK = 'rgb(10, 11, 13)';
@@ -145,6 +154,7 @@ test('QA-42 배치: desktop은 도구 막대가 맨 위에서 가로 전체 + �
     expect(canvas.x + canvas.width).toBeLessThanOrEqual(prop.x + 1);
     expect(Math.abs(layer.y - canvas.y)).toBeLessThanOrEqual(1);
     expect(Math.abs(canvas.y - prop.y)).toBeLessThanOrEqual(1);
+    await expectPanelsNoHorizontalOverflow(page, '처음');
   } else {
     expect(toolbar.y + toolbar.height).toBeLessThanOrEqual(layer.y + 1);
     expect(layer.y + layer.height).toBeLessThanOrEqual(canvas.y + 1);
@@ -248,6 +258,7 @@ test('QA-44 넘침: 인스턴스를 많이 추가해도 desktop 페이지는 세
     const { scrollHeight, innerHeight } = await pageScrollHeights(page);
     expect(scrollHeight, '60개 추가 뒤에도 페이지 세로 스크롤 없음').toBeLessThanOrEqual(innerHeight);
     expect(await noHorizontalScroll(page)).toBe(true);
+    await expectPanelsNoHorizontalOverflow(page, '60개 추가 뒤');
     // 세 영역은 여전히 화면 아래까지 (늘어나지 않음)
     for (const id of ['layer-panel', 'canvas', 'property-panel']) {
       const b = await boxOf(page, id);
