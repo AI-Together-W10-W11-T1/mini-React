@@ -69,7 +69,7 @@ mini-figma 화면을 디자인 시스템(어두운 바탕 + 한 단계 밝은 �
 - 인수: FD-01 ~ 25 + task_004 QA 회귀 → `e2e/mini-figma-*.spec.ts` desktop · mobile
 - 단위: 색 값 · 글자 색 판정 함수, `Toolbar` · 팔레트 판 patch 기대값 → `fixtures/mini-figma/__tests__/`
 - 회귀: `git diff --stat main -- packages/` 비어 있음, vitest · tsc · playwright 전체
-- 테스트 케이스 확인: (1단계 끝에 기록)
+- 테스트 케이스 확인: 2026-11-11T20:52 사용자 "응" — QA-31 ~ 42 · A20 ~ A29 · 바뀌는 단언 표 그대로, ④-1 글자 색 = WCAG 대비 큰 쪽 · ④-2 글자색 style · ④-3 색 입력칸 Ctrl+Z = 앱 Undo · ④-4 override 표시 파랑 (`00_master_dialogue.md`)
 
 ## 7. [고정] 필수 제약
 - task_004와 같음: `packages/` 수정 금지, Hook은 `App`에만, 자식은 props만, 화면 2개 (desktop 1280x800 · mobile 375x812)
