@@ -38,3 +38,7 @@
 2026-11-11T10:16 | stage=2 | agent=master | round=2 | signal=APPROVE | 경량 검수 2회차 APPROVE (BLOCKING 0, NB 2 기록만). 남은 마스터 몫: 1회차 NB-3 상수 위치 · NB-4 select 역패치 한계 (공부 뒤 사용자 확인)
 2026-11-11T13:38 | stage=2.5 | agent=master | round=- | signal=CHECKPOINT | 의존성 · Hook 호출 순서(if 포함) · 결정 8 이유 3개 완료 (00_master_dialogue.md [CheckPoint])
 2026-11-11T13:39 | stage=2 | agent=master | round=- | signal=DECISION | 경량 NB-3 위치 그대로(changelog), NB-4 한계 기록 → 2단계 끝, 3단계 QA로
+2026-11-11T13:42 | stage=3 | agent=mr-qa | round=- | signal=UNKNOWN | - | by=hook
+2026-11-11T13:42 | stage=3 | agent=master | round=- | signal=PASS_PENDING_HUMAN | QA 154 passed (desktop 77 · mobile 77), QA-21 미구현, 캡처 7종 사용자에게 보냄, 서버 남음 5199 PID 8968(vite) 종료 승인 대기
+2026-11-11T13:44 | stage=3 | agent=master | round=- | signal=PASS | 사용자 캡처 확인 완료, 5199 서버 승인 후 종료 → 3단계 통과
+2026-11-11T13:44 | stage=마무리 | agent=master | round=- | signal=PR_DRAFT | 4단계 위키는 가벼운 모드라 발표 전으로 미룸, 07_pr_body.md 초안, main 병합 승인 대기
