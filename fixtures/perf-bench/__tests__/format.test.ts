@@ -68,6 +68,21 @@ describe('cellsOf — 한 행의 칸 글 (QA-20이 읽는 data-col)', () => {
     expect(cellsOf(row({ dom: { patchLines: 0, byKind: {}, mutationRecords: 0, nodesAdded: 0, nodesRemoved: 0 } })).dom).toBe('patch 0줄');
   });
 
+  it('기록판 직접 쓰기(logPanelWrites)가 있으면 비고에 따로 적고 기본 집계에서 뺀 것임을 밝힌다', () => {
+    const base = row({ id: 'B-07', run: { ...row().run, counts: { actions: 13, renders: 16 } } });
+    const dom = { patchLines: 212, byKind: { SET_TEXT: 30 }, mutationRecords: 36, nodesAdded: 4, nodesRemoved: 2, logPanelWrites: 48 };
+    const cells = cellsOf({ ...base, dom });
+    expect(cells.extra).toContain('기록판 직접 쓰기 48건');
+    expect(cells.extra).toContain('기록 · 추가 · 제거 노드에서 뺌');
+    expect(cells.mutations).toBe('기록 36 · 추가 노드 4 · 제거 노드 2');
+    expect(cellsOf(base).extra).not.toContain('기록판');
+    expect(cellsOf({ ...base, dom: { ...dom, logPanelWrites: 0 } }).extra).not.toContain('기록판');
+  });
+
+  it('집계 실행이 실패해 fixture가 null이면 항목 · 노드 · 깊이 칸은 0이 아니라 "집계 실패"', () => {
+    expect(cellsOf(row({ fixture: null, dom: null, preserved: null, stateMatches: null, countError: 'x' })).fixture).toBe('집계 실패');
+  });
+
   it('노드 참조 유지 · 최종 상태', () => {
     expect(cellsOf(row()).preserved).toBe('507 / 507');
     expect(cellsOf(row()).correct).toBe('일치');

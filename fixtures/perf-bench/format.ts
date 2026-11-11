@@ -50,6 +50,8 @@ function extraCell(row: BenchRow): string {
   if (row.id === 'B-06') parts.push(`setter ${counts.setters ?? '?'}번 → 렌더 ${counts.renders ?? '?'}번`);
   else if (row.id === 'B-07') parts.push(`동작 ${counts.actions ?? '?'}번 → 렌더 ${counts.renders ?? '?'}번`);
   else parts.push(`측정 반복마다 patch ${counts.patches ?? '?'}줄`);
+  const panelWrites = row.dom?.logPanelWrites ?? 0;
+  if (panelWrites > 0) parts.push(`기록판 직접 쓰기 ${panelWrites}건 (앱 effect가 쓴 것 — patch 아님, MutationObserver 기록 · 추가 · 제거 노드에서 뺌)`);
   if (!countsStable) parts.push('반복마다 개수가 달라졌습니다');
   if (row.countError !== null) parts.push(`집계 실행 오류: ${row.countError}`);
   return parts.join(' · ');
@@ -60,7 +62,7 @@ export function cellsOf(row: BenchRow): Record<ColumnKey, string> {
   const phase = (key: string): string => (row.phases && row.run.metrics[key] !== undefined ? fmtPair(row.run.metrics[key]) : '—');
   return {
     name: `${row.id} ${row.title}`,
-    fixture: `항목 ${row.fixture.items} · 노드 ${row.fixture.nodes} · 깊이 ${row.fixture.depth}`,
+    fixture: row.fixture === null ? FAILED : `항목 ${row.fixture.items} · 노드 ${row.fixture.nodes} · 깊이 ${row.fixture.depth}`,
     repeat: `준비 ${row.run.warmup} · 측정 ${row.run.runs}`,
     errors: errorCell(row),
     total: fmtPair(row.run.metrics.total),

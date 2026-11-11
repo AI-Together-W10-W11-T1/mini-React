@@ -119,14 +119,19 @@ export interface DomCounts {
   /** 기록에 실린 추가된 노드 수 · 제거된 노드 수 (복합 INSERT는 하위 노드까지 한 덩어리로 1개) */
   readonly nodesAdded: number;
   readonly nodesRemoved: number;
+  /**
+   * 엔진 시나리오만: 앱 자신의 effect가 기록판의 세 칸(effect · patch · 이벤트 교체 줄 수)에 직접 쓴 변경 기록 수.
+   * patch가 만든 변경이 아니므로 위 `mutationRecords` · `nodesAdded` · `nodesRemoved`에서 뺀 값이다 (M-02는 엔진이 만든 DOM 작업만 센다)
+   */
+  readonly logPanelWrites?: number;
 }
 
 export interface BenchRow {
   readonly id: ScenarioId;
   readonly title: string;
   readonly what: string;
-  /** 항목 수 · 노드 수 · 깊이 (섞어 쓰지 않으려고 따로 적는다) */
-  readonly fixture: TreeInfo & { readonly items: number };
+  /** 항목 수 · 노드 수 · 깊이 (섞어 쓰지 않으려고 따로 적는다). 집계 실행이 실패하면 null — 0으로 채우면 측정값처럼 보인다 */
+  readonly fixture: (TreeInfo & { readonly items: number }) | null;
   /** 시간 요약 · 반복 횟수 · 오류 */
   readonly run: ScenarioResult;
   /** M-04 ~ M-06 단계별 시간을 따로 쟀는가 (엔진 update() 한 덩어리로만 잰 시나리오는 false) */
@@ -476,6 +481,9 @@ const B07: EngineScenario = {
 export const ENGINE_SCENARIOS: readonly EngineScenario[] = [B06, B07];
 export const ALL_SCENARIOS: readonly (StageScenario | EngineScenario)[] = [...STAGE_SCENARIOS, ...ENGINE_SCENARIOS];
 
+// 검증 페이지 App의 의존성 없는 effect가 렌더마다 직접 글자를 쓰는 기록판 칸 (fixtures/phase2-app App.ts `writeLog`)
+const LOG_PANEL_DIRECT_CELLS = ['log-effect', 'log-patch', 'log-patch-events'] as const;
+
 interface EngineCount {
   readonly fixture: BenchRow['fixture'];
   readonly dom: DomCounts;
@@ -502,7 +510,17 @@ function countEnginePass(area: Element, scenario: EngineScenario, itemCount: num
     const records = observer.takeRecords();
     let nodesAdded = 0;
     let nodesRemoved = 0;
+    let logPanelWrites = 0;
+    // [AI Note]: 기록판 중 앱 effect가 textContent로 직접 쓰는 세 칸은 patch와 무관하다. 엔진 DOM 작업 집계(M-02)에 섞지 않고 따로 센다.
+    // 기록판 전체가 아니라 이 칸들만 뺀다: 같은 기록판의 렌더 횟수 · memo 횟수 칸은 VNode가 그리는 것이라 patch(SET_TEXT)가 맞다.
+    const directCells = LOG_PANEL_DIRECT_CELLS.map((id) => area.querySelector(`[data-testid="log-panel"] [data-testid="${id}"]`)).filter(
+      (cell): cell is Element => cell !== null,
+    );
     for (const record of records) {
+      if (directCells.some((cell) => cell.contains(record.target))) {
+        logPanelWrites++;
+        continue;
+      }
       nodesAdded += record.addedNodes.length;
       nodesRemoved += record.removedNodes.length;
     }
@@ -511,9 +529,10 @@ function countEnginePass(area: Element, scenario: EngineScenario, itemCount: num
       dom: {
         patchLines: Object.values(byKind).reduce((a, b) => a + b, 0),
         byKind,
-        mutationRecords: records.length,
+        mutationRecords: records.length - logPanelWrites,
         nodesAdded,
         nodesRemoved,
+        logPanelWrites,
       },
       preserved: { same: targets.filter((node) => area.contains(node)).length, targets: targets.length },
       stateMatches: run.verify(area),
@@ -556,7 +575,7 @@ export function runEngineScenario(area: Element, scenario: EngineScenario, optio
     id: scenario.id,
     title: scenario.title,
     what: scenario.what,
-    fixture: counted?.fixture ?? { items: 0, nodes: 0, elements: 0, texts: 0, depth: 0 },
+    fixture: counted?.fixture ?? null,
     run,
     phases: false,
     dom: counted?.dom ?? null,

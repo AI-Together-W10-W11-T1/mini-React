@@ -235,6 +235,32 @@ describe('B-07 개인 앱 대표 동작 (검증 페이지 App: [+1] · 입력 ·
     expect(row.phases).toBe(false);
   });
 
+  it('기록판(log-panel)에 앱 effect가 직접 쓴 변경은 따로 세고, 기본 집계에는 patch가 만든 변경만 남는다', () => {
+    const row = runEngineScenario(makeArea(), engineById('B-07'), { warmup: 0, runs: 1 });
+    // 렌더 16번 × 기록판 3칸(effect · patch · patch 이벤트) = 직접 쓰기 48건 (patch를 거치지 않는다). 렌더 횟수 · memo 칸은 VNode라 patch 몫으로 남는다
+    expect(row.run.counts.renders).toBe(16);
+    expect(row.dom?.logPanelWrites).toBe(16 * 3);
+    // 기본 집계 = patch 몫만: 렌더가 만든 노드 추가(INSERT 2 + REPLACE 1 + 목록 항목 …)와 제거(REPLACE · MOVE)
+    expect(row.dom).toMatchObject({ mutationRecords: 36, nodesAdded: 4, nodesRemoved: 2 });
+  });
+
+  it('집계 실행이 실패하면 fixture는 0으로 채우지 않고 null (측정값처럼 보이지 않게)', () => {
+    const broken: EngineScenario = {
+      ...engineById('B-06'),
+      create: () => {
+        throw new Error('고장');
+      },
+    };
+    const row = runEngineScenario(makeArea(), broken, { warmup: 0, runs: 1 });
+    expect(row.countError).toBe('고장');
+    expect(row.fixture).toBeNull();
+    expect(row.dom).toBeNull();
+  });
+
+  it('기록판이 없는 B-06은 직접 쓰기 0건', () => {
+    expect(runEngineScenario(makeArea(), engineById('B-06'), { warmup: 0, runs: 1 }).dom?.logPanelWrites).toBe(0);
+  });
+
   it('끝나면 영역을 비우고 탭 제목(document.title)을 원래대로 돌려 놓는다', () => {
     const before = document.title;
     const area = makeArea();
@@ -245,9 +271,9 @@ describe('B-07 개인 앱 대표 동작 (검증 페이지 App: [+1] · 입력 ·
 
   it('처음 항목 수는 0이고 노드 수 · 깊이가 결과에 들어간다', () => {
     const row = runEngineScenario(makeArea(), engineById('B-07'), { warmup: 0, runs: 1 });
-    expect(row.fixture.items).toBe(0);
-    expect(row.fixture.nodes).toBeGreaterThan(10);
-    expect(row.fixture.depth).toBeGreaterThan(3);
+    expect(row.fixture?.items).toBe(0);
+    expect(row.fixture?.nodes).toBeGreaterThan(10);
+    expect(row.fixture?.depth).toBeGreaterThan(3);
   });
 });
 
