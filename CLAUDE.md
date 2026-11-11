@@ -31,6 +31,7 @@
 | `fixtures/phase1-vdom-playground` | Phase 1 검증 페이지 (실제 · 테스트 영역, Patch · 뒤로 · 앞으로) | ○ | 엔진 로직 |
 | `fixtures/phase2-app` | Phase 2 웹페이지 (주제는 내가 정함) | ○ | 엔진 로직 |
 | `fixtures/perf-bench` | (선택) 측정 하네스 | ○ | - |
+| `fixtures/mini-figma` | 시연 앱: Figma Components(메인 · 인스턴스 · property)를 미니 React로 (task_004) | ○ | 엔진 로직, `packages/` 수정 |
 
 - **의존 방향**: DOM 조작은 `react-dom-bindings`에서만 한다. 다른 패키지에서 `document` · `window`를 쓰지 않는다.
 
@@ -72,6 +73,14 @@
 - 이벤트 props 처리: 리스너 하나 + 핸들러 교체 (알고리즘 결정 8 B). 요소마다 이벤트 이름당 리스너를 처음 한 번만 등록, 핸들러는 요소 자신에 저장하고 다시 렌더할 때는 핸들러만 바꿈. 이름이 `on` + 대문자이고 값이 함수면 이벤트 (`onClick` → `click`)
 - 재렌더 시점: 마이크로태스크 Batching (알고리즘 결정 9 B, task_003) — setter는 칸 값을 바로 바꾸고 렌더는 `queueMicrotask`로 컴포넌트당 한 번 예약, 지금 실행 중인 코드가 끝난 직후 한 번 렌더 + diff + patch + effect. 이유: "리액트를 공부할려면 배칭 구현하는게 맞는 거 같아서" (task_002는 A 즉시 동기였음)
 - 자식 컴포넌트: diff 전에 그 자리에서 실행해 결과 요소로 풀어 둠. diff · patch는 요소 · 글자만 봄. 이전 VNode는 `mount()` · `update()` 때 만든 VNode 자체를 저장 (DOM에서 다시 읽지 않음)
+
+**시연 앱 mini-figma** (task_004, 2026-11-11 — 이유는 `task_004_ryuuuu5618_mini-figma/01_request_spec.md` 「알고리즘 결정」)
+- 엔진(`packages/`)은 고치지 않고 `@mini-react/*`로 가져다 씀. 자리 `fixtures/mini-figma/`
+- state는 루트 `App`에만: `main` · `instances`(배열, 바꾼 값만) · `selectedId`(`'main'` / id / `null`) · Undo 기록. 그리기 = `h(Button, { key: it.id, ...main, ...it })`
+- override = 키가 있으면 override (빈 글자 · 같은 값 포함), 되돌리기 = 키 지우기. 프로퍼티 4종(Text · Variant · Boolean · Instance swap) + 색(일반 override)
+- 선택 · key = 인스턴스 id (지운 번호 재사용 안 함), 순서 = 배열 순서. 메인은 지울 수 없음, 고른 것을 지우면 선택 풀림
+- 키보드 = `useEffect`에서 `document`에 `keydown` 등록 + cleanup (엔진 이벤트는 그대로 `click` · `input`), 입력칸 안의 키는 무시
+- Undo = `main` · `instances`만, 같은 대상 + 같은 칸 연달아 = 한 단계 (시간 기준 없음), 50개
 
 **정책 (PRD §3.3 · §4.2 · §4.3 · §5)**
 - 이력: 초기 모습 = 0번 기록(뒤로가기의 바닥) · 무변경 Patch는 기록 안 함 · 뒤로 간 뒤 새 Patch면 앞쪽 기록 버림 · 처음 · 끝에서 누르면 무시 · 이동 때 미저장 편집은 버림(편집창 · 테스트 영역 · 실제 영역 모두 그 기록으로) · 보관 한도 50, 넘으면 가장 오래된 기록부터 뺌
