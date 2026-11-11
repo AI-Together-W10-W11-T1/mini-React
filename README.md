@@ -14,7 +14,8 @@
 
 - 패키지 역할: `shared`(타입) · `react`(`h()` · Hook API) · `react-reconciler`(`diff` · `FunctionComponent`) · `react-dom-bindings`(DOM 접근 유일) · `react-dom`(`render` · History) · `scheduler`(재렌더 예약)
 - Phase 1: 테스트 영역 → VNode → `diff`(저장한 이전 VNode와 비교) → 패치 목록 → `patch`(실제 영역에 바뀐 곳만) → History 기록
-- Phase 2: setter → 즉시 렌더(`App()` 재실행) → `diff` → `patch` → effect
+- Phase 2: setter → 칸 값을 바로 바꾸고 렌더는 마이크로태스크로 한 번 예약 (Batching) → 렌더(`App()` 재실행) → `diff` → `patch` → effect
+- 시연 앱 mini-figma: 엔진은 고치지 않고 `@mini-react/*`로 가져다 씀 (`fixtures/mini-figma/`). state는 `App` 하나, 자식은 props만 받음
 - 자세히: [wiki/architecture.md](wiki/architecture.md)
 
 ## 핵심 구현 기능 & 동작 화면
@@ -26,6 +27,9 @@
 | Diff 시각화: 스위치를 켜면 바뀐 노드만 깜빡임 | ![](.agent_workflow/tasks/task_001_ryuuuu5618_phase1/04_qa_evidence/screenshot_05_desktop.png) |
 | Hooks 자동 갱신: 할 일 체크 · 완료 요약 · 기록판(렌더 · effect 횟수) | ![](.agent_workflow/tasks/task_002_ryuuuu5618_phase2/04_qa_evidence/screenshot_04_desktop.png) |
 | Key 이동: [위로] · [아래로]로 순서를 바꿔도 같은 항목(key) 유지 | ![](.agent_workflow/tasks/task_002_ryuuuu5618_phase2/04_qa_evidence/screenshot_05_desktop.png) |
+| mini-figma: 메인 색을 초록으로 바꾸면 override가 없는 인스턴스만 따라 바뀜 (b3 빨강은 그대로) | ![](.agent_workflow/tasks/task_004_ryuuuu5618_mini-figma/04_qa_evidence/screenshot_02_desktop.png) |
+| mini-figma: 메인 아이콘을 켜도 override한 b2는 ♥ 그대로 (아이콘 ★ ★ ♥ ★) | ![](.agent_workflow/tasks/task_004_ryuuuu5618_mini-figma/04_qa_evidence/screenshot_04_desktop.png) |
+| mini-figma: 인스턴스 추가 · 레이어 창 순서 바꾸기 (레이어 · 캔버스 함께 바뀜) · b2 삭제 뒤 Ctrl+Z로 복귀 | ![](.agent_workflow/tasks/task_004_ryuuuu5618_mini-figma/04_qa_evidence/screenshot_05_desktop.png) ![](.agent_workflow/tasks/task_004_ryuuuu5618_mini-figma/04_qa_evidence/screenshot_07_desktop.png) |
 
 ## 핵심 기술 포인트
 
@@ -39,13 +43,19 @@
   - Batching이라 [+3]은 setter 3번을 모아 렌더 · diff · patch가 1번만 돌고(task_002 즉시 동기 때는 3번), 그리기는 클릭 처리 JS가 끝난 뒤 한 번이다. 비용이 생기는 곳은 JS(diff · patch) 쪽이다.
   - 그래서 VDOM이 항상 빠른 것은 아니다. 바뀔 곳을 미리 아는 직접 DOM 수정이 더 싸고, VDOM은 그 비교 비용을 내고 "바뀐 곳 찾기"를 자동으로 해 준다 (PRD §8.2 "Virtual DOM이 항상 빠르다는 결론을 전제로 두지 않는다"). 대시보드 M-07은 DOM 반영까지 시간이라 reflow · repaint 시간은 들어 있지 않다.
 
+## 알려진 한계
+
+- 터치 기기에서는 Undo 수단이 없다 (Undo 버튼 없음, 단축키만)
+- Windows Chromium의 Ctrl+Y는 앱 키가 아니라 막지 않아서, 라벨 글자 칸에서 브라우저 글자 되돌리기를 한 뒤 칸 밖에서 Ctrl+Y를 누르면 브라우저 Redo가 라벨 칸에 적용돼 일반 수정 한 단계로 기록될 수 있다
+- 엔진 이벤트는 `click` · `input`뿐이라 끌기 · 크기 조절 · 확대·축소가 없다
+
 ## AI 워크플로 운영 결과
 
 | 항목 | 값 |
 | --- | --- |
-| task 수 · 검수 회차 | task 2개 · task_001 검수 2회 (둘 다 REJECT, 2회차 뒤 마스터 확인) · task_002 검수 3회 (개발 1회 APPROVE · 경량 2회: REJECT → APPROVE) |
-| QA 실패 분류 (구현 · 테스트 · 명세) | QA 실패 0건 (두 task 모두) — 3갈래 분류 대상 없음. 개발 검수 BLOCKING 5건(task_001 4 · task_002 1)은 모두 작업자 재작업으로 해결 (`code_review_log.md`) |
-| 자동 테스트 (최종) | task_001: vitest 432 · playwright 96 / task_002: vitest 776 · playwright 154 / tsc 오류 0 |
+| task 수 · 검수 회차 | task 4개 · task_001 검수 2회 (둘 다 REJECT, 2회차 뒤 마스터 확인) · task_002 검수 3회 (개발 1회 APPROVE · 경량 2회: REJECT → APPROVE) · task_003 검수 1회 (가벼운 모드, 기획 검수 생략 · 개발 1회 APPROVE) · task_004 검수 6회 (기본 모드, 기획 2회: REJECT → APPROVE · 개발 묶음 3개 4회: 묶음 1 · 2 APPROVE, 묶음 3 REJECT → APPROVE) |
+| QA 실패 분류 (구현 · 테스트 · 명세) | QA 실패 0건 (task_001 · 002 · 003 · 004) — 3갈래 분류 대상 없음. 개발 검수 BLOCKING은 모두 작업자 재작업으로 해결: task_001 4 · task_002 1 · task_004 1 (묶음 3, Undo 키 겹침, Q18) (`code_review_log.md`). task_003 BLOCKING 0 |
+| 자동 테스트 (최종) | task_001: vitest 432 · playwright 96 / task_002: vitest 776 · playwright 154 / task_003: vitest 801 · playwright 172 / task_004: vitest 1064 · playwright 272 (레포 전체 최종) / tsc 오류 0 |
 | 구현에 쓴 토큰량 | 아래 표 (`/usage` 전후 비교는 하지 않음) |
 
 - 위키 · 상세 기록: [wiki/index.md](wiki/index.md) · [wiki/qna_prep.md](wiki/qna_prep.md)
@@ -53,7 +63,7 @@
 
 ### 구현에 쓴 토큰량
 
-세션 · 서브에이전트 기록(`~/.claude/projects/…/<세션>.jsonl` · `subagents/*.jsonl`)의 `usage`를 메시지마다 한 번씩 더한 값. 구간은 각 task 타임라인의 시작 ~ 병합 시각(KST). task_003은 세션이 한 번 다시 시작돼 두 세션 기록을 함께 셌다(같은 메시지는 한 번만). 합계의 약 97%는 캐시 읽기(이미 읽은 맥락을 다시 쓰는 것)다.
+세션 · 서브에이전트 기록(`~/.claude/projects/…/<세션>.jsonl` · `subagents/*.jsonl`)의 `usage`를 메시지마다 한 번씩 더한 값. 구간은 각 task 타임라인의 시작 ~ 병합 시각(KST). task_004는 QA 끝까지(4단계 · 병합 제외). task_003은 세션이 한 번 다시 시작돼 두 세션 기록을 함께 셌다(같은 메시지는 한 번만). 합계의 약 97%는 캐시 읽기(이미 읽은 맥락을 다시 쓰는 것)다. task_004 숫자는 마스터가 세션 · 서브에이전트 jsonl을 메시지마다 한 번씩 더해 잰 값이다.
 
 | 구간 | 마스터 (Opus) | 작업자 (Sonnet) | 검수자 (Opus) | QA (Sonnet) | 위키 (Haiku) | 합계 | 그중 출력 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -61,5 +71,6 @@
 | task_002 Phase 2 (11-11 04:30 ~ 13:48) | 5,195만 | 5,283만 | 603만 | 78만 | - | **1억 1,160만** | 51.8만 |
 | 4단계 위키 · README (11-11 13:49 ~ 14:09) | 1,518만 | - | - | - | 310만 | **1,828만** | 12.5만 |
 | task_003 Batching (11-11 14:09 ~ 15:03) | 2,418만 | 2,475만 | 350만 | 152만 | - | **5,395만** | 12.6만 |
+| task_004 mini-figma (11-11 16:15 ~ 19:52, QA까지) | 4,596만 | 3,746만 | 640만 | 105만 | - | **9,087만** | 56.3만 |
 
 <!-- mini-react-kit:readme:end -->
