@@ -80,7 +80,7 @@ describe('T-16 코드 확인 — 루트(App.ts)만 Hook을 쓴다', () => {
   it('components/*.ts · model · undo · keys · color는 useEffect도 부르지 않는다 (keydown 등록은 App.ts 한 곳)', () => {
     const files = [
       ...Object.entries(components).map(([path, source]) => [path, source] as const),
-      ...['model.ts', 'undo.ts', 'keys.ts', 'color.ts', 'previewVNode.ts', 'main.ts'].map((file) => [file, sourceOf(topLevel, `../${file}`)] as const),
+      ...['model.ts', 'undo.ts', 'keys.ts', 'color.ts', 'previewVNode.ts', 'previewNav.ts', 'main.ts'].map((file) => [file, sourceOf(topLevel, `../${file}`)] as const),
     ];
     for (const [path, source] of files) {
       expect(/\buseEffect\b/.test(stripNoise(source)), `${path}의 useEffect`).toBe(false);
@@ -88,14 +88,14 @@ describe('T-16 코드 확인 — 루트(App.ts)만 Hook을 쓴다', () => {
     }
   });
 
-  for (const file of ['model.ts', 'undo.ts', 'keys.ts', 'color.ts', 'previewVNode.ts']) {
+  for (const file of ['model.ts', 'undo.ts', 'keys.ts', 'color.ts', 'previewVNode.ts', 'previewNav.ts']) {
     it(`${file}: 순수 모듈이라 Hook · document · window · 엔진 내부 접근이 없다`, () => {
       expect(findViolations(sourceOf(topLevel, `../${file}`))).toEqual([]);
     });
   }
 
   it('App.ts 밖의 소스(model · undo · keys · color · main)는 Hook을 쓰지 않는다', () => {
-    for (const file of ['model.ts', 'undo.ts', 'keys.ts', 'color.ts', 'previewVNode.ts', 'main.ts']) {
+    for (const file of ['model.ts', 'undo.ts', 'keys.ts', 'color.ts', 'previewVNode.ts', 'previewNav.ts', 'main.ts']) {
       const code = stripNoise(sourceOf(topLevel, `../${file}`));
       for (const hook of ['useState', 'useEffect', 'useMemo']) {
         expect(new RegExp(`\\b${hook}\\b`).test(code), `${file}의 ${hook}`).toBe(false);
