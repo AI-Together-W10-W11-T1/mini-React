@@ -23,5 +23,10 @@ function invertPatch(patch: Patch): Patch {
       return { kind: 'REPLACE', path: patch.path, before: patch.after, after: patch.before };
     case 'MOVE':
       return { kind: 'MOVE', parent: patch.parent, from: patch.to, to: patch.from };
+    // [AI Note]: Phase 2 새 종류도 같은 규칙 — 전 · 후만 뒤집는다. 함수(핸들러)는 복사하지 않고 같은 참조를 그대로 둔다.
+    case 'SET_EVENT':
+      return { kind: 'SET_EVENT', path: patch.path, event: patch.event, before: patch.after, after: patch.before };
+    case 'SET_PROP':
+      return { kind: 'SET_PROP', path: patch.path, name: patch.name, before: patch.after, after: patch.before };
   }
 }

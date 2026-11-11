@@ -54,6 +54,27 @@ describe('invertPatches — 종류별 뒤집기', () => {
   it('MOVE는 from ↔ to', () => {
     expect(invertPatches([{ kind: 'MOVE', parent: [0], from: 3, to: 1 }])).toEqual([{ kind: 'MOVE', parent: [0], from: 1, to: 3 }]);
   });
+
+  it('SET_EVENT는 before ↔ after (null 포함), event · path는 그대로 (Phase 2)', () => {
+    const a = () => undefined;
+    const b = () => undefined;
+    const [added] = invertPatches([{ kind: 'SET_EVENT', path: [0, 1], event: 'click', before: null, after: a }]);
+    expect(added).toEqual({ kind: 'SET_EVENT', path: [0, 1], event: 'click', before: a, after: null });
+    const [swapped] = invertPatches([{ kind: 'SET_EVENT', path: [2], event: 'input', before: a, after: b }]);
+    expect(swapped).toEqual({ kind: 'SET_EVENT', path: [2], event: 'input', before: b, after: a });
+    // 함수는 같은 참조 그대로 (복사하지 않음)
+    expect((swapped as { before: unknown }).before).toBe(b);
+    expect((swapped as { after: unknown }).after).toBe(a);
+  });
+
+  it('SET_PROP은 before ↔ after (null 포함), name · path는 그대로 (Phase 2)', () => {
+    expect(invertPatches([{ kind: 'SET_PROP', path: [0], name: 'value', before: null, after: 'x' }])).toEqual([
+      { kind: 'SET_PROP', path: [0], name: 'value', before: 'x', after: null },
+    ]);
+    expect(invertPatches([{ kind: 'SET_PROP', path: [1, 0], name: 'checked', before: false, after: true }])).toEqual([
+      { kind: 'SET_PROP', path: [1, 0], name: 'checked', before: true, after: false },
+    ]);
+  });
 });
 
 describe('invertPatches — 순서 · 불변', () => {
@@ -62,10 +83,12 @@ describe('invertPatches — 순서 · 불변', () => {
     { kind: 'INSERT', path: [1], node: el('p') },
     { kind: 'MOVE', parent: [], from: 0, to: 1 },
     { kind: 'REMOVE', path: [2], node: el('i') },
+    { kind: 'SET_EVENT', path: [0], event: 'click', before: null, after: () => undefined },
+    { kind: 'SET_PROP', path: [0], name: 'value', before: 'a', after: 'b' },
   ];
 
   it('목록 순서가 뒤집힌다 (되돌릴 때는 역순, 알고리즘 결정 7 세부)', () => {
-    expect(invertPatches(list).map((p) => p.kind)).toEqual(['INSERT', 'MOVE', 'REMOVE', 'SET_TEXT']);
+    expect(invertPatches(list).map((p) => p.kind)).toEqual(['SET_PROP', 'SET_EVENT', 'INSERT', 'MOVE', 'REMOVE', 'SET_TEXT']);
   });
 
   it('두 번 뒤집으면 원래 목록', () => {

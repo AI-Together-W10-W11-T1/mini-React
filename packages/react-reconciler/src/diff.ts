@@ -1,5 +1,5 @@
-import { COMMENT_NODE, TEXT_NODE } from '@mini-react/shared';
-import type { AreaChildren, Key, Patch, Path, StyleMap, VNode } from '@mini-react/shared';
+import { COMMENT_NODE, DOM_PROP_ELEMENTS, TEXT_NODE } from '@mini-react/shared';
+import type { AreaChildren, DomPropName, DomPropValue, EventHandler, Key, Patch, Path, StyleMap, VNode } from '@mini-react/shared';
 
 // [AI Note]: 이전 · 새 VNode 두 개만 비교해 "고칠 일 목록"을 만든다 (P1-33 — 실제 DOM을 다시 읽지 않는다).
 // DOM을 전혀 모른다. 한 줄 = 종류 · 경로 · 전 · 후 (알고리즘 결정 3 A). 경로는 영역 상자 안 자식부터 (결정 4 A).
@@ -86,6 +86,10 @@ function diffKeyedChildren(oldChildren: readonly VNode[], newChildren: readonly 
 }
 
 function diffNode(oldNode: VNode, newNode: VNode, path: Path, out: Patch[]): void {
+  // [AI Note]: diff는 요소 · 글자만 안다. 컴포넌트 VNode는 FunctionComponent가 resolveComponents로 먼저 풀어서 넘겨야 한다.
+  if (typeof oldNode.type === 'function' || typeof newNode.type === 'function') {
+    throw new Error('diff는 풀리지 않은 컴포넌트 VNode를 비교할 수 없습니다. resolveComponents로 먼저 풀어야 합니다.');
+  }
   if (oldNode.type !== newNode.type) {
     out.push({ kind: 'REPLACE', path, before: oldNode, after: newNode });
     return;
@@ -98,15 +102,20 @@ function diffNode(oldNode: VNode, newNode: VNode, path: Path, out: Patch[]): voi
   }
   diffAttrs(oldNode, newNode, path, out);
   diffStyle(oldNode, newNode, path, out);
+  diffEvents(oldNode, newNode, path, out);
   diffChildren(oldNode.children, newNode.children, path, out);
+  // [AI Note]: SET_PROP은 자식 비교 "뒤"에 둔다. `<select value>`는 새 `<option>`이 먼저 들어와야 그 값을 고를 수 있다.
+  // 이 요소 자신의 경로는 자식 INSERT · REMOVE · MOVE로 바뀌지 않으므로 순서를 바꿔도 안전하다.
+  diffProps(oldNode, newNode, path, out);
 }
 
 // [AI Note]: 속성 값 정규화 — 문자열 · 숫자 → 문자열, true → "" (boolean 속성), false · null · undefined → 속성 없음.
-// 함수 · style이 아닌 객체는 Phase 1에서 속성으로 다루지 않는다 (이벤트는 phase2). style은 항목별 비교(StyleMap)라 여기서 뺀다.
+// 함수 · style이 아닌 객체는 속성으로 다루지 않는다 (함수 이벤트는 diffEvents가 따로 비교). style은 항목별 비교(StyleMap)라 여기서 뺀다.
 function readAttrs(node: VNode): Map<string, string> {
   const attrs = new Map<string, string>();
   for (const [name, value] of Object.entries(node.props)) {
     if (name === 'style' && isStyleMap(value)) continue;
+    if (isDomPropName(name) && hasDomProps(node)) continue; // input · textarea · select의 value · checked는 속성이 아니라 DOM 프로퍼티 (diffProps)
     if (typeof value === 'string') attrs.set(name, value);
     else if (typeof value === 'number') attrs.set(name, String(value));
     else if (value === true) attrs.set(name, '');
@@ -148,5 +157,63 @@ function diffStyle(oldNode: VNode, newNode: VNode, path: Path, out: Patch[]): vo
   }
   for (const [property, newValue] of Object.entries(after)) {
     if (!Object.hasOwn(before, property)) out.push({ kind: 'SET_STYLE', path, property, before: null, after: newValue });
+  }
+}
+
+// [AI Note]: 이벤트 props (Phase 2, 알고리즘 결정 8 B). 이름이 `on` + 대문자이고 값이 함수면 이벤트 (`onClick` → `click`).
+// 속성(SET_ATTR)이 아니라 SET_EVENT로 따로 비교한다. 같은 함수 참조면 줄이 없어 무변경 렌더(T-04)에 작업이 생기지 않고,
+// 다르면 전 · 후 함수 한 줄 — patch가 DOM 리스너를 다시 달지 않고 요소에 저장된 핸들러만 바꾼다.
+// 요소 종류가 달라 REPLACE · INSERT되는 새 요소는 통째로 새로 그려지므로(renderVNode) 여기서 비교하지 않는다.
+function readEvents(node: VNode): Map<string, EventHandler> {
+  const events = new Map<string, EventHandler>();
+  for (const [name, value] of Object.entries(node.props)) {
+    if (/^on[A-Z]/.test(name) && typeof value === 'function') events.set(name.slice(2).toLowerCase(), value as EventHandler);
+  }
+  return events;
+}
+
+function diffEvents(oldNode: VNode, newNode: VNode, path: Path, out: Patch[]): void {
+  const before = readEvents(oldNode);
+  const after = readEvents(newNode);
+  for (const [event, oldHandler] of before) {
+    const newHandler = after.get(event);
+    if (newHandler === undefined) out.push({ kind: 'SET_EVENT', path, event, before: oldHandler, after: null });
+    else if (newHandler !== oldHandler) out.push({ kind: 'SET_EVENT', path, event, before: oldHandler, after: newHandler });
+  }
+  for (const [event, newHandler] of after) {
+    if (!before.has(event)) out.push({ kind: 'SET_EVENT', path, event, before: null, after: newHandler });
+  }
+}
+
+// [AI Note]: DOM 프로퍼티 (Phase 2, 정책 「§4.3 DOM 프로퍼티」). `input` · `textarea` · `select`의 `value` · `checked`는 속성(SET_ATTR)이 아니라 SET_PROP 한 줄로 비교한다.
+// 입력창은 사용자가 타이핑하면 속성이 아니라 프로퍼티가 바뀌므로, patch가 프로퍼티로 넣는다 (실제 값과 다를 때만 — 커서 유지, Dev-5 · 6).
+// 정규화: value = 문자열 · 숫자(→ 문자열), checked = true · "" → true / false → false, 나머지는 props에 없는 것. null = props에 없음.
+function isDomPropName(name: string): name is DomPropName {
+  return name === 'value' || name === 'checked';
+}
+
+// [AI Note]: 요소 종류 제한 (검수 NB-4) — `input` · `textarea` · `select`만 프로퍼티. 다른 요소의 value · checked는 readAttrs가 보통 속성으로 비교한다.
+function hasDomProps(node: VNode): boolean {
+  return typeof node.type === 'string' && DOM_PROP_ELEMENTS.has(node.type.toLowerCase());
+}
+
+function readDomProps(node: VNode): Map<DomPropName, DomPropValue> {
+  const props = new Map<DomPropName, DomPropValue>();
+  if (!hasDomProps(node)) return props;
+  const { value, checked } = node.props as { value?: unknown; checked?: unknown };
+  if (typeof value === 'string') props.set('value', value);
+  else if (typeof value === 'number') props.set('value', String(value));
+  if (checked === true || checked === '') props.set('checked', true);
+  else if (checked === false) props.set('checked', false);
+  return props;
+}
+
+function diffProps(oldNode: VNode, newNode: VNode, path: Path, out: Patch[]): void {
+  const before = readDomProps(oldNode);
+  const after = readDomProps(newNode);
+  for (const name of ['value', 'checked'] as const) {
+    const oldValue = before.get(name) ?? null;
+    const newValue = after.get(name) ?? null;
+    if (oldValue !== newValue) out.push({ kind: 'SET_PROP', path, name, before: oldValue, after: newValue });
   }
 }

@@ -56,3 +56,10 @@
 - (테스트 케이스 확인 C1~C5) `tbody` 자동 추가는 구조 비교 예외로 허용 · Patch 도중 예외면 기록 그대로 + 실제 영역을 마지막 기록 VNode로 다시 그린 뒤 alert · `<iframe>` · `<object>` · `<embed>` · `<style>` · `<link rel="stylesheet">` · `<meta http-equiv="refresh">` · `<base>`는 미리보기에서 빼고 Patch 때 막음 · 두 영역 안 링크 클릭 · 폼 제출은 기본 동작 막음(fixture)
 - Diff 시각화(확장): 스위치(기본 꺼짐), 켜면 바뀐 노드만 실제 영역 위 오버레이에서 깜빡임. 실제 DOM에 표시용 class를 붙이지 않음
 - 근거 · 이유 전문: `.agent_workflow/tasks/task_001_ryuuuu5618_phase1/01_request_spec.md` 「알고리즘 결정」
+- (Phase 2, task_002) 이벤트 props: 리스너 하나 + 핸들러 교체 (결정 8 B) — 요소마다 이벤트 이름당 리스너 1개, 핸들러는 요소 자신에 저장, 다시 렌더 땐 핸들러만 교체, props에서 빠지면 핸들러만 비움(리스너 남김). `on` + 대문자 · 함수 값 = 이벤트. 지원 `click` · `input`
+- (Phase 2) 재렌더: 즉시 동기 (결정 9 A) — setter 호출 즉시 렌더 + diff + patch. Batching은 확장 맨 끝(시간이 남으면)
+- (Phase 2) DOM 프로퍼티: `value` · `checked`만, 프로퍼티로 넣고 실제 값과 다를 때만. 입력창은 다시 만들지 않음
+- (Phase 2) 자식 컴포넌트: diff 전에 풀어서 요소 · 글자만 diff에 넘김. 이전 VNode는 mount · update 때 만든 것을 저장(DOM에서 다시 읽지 않음)
+- (Phase 2) Hook: hooks 배열 + 호출 순서 · 개수가 달라지면 오류 · 자식 실행 중 Hook 호출 오류 · 같은 값(`Object.is`) setter는 렌더 안 함 · 함수형 setter · 지연 초기화 · effect는 patch 직후, 의존성 생략/`[]`/변경(항목별 `Object.is`, 길이 다르면 변경) · cleanup은 재실행 직전 · `unmount()` · 렌더가 연달아 50번 넘으면 오류 · memo 재사용
+- (Phase 2) 검증 페이지 = 루트 App + ① 카운터 ② 입력창 ③ 목록(key = 항목 id, [위로] · [아래로] = MOVE) ④ 기록판. 피그마 편집기는 범위 밖
+- Phase 2 근거 · 이유 전문: `.agent_workflow/tasks/task_002_ryuuuu5618_phase2/01_request_spec.md`

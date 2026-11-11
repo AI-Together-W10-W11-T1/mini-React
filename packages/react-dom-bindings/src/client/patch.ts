@@ -1,4 +1,6 @@
 import type { Patch, Path } from '@mini-react/shared';
+import { applyDomProp } from './domProps';
+import { setEventHandler } from './events';
 import { renderVNode } from './renderVNode';
 import { parseStyleText, styleMapToText } from './style';
 
@@ -91,6 +93,20 @@ function applyPatch(area: Element, p: Patch, observer?: PatchObserver): void {
       const before = parent.childNodes[p.to < p.from ? p.to : p.to + 1] ?? null;
       parent.insertBefore(moved, before);
       observer?.({ patch: p, node: moved, stage: 'after' });
+      return;
+    }
+    case 'SET_EVENT': {
+      // [AI Note]: Phase 2 (결정 8 B). 리스너를 달고 떼지 않고, 요소에 저장된 핸들러만 바꾼다 (null이면 핸들러만 비움). DOM 변경은 없다.
+      const element = elementAt(area, p.path, 'SET_EVENT');
+      setEventHandler(element, p.event, p.after);
+      observer?.({ patch: p, node: element, stage: 'after' });
+      return;
+    }
+    case 'SET_PROP': {
+      // [AI Note]: value · checked는 속성이 아니라 프로퍼티. 실제 값과 같으면 대입하지 않는다 (applyDomProp — 타이핑 중 커서 유지).
+      const element = elementAt(area, p.path, 'SET_PROP');
+      applyDomProp(element, p.name, p.after);
+      observer?.({ patch: p, node: element, stage: 'after' });
       return;
     }
   }
