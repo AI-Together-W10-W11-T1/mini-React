@@ -27,3 +27,14 @@
 2026-11-11T09:25 | stage=2 | agent=mr-reviewer | round=1/3 | signal=UNKNOWN | Dev-1~22 | by=hook
 2026-11-11T09:25 | stage=2 | agent=master | round=1 | signal=APPROVE | 개발 검수 1회차 APPROVE (BLOCKING 0, NON-BLOCKING 8) → code_review_log.md, NB 반영 여부 사용자에게 물음
 2026-11-11T09:41 | stage=2 | agent=master | round=- | signal=DECISION | 사용자 "응": NB-1 · 2 · 4 · 5 · 6 · 7 고침, NB-3 · 8 기록만 → 명세 · CLAUDE.md 정책 추가, 작업자에게 NB 반영 + Dev-23~26 맡김
+2026-11-11T10:03 | stage=2 | agent=mr-worker | round=- | signal=UNKNOWN | Dev-23~26 | by=hook
+2026-11-11T10:05 | stage=2 | agent=master | round=- | signal=VERIFY | NB 반영 + 확장 1 Dev-23~26 확인: 커밋 e13b847~daf8f99, vitest 36 files 771 · tsc 0 · playwright 154 passed, 5199 · 5299 LISTEN 없음 → 경량 검수 (02_diff_src.patch, e8cde94..daf8f99)
+2026-11-11T10:05 | stage=2.5 | agent=master | round=- | signal=START | 이해 체크포인트 시작 (의존성 → Hook 호출 순서 → 결정 8 이유), 경량 검수는 뒤에서 진행
+2026-11-11T10:10 | stage=2 | agent=mr-reviewer | round=1/3 | signal=UNKNOWN | Dev-23~26 | by=hook
+2026-11-11T10:11 | stage=2 | agent=master | round=1 | signal=REJECT | 경량 검수 1회차 REJECT (BLOCKING 1: B-07 집계에 기록판 쓰기 섞임, NB 4) → 작업자 재작업 BLOCKING 1 + NB-2 · 5, NB-3 · 4는 공부 뒤 사용자 확인
+2026-11-11T10:15 | stage=2 | agent=mr-worker | round=- | signal=UNKNOWN | Dev-26 | by=hook
+2026-11-11T10:15 | stage=2 | agent=master | round=- | signal=VERIFY | 경량 재작업 확인: 커밋 3de9853~c205c93, vitest 776 · tsc 0 (작업자 playwright 154) → 경량 검수 2회차 (03_diff_src.patch)
+2026-11-11T10:16 | stage=2 | agent=mr-reviewer | round=2/3 | signal=UNKNOWN | Dev-26 | by=hook
+2026-11-11T10:16 | stage=2 | agent=master | round=2 | signal=APPROVE | 경량 검수 2회차 APPROVE (BLOCKING 0, NB 2 기록만). 남은 마스터 몫: 1회차 NB-3 상수 위치 · NB-4 select 역패치 한계 (공부 뒤 사용자 확인)
+2026-11-11T13:38 | stage=2.5 | agent=master | round=- | signal=CHECKPOINT | 의존성 · Hook 호출 순서(if 포함) · 결정 8 이유 3개 완료 (00_master_dialogue.md [CheckPoint])
+2026-11-11T13:39 | stage=2 | agent=master | round=- | signal=DECISION | 경량 NB-3 위치 그대로(changelog), NB-4 한계 기록 → 2단계 끝, 3단계 QA로

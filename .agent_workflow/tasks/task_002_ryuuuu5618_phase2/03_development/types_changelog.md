@@ -22,3 +22,7 @@
 - 영향:
   - `react-reconciler/src/invertPatches.ts`의 `switch`와 테스트 도우미 `react-reconciler/src/__tests__/applyPatches.ts`의 `switch`가 새 kind를 다루지 않아 **`npx tsc --noEmit` 오류 2건** (TS2366). 마스터는 코드를 고치지 않으므로 **1단계 기획의 첫 Dev 항목**에서 작업자가 두 `switch`에 새 kind를 넣어 tsc 0으로 되돌린다
   - `npx vitest run`: 432 passed (변경 전과 같음)
+
+## 2026-11-11 · `DOM_PROP_ELEMENTS` 위치 (types.ts 변경 없음)
+- 내용: 검수 1회차 NB-4 반영으로 작업자가 상수 `DOM_PROP_ELEMENTS` (`input` · `textarea` · `select`)를 `packages/shared/src/index.ts`에 둠 (커밋 9f588e2)
+- 결정: 사용자 "응" (경량 검수 1회차 NB-3 추천안) — 위치 그대로 둠. 타입이 아니라 값 상수이고 types.ts 규칙 위반이 아님

@@ -82,6 +82,7 @@ Phase 2 전체(P2-01~24, T-09~16)를 Phase 1처럼 **엔진 + 검증 페이지**
 - **즉시 동기 렌더의 주의점**: effect 안에서 setter를 부르면 렌더가 중첩된다. 안전장치(연달아 50번 넘으면 오류, 묶음 2-4)가 필요하다. 한 핸들러에서 setter를 여러 번 부르면 핸들러 안의 변수는 옛 값이므로 함수형 setter를 쓴다 (묶음 1-4). [+3]은 렌더도 3번 (정책으로 기록, PRD §4.2 "렌더링 횟수는 스케줄링 정책과 함께 기록").
 - **입력창**: patch가 `input.value`를 넣을 때 실제 값과 같으면 넣지 않아야 커서가 유지된다.
 - **알려진 한계 (테스트 케이스 확인 4)**: Phase 1 `domToVNode`는 `<input value="…">` · `<input checked>` 속성을 props로 읽으므로, Phase 1 편집창에서 이 속성을 고치면 이제 SET_PROP(프로퍼티)로 가서 속성 글은 바뀌지 않는다. (검수 NB-4 반영 뒤 `input` · `textarea` · `select`에만 해당)
+- **알려진 한계 (경량 검수 1회차 NB-4)**: 역패치는 SET_PROP이 자식 복구보다 먼저 적용된다. Phase 1 편집창에서 `<select value="x">` 속성과 그 값의 `<option>` 삭제를 한 번에 한 기록을 「뒤로」 하면 실제 영역의 선택값이 테스트 영역(스냅샷)과 다를 수 있다 (비표준 속성 · 드문 경우)
 - **DOM 접근**: 리스너 등록 · 핸들러 저장 · 프로퍼티 반영은 `react-dom-bindings`에서만. `react` · `react-reconciler` · `scheduler`는 DOM을 만지지 않는다. 탭 제목 바꾸기는 검증 페이지(`fixtures/phase2-app`)의 effect 안에서.
 - **2.5단계 체크포인트 대상** (사용자 요청 순서):
   1. **의존성 개념 먼저** (effect · memo 의존성 배열, `Object.is` 비교)
