@@ -356,7 +356,7 @@ describe('렌더 중 setter 호출은 오류 (검수 1회차 NB-1 · 정책 「�
     expect(updater).not.toHaveBeenCalled();
   });
 
-  it('렌더 중 setter 오류 뒤에도 앱이 산다 (깊이 · 렌더 표시 복구, 이후 setter 정상)', () => {
+  it('렌더 중 setter 오류 뒤에도 새 컴포넌트 인스턴스는 정상으로 마운트되고 setter가 patch를 낸다 (전역 깊이 · 렌더 표시 복구)', () => {
     let boom = true;
     let setN: Setter<number> = () => {};
     const { host, patches } = makeHost();
