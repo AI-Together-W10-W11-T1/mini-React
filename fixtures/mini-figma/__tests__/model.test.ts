@@ -1,5 +1,17 @@
 import { describe, expect, it } from 'vitest';
-import { INITIAL_DOC, isOverridden, mergeProps, resetInstanceField, setInstanceField, setMainField } from '../model';
+import {
+  INITIAL_DOC,
+  addInstance,
+  instanceName,
+  isOverridden,
+  mergeProps,
+  moveInstance,
+  reconcileSelection,
+  removeInstance,
+  resetInstanceField,
+  setInstanceField,
+  setMainField,
+} from '../model';
 import type { Doc, Field, Instance, MainProps } from '../model';
 
 function deepFreeze<T>(value: T): T {
@@ -252,5 +264,151 @@ describe('아이콘 칸 hasIcon · icon도 같은 규칙 (MF-14, Boolean · Inst
     // 메인을 켜면 b2도 따라 ★이 된다 (♥ 아님)
     const mainOn = setMainField(bare, 'hasIcon', true);
     expect(mergeProps(mainOn.main, instanceOf(mainOn, 'b2'))).toMatchObject({ hasIcon: true, icon: 'star' });
+  });
+});
+
+const ids = (doc: Doc): string[] => doc.instances.map((it) => it.id);
+
+describe('addInstance — 추가 (MF-22, 정책: 새 인스턴스 = override 없음)', () => {
+  it('끝에 붙고 id는 b + nextId다', () => {
+    const next = addInstance(INITIAL_DOC, 4);
+    expect(ids(next)).toEqual(['b1', 'b2', 'b3', 'b4']);
+  });
+
+  it('새 인스턴스는 override가 없다 (키가 id뿐)', () => {
+    const next = addInstance(INITIAL_DOC, 4);
+    expect(Object.keys(next.instances[3])).toEqual(['id']);
+  });
+
+  it('기존 인스턴스 객체와 메인은 같은 참조다', () => {
+    const next = addInstance(INITIAL_DOC, 4);
+    INITIAL_DOC.instances.forEach((it, i) => expect(next.instances[i]).toBe(it));
+    expect(next.main).toBe(INITIAL_DOC.main);
+    expect(next).not.toBe(INITIAL_DOC);
+    expect(next.instances).not.toBe(INITIAL_DOC.instances);
+  });
+
+  it('번호를 다시 쓰지 않는다: b3를 지운 뒤에도 nextId 4면 b4다 (b3 아님)', () => {
+    const removed = removeInstance(INITIAL_DOC, 'b3');
+    expect(ids(addInstance(removed, 4))).toEqual(['b1', 'b2', 'b4']);
+  });
+
+  it('doc에는 nextId가 없다 (번호는 App이 세어 넘긴다)', () => {
+    expect(Object.keys(addInstance(INITIAL_DOC, 4))).toEqual(['main', 'instances']);
+  });
+
+  it('메인 값이 바뀐 상태에서 추가해도 새 인스턴스는 메인을 따른다', () => {
+    const changed = setMainField(setMainField(INITIAL_DOC, 'label', '확인'), 'size', 'L');
+    const next = addInstance(changed, 4);
+    expect(mergeProps(next.main, instanceOf(next, 'b4'))).toMatchObject({ label: '확인', size: 'L' });
+  });
+
+  it('입력을 고치지 않는다 (freeze)', () => {
+    const frozen = deepFreeze<Doc>({ main: { ...INITIAL_DOC.main }, instances: INITIAL_DOC.instances.map((it) => ({ ...it })) });
+    expect(() => addInstance(frozen, 4)).not.toThrow();
+    expect(frozen.instances).toHaveLength(3);
+  });
+});
+
+describe('removeInstance — 삭제 (MF-23 · MF-24)', () => {
+  it('그 id만 빠지고 나머지 순서는 그대로다', () => {
+    expect(ids(removeInstance(INITIAL_DOC, 'b2'))).toEqual(['b1', 'b3']);
+    expect(ids(removeInstance(INITIAL_DOC, 'b1'))).toEqual(['b2', 'b3']);
+  });
+
+  it('남은 인스턴스 객체와 메인은 같은 참조다', () => {
+    const next = removeInstance(INITIAL_DOC, 'b2');
+    expect(next.instances[0]).toBe(instanceOf(INITIAL_DOC, 'b1'));
+    expect(next.instances[1]).toBe(instanceOf(INITIAL_DOC, 'b3'));
+    expect(next.main).toBe(INITIAL_DOC.main);
+  });
+
+  it('없는 id는 같은 Doc 객체다', () => {
+    expect(removeInstance(INITIAL_DOC, 'b99')).toBe(INITIAL_DOC);
+  });
+
+  it('메인("main")은 지울 수 없다: 같은 Doc 객체다', () => {
+    expect(removeInstance(INITIAL_DOC, 'main')).toBe(INITIAL_DOC);
+  });
+
+  it('입력을 고치지 않는다 (freeze)', () => {
+    const frozen = deepFreeze<Doc>({ main: { ...INITIAL_DOC.main }, instances: INITIAL_DOC.instances.map((it) => ({ ...it })) });
+    expect(() => removeInstance(frozen, 'b1')).not.toThrow();
+    expect(frozen.instances).toHaveLength(3);
+  });
+});
+
+describe('moveInstance — 순서 바꾸기 (MF-25)', () => {
+  it('-1은 앞과, +1은 뒤와 자리를 바꾼다', () => {
+    expect(ids(moveInstance(INITIAL_DOC, 'b2', -1))).toEqual(['b2', 'b1', 'b3']);
+    expect(ids(moveInstance(INITIAL_DOC, 'b2', 1))).toEqual(['b1', 'b3', 'b2']);
+    expect(ids(moveInstance(INITIAL_DOC, 'b1', 1))).toEqual(['b2', 'b1', 'b3']);
+  });
+
+  it('항목 객체는 같은 참조고 순서만 바뀐다 (화면에서 MOVE가 되는 근거)', () => {
+    const next = moveInstance(INITIAL_DOC, 'b1', 1);
+    INITIAL_DOC.instances.forEach((it) => expect(next.instances).toContain(it));
+    expect(next.main).toBe(INITIAL_DOC.main);
+    expect(next.instances).not.toBe(INITIAL_DOC.instances);
+  });
+
+  it('경계(맨 위의 -1 · 맨 아래의 +1)는 같은 Doc 객체다', () => {
+    expect(moveInstance(INITIAL_DOC, 'b1', -1)).toBe(INITIAL_DOC);
+    expect(moveInstance(INITIAL_DOC, 'b3', 1)).toBe(INITIAL_DOC);
+  });
+
+  it('없는 id는 같은 Doc 객체다', () => {
+    expect(moveInstance(INITIAL_DOC, 'b99', -1)).toBe(INITIAL_DOC);
+    expect(moveInstance(INITIAL_DOC, 'b99', 1)).toBe(INITIAL_DOC);
+  });
+
+  it('입력을 고치지 않는다 (freeze)', () => {
+    const frozen = deepFreeze<Doc>({ main: { ...INITIAL_DOC.main }, instances: INITIAL_DOC.instances.map((it) => ({ ...it })) });
+    expect(() => moveInstance(frozen, 'b1', 1)).not.toThrow();
+    expect(ids(frozen)).toEqual(['b1', 'b2', 'b3']);
+  });
+});
+
+describe('reconcileSelection — 사라진 선택 정리 (MF-26 · MF-32)', () => {
+  it('null은 null이다', () => {
+    expect(reconcileSelection(null, INITIAL_DOC)).toBeNull();
+  });
+
+  it("'main'은 항상 유효하다 (인스턴스가 하나도 없어도)", () => {
+    expect(reconcileSelection('main', INITIAL_DOC)).toBe('main');
+    expect(reconcileSelection('main', { ...INITIAL_DOC, instances: [] })).toBe('main');
+  });
+
+  it('있는 id는 그대로다', () => {
+    expect(reconcileSelection('b2', INITIAL_DOC)).toBe('b2');
+  });
+
+  it('없는 id는 null이다 (삭제 · Undo · Redo로 사라진 경우 모두)', () => {
+    expect(reconcileSelection('b2', removeInstance(INITIAL_DOC, 'b2'))).toBeNull();
+    expect(reconcileSelection('b4', INITIAL_DOC)).toBeNull();
+  });
+});
+
+describe('instanceName — 레이어 행 · 패널 머리의 이름 (④-3)', () => {
+  const main = INITIAL_DOC.main;
+
+  it('override 글자가 있으면 그 글자다', () => {
+    expect(instanceName(main, instanceOf(INITIAL_DOC, 'b2'))).toBe('취소');
+  });
+
+  it('메인을 따르면 메인 글자다', () => {
+    expect(instanceName(main, instanceOf(INITIAL_DOC, 'b1'))).toBe('버튼');
+  });
+
+  it("지금 글자가 ''이면 id다 (override 빈 글자)", () => {
+    expect(instanceName(main, { id: 'b1', label: '' })).toBe('b1');
+  });
+
+  it("메인이 ''이고 따르면 id다", () => {
+    expect(instanceName({ ...main, label: '' }, { id: 'b3' })).toBe('b3');
+  });
+
+  it("메인이 ''여도 override 글자가 있으면 그 글자다", () => {
+    expect(instanceName({ ...main, label: '' }, { id: 'b3', label: '삭제' })).toBe('삭제');
   });
 });

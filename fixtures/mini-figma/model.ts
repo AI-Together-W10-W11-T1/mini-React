@@ -81,3 +81,48 @@ export function resetInstanceField(doc: Doc, id: string, field: Field): Doc {
     instances: doc.instances.map((it) => (it.id === id ? (rest as Instance) : it)),
   };
 }
+
+/**
+ * 끝에 새 인스턴스를 붙인다. 번호 `nextId`는 doc 밖(App의 칸)에서 받는다.
+ * [AI Note]: 번호가 doc 안에 있으면 Undo가 번호까지 되돌려서 추가 → Undo → 추가가 같은 id(b4)를 다시 만든다.
+ * 번호를 App이 따로 세고 Undo가 건드리지 않으므로 지운 번호를 다시 쓰지 않는다 (key가 겹치지 않음, Q17-3).
+ * 새 인스턴스는 override 없이 `{ id }`만 가진다 → 메인을 따른다.
+ */
+export function addInstance(doc: Doc, nextId: number): Doc {
+  return { main: doc.main, instances: [...doc.instances, { id: `b${nextId}` }] };
+}
+
+/** 그 인스턴스를 뺀다. 없는 id · 메인('main')은 같은 Doc (메인은 지울 수 없다, MF-24) */
+export function removeInstance(doc: Doc, id: string): Doc {
+  if (!doc.instances.some((it) => it.id === id)) return doc;
+  return { main: doc.main, instances: doc.instances.filter((it) => it.id !== id) };
+}
+
+/**
+ * 그 인스턴스를 한 칸 옮긴다. delta = -1([↑]) · +1([↓]).
+ * 경계(맨 위의 -1 · 맨 아래의 +1)이거나 없는 id면 같은 Doc (같은 값 → 다시 그리지 않고 기록 안 남음, ④-13).
+ * 항목 객체는 그대로 두고 순서만 바꾸므로 화면에서는 같은 key의 요소가 새로 만들어지지 않고 이동(MOVE)한다.
+ */
+export function moveInstance(doc: Doc, id: string, delta: -1 | 1): Doc {
+  const from = doc.instances.findIndex((it) => it.id === id);
+  const to = from + delta;
+  if (from === -1 || to < 0 || to >= doc.instances.length) return doc;
+  const instances = [...doc.instances];
+  [instances[from], instances[to]] = [instances[to], instances[from]];
+  return { main: doc.main, instances };
+}
+
+/**
+ * 삭제 · Undo · Redo로 doc이 바뀐 뒤 선택을 정리한다. 'main'은 항상 유효, 없는 인스턴스 id는 null (MF-32).
+ * [AI Note]: 선택은 인덱스가 아니라 id라서, 앞에 다른 인스턴스가 끼어들거나 빠져도 같은 인스턴스를 계속 가리킨다 (MF-26).
+ */
+export function reconcileSelection(selectedId: string | null, doc: Doc): string | null {
+  if (selectedId === null || selectedId === 'main') return selectedId;
+  return doc.instances.some((it) => it.id === selectedId) ? selectedId : null;
+}
+
+/** 레이어 행 · 속성 패널 머리에 쓸 인스턴스 이름 = 지금 보이는 글자. 글자가 ''이면 id로 대신한다 (④-3) */
+export function instanceName(main: MainProps, instance: Instance): string {
+  const { label } = mergeProps(main, instance);
+  return label === '' ? instance.id : label;
+}
