@@ -474,3 +474,116 @@ describe('update 중 patch 예외 복구 (검수 1회차 NB-7 · 정책 「§5�
     expect(box.textContent).toBe('n=2');
   });
 });
+
+describe('render 옵션 onPatch — patch 관찰 콜백 (확장 1 Dev-23 · PRD §7 M-02)', () => {
+  type Seen = { kind: string; stage: string; tag: string };
+
+  function observed(): { seen: Seen[]; onPatch: (e: { patch: { kind: string }; node: Node; stage: 'before' | 'after' }) => void } {
+    const seen: Seen[] = [];
+    return {
+      seen,
+      onPatch: (e) => seen.push({ kind: e.patch.kind, stage: e.stage, tag: e.node.nodeName.toLowerCase() }),
+    };
+  }
+
+  function Panel(): VNode {
+    const [n, setN] = useState(0);
+    const [name, setName] = useState('');
+    return h(
+      'main',
+      null,
+      h('p', null, `n=${n}`),
+      h('input', { value: name, onInput: () => {} }),
+      h('button', { onClick: () => setN((c) => c + 1) }, '+1'),
+      h('i', { 'data-id': name }),
+    );
+  }
+
+  it('update의 patch마다 { patch, node, stage }로 불린다 (SET_TEXT → 글자 노드, stage after)', () => {
+    const box = makeContainer();
+    const { seen, onPatch } = observed();
+    render(Panel, box, { onPatch });
+    expect(seen).toEqual([]); // 처음 그리기(mount)는 patch가 아니라서 알리지 않는다
+    click(box.querySelector('button')!);
+    expect(seen.filter((s) => s.kind === 'SET_TEXT')).toEqual([{ kind: 'SET_TEXT', stage: 'after', tag: '#text' }]);
+  });
+
+  it('무변경 update(같은 값 setter 아님, 다시 그려도 diff 0건)는 불리지 않는다', () => {
+    const box = makeContainer();
+    const { seen, onPatch } = observed();
+    let force: () => void = () => {};
+    const inst = render(
+      (): VNode => {
+        const [, setTick] = useState(0);
+        force = () => setTick((t) => t + 1);
+        return h('p', null, '고정'); // tick이 바뀌어 다시 그려도 결과가 같다
+      },
+      box,
+      { onPatch },
+    );
+    force();
+    force();
+    expect(inst.lastPatches).toEqual([]);
+    expect(seen).toEqual([]);
+  });
+
+  it('SET_PROP · SET_EVENT · SET_ATTR도 알린다 (입력창 값 · 핸들러 교체 · 속성)', () => {
+    const box = makeContainer();
+    const { seen, onPatch } = observed();
+    let setName: Setter<string> = () => {};
+    render(
+      (): VNode => {
+        const [name, s] = useState('');
+        setName = s;
+        return h('main', null, h('input', { value: name, onInput: () => {} }), h('i', { 'data-id': name }));
+      },
+      box,
+      { onPatch },
+    );
+    setName('가');
+    expect(seen.map((s) => s.kind).sort()).toEqual(['SET_ATTR', 'SET_EVENT', 'SET_PROP']);
+    expect(seen.every((s) => s.stage === 'after')).toBe(true);
+    expect(seen.find((s) => s.kind === 'SET_PROP')?.tag).toBe('input');
+  });
+
+  it('REMOVE는 지우기 직전(stage before), INSERT는 적용 직후(stage after)', () => {
+    const box = makeContainer();
+    const { seen, onPatch } = observed();
+    let setN: Setter<number> = () => {};
+    render(
+      (): VNode => {
+        const [n, s] = useState(2);
+        setN = s;
+        return h('ul', null, ...Array.from({ length: n }, (_, i) => h('li', { key: `k${i}` }, `i${i}`)));
+      },
+      box,
+      { onPatch },
+    );
+    setN(3);
+    expect(seen).toEqual([{ kind: 'INSERT', stage: 'after', tag: 'li' }]);
+    seen.length = 0;
+    setN(1);
+    expect(seen.map((s) => `${s.kind}:${s.stage}`)).toEqual(['REMOVE:before', 'REMOVE:before']);
+  });
+
+  it('콜백이 없으면 동작이 이전과 똑같다 (옵션 없이 · 빈 옵션으로 불러도 정상)', () => {
+    const a = makeContainer();
+    const b = makeContainer();
+    render(Panel, a);
+    render(Panel, b, {});
+    click(a.querySelector('button')!);
+    click(b.querySelector('button')!);
+    expect(a.innerHTML).toBe(b.innerHTML);
+    expect(a.querySelector('p')!.textContent).toBe('n=1');
+  });
+
+  it('콜백 안에서 DOM을 읽을 수 있고 표시용 class · 속성이 실제 DOM에 붙지 않는다', () => {
+    const box = makeContainer();
+    const texts: string[] = [];
+    render(Panel, box, { onPatch: (e) => texts.push(e.node.textContent ?? '') });
+    const before = box.innerHTML;
+    click(box.querySelector('button')!);
+    expect(texts[0]).toBe('n=1'); // 첫 patch(SET_TEXT) 시점에 이미 새 글자가 DOM에 있다 (뒤따르는 줄은 새 핸들러 SET_EVENT)
+    expect(box.innerHTML).toBe(before.replace('n=0', 'n=1'));
+  });
+});
