@@ -87,7 +87,7 @@ e2e/mini-figma-helpers.ts        변수 도우미 (variableSel · setVariableVal
 
 ## Dev 항목
 
-- [ ] **Dev-1** (`mini-figma`): 변수 데이터 · 풀기 · 값 바꾸기 순수 함수 [VR-01 · 02 · 03]
+- [x] **Dev-1** (`mini-figma`): 변수 데이터 · 풀기 · 값 바꾸기 순수 함수 [VR-01 · 02 · 03]
   - 의존: 없음 (UI 안 바뀜, 화면은 그대로)
   - 대상 파일: `fixtures/mini-figma/model.ts` · `fixtures/mini-figma/color.ts`
     - `model.ts`: `export interface Variable { readonly id: string; readonly name: string; readonly value: Color }`, `Doc.variables: readonly Variable[]`, `INITIAL_VARIABLES` = `primary` Primary `#0052ff` · `danger` Danger `#cf202f` · `success` Success `#05b169`, `INITIAL_DOC`에 `variables: INITIAL_VARIABLES`. `setVariableValue(doc, id, value)`: 같은 값 · 없는 id · 형식 밖 값이면 같은 Doc, 아니면 새 Doc (**그 변수 하나만 새 객체**, 나머지 변수 · `main` · `instances`는 같은 참조). 기존 6개 doc 함수가 `variables`를 같은 참조로 이어받게 고침. `Color` 타입 주석(FD-20)을 「`#rrggbb` 또는 `var:<id>`」로
