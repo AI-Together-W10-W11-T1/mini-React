@@ -5,6 +5,7 @@ import type { FunctionComponent } from '@mini-react/react-reconciler';
 import type { Patch, Path, StateHook, VNode } from '@mini-react/shared';
 import { App } from '../App';
 import { INITIAL_DOC } from '../model';
+import { PALETTE, textColorFor } from '../color';
 import { EMPTY_UNDO } from '../undo';
 import type { UndoState } from '../undo';
 
@@ -14,8 +15,11 @@ import type { UndoState } from '../undo';
 // ② document.addEventListener spy는 render() 호출 전에 건다 (Dev-11) ③ 준비 동작마다 `await Promise.resolve()`로 렌더를 끝낸 뒤
 // 센 동작을 한다 (Batching, 결정 9 B — 같은 틱에 보내면 렌더가 합쳐져 lastPatches에 준비 동작의 줄이 섞인다).
 
-const CANVAS_PREFIX: Path = [0, 1];
-const LAYER_PREFIX: Path = [0, 0];
+// 경로 접두 (FD-10): 도구 막대 [0,0] · 레이어 [0,1] · 캔버스 [0,2] · 속성 패널 [0,3] — div.app의 자식 순서 0 ~ 3
+const TOOLBAR_PREFIX: Path = [0, 0];
+const LAYER_PREFIX: Path = [0, 1];
+const CANVAS_PREFIX: Path = [0, 2];
+const PANEL_PREFIX_ALL: Path = [0, 3];
 
 const startsWith = (path: Path, prefix: Path): boolean => prefix.every((n, i) => path[i] === n);
 /** patch가 가리키는 경로 (MOVE는 parent) */
@@ -24,7 +28,7 @@ const pathOf = (patch: Patch): Path => (patch.kind === 'MOVE' ? patch.parent : p
 /**
  * patch 중 그 영역(접두 경로)의 줄만 모아 `SET_EVENT`를 빼고 종류별 개수로 센다 (qa_todo 「patch 기대 표」 · 공통 주의 13).
  * 렌더마다 핸들러가 새 함수라 SET_EVENT 줄이 생기는 것은 task_002의 알려진 한계라 센 값에서 뺀다.
- * 속성 패널(`[0, 2]`)은 value · checked 때문에 SET_PROP이 섞여서 세지 않는다.
+ * 속성 패널(`[0, 3]`)은 value · checked 때문에 SET_PROP이 섞여서 세지 않는다.
  */
 function countsUnder(patches: readonly Patch[], prefix: Path): Record<string, number> {
   const out: Record<string, number> = {};
@@ -34,6 +38,7 @@ function countsUnder(patches: readonly Patch[], prefix: Path): Record<string, nu
   }
   return out;
 }
+const toolbarCounts = (patches: readonly Patch[]): Record<string, number> => countsUnder(patches, TOOLBAR_PREFIX);
 const canvasCounts = (patches: readonly Patch[]): Record<string, number> => countsUnder(patches, CANVAS_PREFIX);
 const layerCounts = (patches: readonly Patch[]): Record<string, number> => countsUnder(patches, LAYER_PREFIX);
 
@@ -81,6 +86,16 @@ const typeInto = async (id: string, text: string): Promise<void> => {
   input.dispatchEvent(new Event('input'));
   await Promise.resolve();
 };
+/** 색 칩 하나를 누르고 렌더가 끝나길 기다린다 */
+const chipOf = (hex: string): HTMLElement => {
+  const found = root.querySelector<HTMLElement>(`[data-testid="color-chip"][data-color="${hex}"]`);
+  if (found === null) throw new Error(`색 칩 ${hex}가 없다`);
+  return found;
+};
+const pick = (hex: string): Promise<void> => click(chipOf(hex));
+const chips = (): HTMLElement[] => Array.from(root.querySelectorAll<HTMLElement>('[data-testid="color-chip"]'));
+/** 지금 aria-pressed="true"인 칩의 색들 */
+const pressedChips = (): (string | null)[] => chips().filter((c) => c.getAttribute('aria-pressed') === 'true').map((c) => c.getAttribute('data-color'));
 const choose = async (id: string, value: string): Promise<void> => {
   const select = byId(id) as HTMLSelectElement;
   select.value = value;
@@ -97,6 +112,18 @@ const toggle = async (id: string, checked: boolean): Promise<void> => {
 const slot = (index: number): unknown => (instance.hooks[index] as StateHook).value;
 const layerNames = (): string[] =>
   Array.from(root.querySelectorAll('[data-testid="layer-item"] [data-testid="layer-name"]')).map((el) => el.textContent ?? '');
+
+/** `#rrggbb` → jsdom이 style에서 돌려주는 `rgb(r, g, b)` 글 */
+const rgb = (hex: string): string => {
+  const n = parseInt(hex.slice(1), 16);
+  return `rgb(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255})`;
+};
+/** 버튼의 배경색 · 글자색 (색은 클래스가 아니라 인라인 style, FD-23) */
+const bgOf = (id: string): string => buttonOf(id).style.getPropertyValue('background-color');
+const fgOf = (id: string): string => buttonOf(id).style.getPropertyValue('color');
+const bgs = (): string[] => ['main', 'b1', 'b2', 'b3'].map(bgOf);
+/** 한 patch 목록에서 캔버스 접두 안 SET_STYLE 줄만 */
+const canvasStyles = (patches: readonly Patch[]): Patch[] => patches.filter((p) => p.kind === 'SET_STYLE' && startsWith(p.path, CANVAS_PREFIX));
 
 /** document의 addEventListener · removeEventListener 호출 기록 (render() 전에 걸어야 처음 등록까지 잡힌다 — 1회차 NON-BLOCKING 7) */
 let addSpy: MockInstance;
@@ -121,50 +148,58 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-describe('patch 세는 도우미 (canvasCounts · layerCounts)', () => {
+describe('patch 세는 도우미 (toolbarCounts · canvasCounts · layerCounts)', () => {
   const p = (path: Path): Patch => ({ kind: 'SET_TEXT', path, before: 'a', after: 'b' });
   const patches: Patch[] = [
-    p([0, 1, 1, 0, 0]),
-    p([0, 1, 0, 0, 0]),
-    p([0, 0, 1, 2, 0]),
-    { kind: 'SET_EVENT', path: [0, 1, 1, 0], event: 'click', before: null, after: () => {} },
-    { kind: 'SET_PROP', path: [0, 2, 1], name: 'value', before: 'a', after: 'b' },
+    p([0, 2, 1, 0, 0]),
+    p([0, 2, 0, 0, 0]),
+    p([0, 1, 1, 2, 0]),
+    p([0, 0, 2]),
+    { kind: 'SET_ATTR', path: [0, 0, 2], name: 'disabled', before: '', after: null },
+    { kind: 'SET_EVENT', path: [0, 2, 1, 0], event: 'click', before: null, after: () => {} },
+    { kind: 'SET_PROP', path: [0, 3, 1], name: 'value', before: 'a', after: 'b' },
+    { kind: 'MOVE', parent: [0, 2, 1], from: 0, to: 1 },
     { kind: 'MOVE', parent: [0, 1, 1], from: 0, to: 1 },
-    { kind: 'MOVE', parent: [0, 0, 1], from: 0, to: 1 },
   ];
 
-  it('캔버스(접두 [0, 1]) 줄만 종류별로 세고 SET_EVENT는 뺀다. MOVE는 parent 경로로 본다', () => {
+  it('캔버스(접두 [0, 2]) 줄만 종류별로 세고 SET_EVENT는 뺀다. MOVE는 parent 경로로 본다', () => {
     expect(canvasCounts(patches)).toEqual({ SET_TEXT: 2, MOVE: 1 });
   });
 
-  it('레이어(접두 [0, 0]) 줄만 센다. 속성 패널 줄은 어느 쪽에도 안 들어간다', () => {
+  it('레이어(접두 [0, 1]) 줄만 센다. 속성 패널 줄은 어느 쪽에도 안 들어간다', () => {
     expect(layerCounts(patches)).toEqual({ SET_TEXT: 1, MOVE: 1 });
+  });
+
+  it('도구 막대(접두 [0, 0]) 줄만 센다', () => {
+    expect(toolbarCounts(patches)).toEqual({ SET_TEXT: 1, SET_ATTR: 1 });
   });
 });
 
 describe('시작 화면 (MF-16 · MF-04)', () => {
-  it('영역 상자 안 최상위는 <div class="app"> 하나이고 자식 순서는 레이어 · 캔버스 · 속성 패널이다 (경로 접두 [0,0] · [0,1] · [0,2])', () => {
+  it('영역 상자 안 최상위는 <div class="app"> 하나이고 자식 순서는 도구 막대 · 레이어 · 캔버스 · 속성 패널이다 (경로 접두 [0,0] · [0,1] · [0,2] · [0,3])', () => {
     expect(root.children).toHaveLength(1);
     expect(area().localName).toBe('div');
     expect(area().className).toBe('app');
-    expect(Array.from(area().children).map(testId)).toEqual(['layer-panel', 'canvas', 'property-panel']);
-    // canvasCounts의 접두 [0, 1]이 정말 캔버스를 가리키는지 한 줄로 지킨다
-    expect(testId(root.firstElementChild?.children[1])).toBe('canvas');
-    expect(testId(root.firstElementChild?.children[0])).toBe('layer-panel');
+    expect(Array.from(area().children).map(testId)).toEqual(['toolbar', 'layer-panel', 'canvas', 'property-panel']);
+    // 접두 [0, 0 ~ 3]이 정말 그 영역을 가리키는지 한 줄씩 지킨다 (qa_todo 「접두 맞는지 한 줄 단언」)
+    expect(['toolbar', 'layer-panel', 'canvas', 'property-panel']).toEqual([0, 1, 2, 3].map((i) => testId(root.firstElementChild?.children[i])));
   });
 
   it('캔버스에 메인 버튼 1개 + 인스턴스 버튼 3개, 글자는 버튼 · 버튼 · 취소 · 삭제', () => {
-    const canvas = area().children[1];
+    const canvas = area().children[2];
     expect(canvas.querySelectorAll('[data-testid="canvas-main"] [data-testid="figma-button"]')).toHaveLength(1);
     expect(canvas.querySelectorAll('[data-testid="canvas-instances"] [data-testid="figma-button"]')).toHaveLength(3);
     expect(buttons().map((b) => b.getAttribute('data-id'))).toEqual(['main', 'b1', 'b2', 'b3']);
     expect(labels()).toEqual(['버튼', '버튼', '취소', '삭제']);
   });
 
-  it('Button에 메인 값(크기 M · 파랑 · 아이콘 없음)이 들어가고 b3만 색이 빨강이다', () => {
+  it('Button에 메인 값(크기 M · 파랑 · 아이콘 없음)이 들어가고 b3만 색이 빨강이다 — 색은 style(배경 · 글자색)로 칠하고 클래스에 색 이름이 없다 (FD-23 · 24)', () => {
     const classes = buttons().map((b) => b.className);
     for (const c of classes) expect(c.split(' ')).toContain('btn-M');
-    expect(classes.map((c) => c.split(' ').find((x) => x.startsWith('btn-') && x !== 'btn-M'))).toEqual(['btn-blue', 'btn-blue', 'btn-blue', 'btn-red']);
+    for (const c of classes) expect(c).not.toMatch(/btn-(blue|red|green)/);
+    expect(bgs()).toEqual([rgb('#0052ff'), rgb('#0052ff'), rgb('#0052ff'), rgb('#cf202f')]);
+    expect(bgs()).toEqual(['rgb(0, 82, 255)', 'rgb(0, 82, 255)', 'rgb(0, 82, 255)', 'rgb(207, 32, 47)']);
+    for (const id of ['main', 'b1', 'b2', 'b3']) expect(fgOf(id), `${id} 글자색`).toBe('rgb(255, 255, 255)');
     expect(root.querySelectorAll('[data-testid="btn-icon"]')).toHaveLength(0);
   });
 
@@ -207,7 +242,8 @@ describe('고르기 (MF-20 · D-05)', () => {
     await click(buttonOf('b2'));
     expect(canvasCounts(instance.lastPatches)).toEqual({ SET_ATTR: 1 });
     expect(layerCounts(instance.lastPatches)).toEqual({ SET_ATTR: 1 });
-    const panelReplaces = instance.lastPatches.filter((p) => p.kind === 'REPLACE' && startsWith(p.path, [0, 2]));
+    expect(toolbarCounts(instance.lastPatches)).toEqual({});
+    const panelReplaces = instance.lastPatches.filter((p) => p.kind === 'REPLACE' && startsWith(p.path, PANEL_PREFIX_ALL));
     expect(panelReplaces.length).toBeGreaterThanOrEqual(1);
     // 화면: 머리 <h2> 「인스턴스 · 취소」, 빈 안내 <p>는 DOM에서 빠짐
     expect(root.querySelector('[data-testid="property-title"]')?.textContent).toBe('인스턴스 · 취소');
@@ -227,6 +263,7 @@ describe('고르기 (MF-20 · D-05)', () => {
     await click(buttonOf('b3'));
     expect(canvasCounts(instance.lastPatches)).toEqual({ SET_ATTR: 2 });
     expect(layerCounts(instance.lastPatches)).toEqual({ SET_ATTR: 2 });
+    expect(toolbarCounts(instance.lastPatches)).toEqual({});
     expect(root.querySelector('[data-testid="property-title"]')?.textContent).toBe('인스턴스 · 삭제');
     expect(buttons().filter((b) => b.classList.contains('selected')).map((b) => b.getAttribute('data-id'))).toEqual(['b3']);
   });
@@ -273,7 +310,7 @@ describe('메인 속성 편집 (MF-14 · MF-15 · P2-10 · D-01 ~ D-04) — patc
     expect((byId('prop-size') as HTMLSelectElement).value).toBe('M');
     expect((byId('prop-hasicon') as HTMLInputElement).checked).toBe(false);
     expect((byId('prop-icon') as HTMLSelectElement).value).toBe('star');
-    expect((byId('prop-color') as HTMLSelectElement).value).toBe('blue');
+    expect((byId('prop-color') as HTMLInputElement).value).toBe('#0052ff');
   });
 
   it('P-3 라벨 한 글자(`버튼!`): 캔버스 { SET_TEXT: 2 }(메인 · b1, b2 · b3는 override) · 레이어 { SET_TEXT: 1 }(b1 행 이름). 렌더 한 번', async () => {
@@ -281,6 +318,7 @@ describe('메인 속성 편집 (MF-14 · MF-15 · P2-10 · D-01 ~ D-04) — patc
     await typeInto('prop-label', '버튼!');
     expect(canvasCounts(instance.lastPatches)).toEqual({ SET_TEXT: 2 });
     expect(layerCounts(instance.lastPatches)).toEqual({ SET_TEXT: 1 });
+    expect(toolbarCounts(instance.lastPatches), '첫 수정 = [↶]이 켜짐').toEqual({ SET_ATTR: 1 });
     expect(renders - before).toBe(1);
     expect(labels()).toEqual(['버튼!', '버튼!', '취소', '삭제']);
     expect(layerNames()).toEqual(['버튼!', '취소', '삭제']);
@@ -298,14 +336,47 @@ describe('메인 속성 편집 (MF-14 · MF-15 · P2-10 · D-01 ~ D-04) — patc
     await choose('prop-size', 'L');
     expect(canvasCounts(instance.lastPatches)).toEqual({ SET_ATTR: 4 });
     expect(layerCounts(instance.lastPatches)).toEqual({});
+    expect(toolbarCounts(instance.lastPatches)).toEqual({ SET_ATTR: 1 });
     expect(buttons().every((b) => b.classList.contains('btn-L'))).toBe(true);
   });
 
-  it('P-5 색 초록: 캔버스 { SET_ATTR: 3 }(메인 · b1 · b2, b3는 빨강 override) · 레이어 { }', async () => {
-    await choose('prop-color', 'green');
-    expect(canvasCounts(instance.lastPatches)).toEqual({ SET_ATTR: 3 });
+  it('P-5 색 #05b169(초록): 캔버스 { SET_STYLE: 6 }(메인 · b1 · b2 × (배경 + 글자색 흰 → 먹), b3는 빨강 override) · 레이어 { }', async () => {
+    await pick('#05b169');
+    expect(canvasCounts(instance.lastPatches)).toEqual({ SET_STYLE: 6 });
     expect(layerCounts(instance.lastPatches)).toEqual({});
-    expect(buttons().map((b) => b.className.match(/btn-(blue|red|green)/)?.[0])).toEqual(['btn-green', 'btn-green', 'btn-green', 'btn-red']);
+    expect(toolbarCounts(instance.lastPatches)).toEqual({ SET_ATTR: 1 });
+    expect(bgs()).toEqual([rgb('#05b169'), rgb('#05b169'), rgb('#05b169'), rgb('#cf202f')]);
+    expect(['main', 'b1', 'b2', 'b3'].map(fgOf)).toEqual([rgb('#0a0b0d'), rgb('#0a0b0d'), rgb('#0a0b0d'), rgb('#ffffff')]);
+  });
+
+  it('P-5b 색 #cf202f(빨강): 캔버스 { SET_STYLE: 3 }(배경만 — 글자색은 흰 그대로, b3는 이미 #cf202f라 줄 없음) · 레이어 { }. 한 줄 필드는 property · before · after를 hex로 단언', async () => {
+    await pick('#cf202f');
+    expect(canvasCounts(instance.lastPatches)).toEqual({ SET_STYLE: 3 });
+    expect(layerCounts(instance.lastPatches)).toEqual({});
+    expect(toolbarCounts(instance.lastPatches)).toEqual({ SET_ATTR: 1 });
+    const styles = canvasStyles(instance.lastPatches);
+    expect(styles).toHaveLength(3);
+    for (const patch of styles) {
+      expect(patch.kind === 'SET_STYLE' && { property: patch.property, before: patch.before, after: patch.after }).toEqual({ property: 'background-color', before: '#0052ff', after: '#cf202f' });
+    }
+  });
+
+  it('색을 바꿔도 버튼 노드는 같은 참조이고 class 글이 그대로다', async () => {
+    const held = buttons();
+    const classes = held.map((b) => b.className);
+    await pick('#05b169');
+    expect(buttons()).toEqual(held);
+    expect(buttons().map((b) => b.className)).toEqual(classes);
+  });
+
+  it('글자색은 배경에 따라 textColorFor 규칙을 따른다 (메인 · b1 · b2)', async () => {
+    for (const hex of ['#05b169', '#cf202f', '#0052ff']) {
+      await pick(hex);
+      for (const id of ['main', 'b1', 'b2']) {
+        expect(bgOf(id)).toBe(rgb(hex));
+        expect(fgOf(id)).toBe(rgb(textColorFor(hex)));
+      }
+    }
   });
 
   it('P-6 아이콘 켜기: 캔버스 { INSERT: 4 }(REPLACE · REMOVE · SET_TEXT 0, 각 INSERT 경로 마지막 = 0) · 레이어 { }. 글자 <span> 노드는 같은 참조', async () => {
@@ -314,6 +385,7 @@ describe('메인 속성 편집 (MF-14 · MF-15 · P2-10 · D-01 ~ D-04) — patc
     await toggle('prop-hasicon', true);
     expect(canvasCounts(instance.lastPatches)).toEqual({ INSERT: 4 });
     expect(layerCounts(instance.lastPatches)).toEqual({});
+    expect(toolbarCounts(instance.lastPatches)).toEqual({ SET_ATTR: 1 });
     expect(renders - before).toBe(1);
     const inserts = instance.lastPatches.filter((p) => p.kind === 'INSERT' && startsWith(p.path, CANVAS_PREFIX));
     expect(inserts).toHaveLength(4);
@@ -331,6 +403,7 @@ describe('메인 속성 편집 (MF-14 · MF-15 · P2-10 · D-01 ~ D-04) — patc
     await toggle('prop-hasicon', false);
     expect(canvasCounts(instance.lastPatches)).toEqual({ REMOVE: 4 });
     expect(layerCounts(instance.lastPatches)).toEqual({});
+    expect(toolbarCounts(instance.lastPatches), '같은 칸 묶음 = [↶]은 이미 켜져 있음').toEqual({});
     expect(root.querySelectorAll('[data-testid="btn-icon"]')).toHaveLength(0);
   });
 
@@ -340,6 +413,7 @@ describe('메인 속성 편집 (MF-14 · MF-15 · P2-10 · D-01 ~ D-04) — patc
     await choose('prop-icon', 'heart');
     expect(canvasCounts(instance.lastPatches)).toEqual({ SET_TEXT: 4 });
     expect(layerCounts(instance.lastPatches)).toEqual({});
+    expect(toolbarCounts(instance.lastPatches)).toEqual({});
     expect(Array.from(root.querySelectorAll('[data-testid="btn-icon"]'))).toEqual(icons);
     expect(icons.map((el) => el.textContent)).toEqual(['♥', '♥', '♥', '♥']);
   });
@@ -362,7 +436,7 @@ describe('메인 속성 편집 (MF-14 · MF-15 · P2-10 · D-01 ~ D-04) — patc
 
   it('메인을 바꿔도 doc의 instances 배열은 같은 참조다', async () => {
     const before = (slot(0) as typeof INITIAL_DOC).instances;
-    await choose('prop-color', 'green');
+    await pick('#05b169');
     expect((slot(0) as typeof INITIAL_DOC).instances).toBe(before);
   });
 });
@@ -374,8 +448,8 @@ const followRows = (): string[] =>
   Array.from(root.querySelectorAll('[data-testid="prop-row"]'))
     .filter((r) => r.querySelector('[data-testid="prop-follow"]') !== null)
     .map((r) => r.getAttribute('data-field') ?? '');
-/** b2 버튼 안 경로 접두: 캔버스 [0, 1] → 인스턴스 줄(1번 자식) → 위치 1 */
-const B2_PATH: Path = [0, 1, 1, 1];
+/** b2 버튼 안 경로 접두: 캔버스 [0, 2] → 인스턴스 줄(1번 자식) → 위치 1 */
+const B2_PATH: Path = [0, 2, 1, 1];
 
 describe('인스턴스 속성 편집 · override 표시 · ↻ (MF-12 ~ 15 · MF-21) — patch 기대 표 P-9 ~ P-14 · P-21 · P-22', () => {
   it('인스턴스를 고르면 5칸이 합쳐진 값(메인 값 위에 인스턴스 값)으로 뜨고 override 칸은 색 구분 + ↻, 아닌 칸은 「메인 따름」이다 (b2 · b3 · b1)', async () => {
@@ -389,7 +463,7 @@ describe('인스턴스 속성 편집 · override 표시 · ↻ (MF-12 ~ 15 · MF
     await click(buttonOf('b3'));
     expect(overriddenRows()).toEqual(['label', 'color']);
     expect(followRows()).toEqual(['size', 'hasIcon', 'icon']);
-    expect((byId('prop-color') as HTMLSelectElement).value).toBe('red');
+    expect((byId('prop-color') as HTMLInputElement).value).toBe('#cf202f');
 
     await click(buttonOf('b1'));
     expect(overriddenRows()).toEqual([]);
@@ -404,6 +478,7 @@ describe('인스턴스 속성 편집 · override 표시 · ↻ (MF-12 ~ 15 · MF
     await typeInto('prop-label', '확인');
     expect(canvasCounts(instance.lastPatches)).toEqual({ SET_TEXT: 1 });
     expect(layerCounts(instance.lastPatches)).toEqual({ SET_TEXT: 1 });
+    expect(toolbarCounts(instance.lastPatches)).toEqual({ SET_ATTR: 1 });
     expect(renders - before).toBe(1);
     expect(labels()).toEqual(['버튼', '확인', '취소', '삭제']);
     expect(overriddenRows()).toEqual(['label']);
@@ -415,6 +490,7 @@ describe('인스턴스 속성 편집 · override 표시 · ↻ (MF-12 ~ 15 · MF
     await choose('prop-size', 'S');
     expect(canvasCounts(instance.lastPatches)).toEqual({ SET_ATTR: 1 });
     expect(layerCounts(instance.lastPatches)).toEqual({});
+    expect(toolbarCounts(instance.lastPatches)).toEqual({ SET_ATTR: 1 });
     expect(buttons().map((b) => (b.classList.contains('btn-S') ? 'S' : b.classList.contains('btn-M') ? 'M' : '?'))).toEqual(['M', 'S', 'M', 'M']);
   });
 
@@ -423,6 +499,7 @@ describe('인스턴스 속성 편집 · override 표시 · ↻ (MF-12 ~ 15 · MF
     await toggle('prop-hasicon', true);
     expect(canvasCounts(instance.lastPatches)).toEqual({ INSERT: 1 });
     expect(layerCounts(instance.lastPatches)).toEqual({});
+    expect(toolbarCounts(instance.lastPatches)).toEqual({ SET_ATTR: 1 });
     const insert = instance.lastPatches.find((p) => p.kind === 'INSERT' && startsWith(p.path, CANVAS_PREFIX));
     expect(insert?.kind === 'INSERT' && insert.path).toEqual([...B2_PATH, 0]);
     expect(buttonOf('b2').querySelector('[data-testid="btn-icon"]')?.textContent).toBe('★');
@@ -435,6 +512,7 @@ describe('인스턴스 속성 편집 · override 표시 · ↻ (MF-12 ~ 15 · MF
     await choose('prop-icon', 'heart');
     expect(canvasCounts(instance.lastPatches)).toEqual({ SET_TEXT: 1 });
     expect(layerCounts(instance.lastPatches)).toEqual({});
+    expect(toolbarCounts(instance.lastPatches)).toEqual({});
     expect(buttonOf('b2').querySelector('[data-testid="btn-icon"]')?.textContent).toBe('♥');
   });
 
@@ -451,6 +529,7 @@ describe('인스턴스 속성 편집 · override 표시 · ↻ (MF-12 ~ 15 · MF
     await toggle('prop-hasicon', true);
     expect(canvasCounts(instance.lastPatches)).toEqual({ INSERT: 3 });
     expect(layerCounts(instance.lastPatches)).toEqual({});
+    expect(toolbarCounts(instance.lastPatches)).toEqual({});
     expect(instance.lastPatches.filter((p) => p.kind !== 'SET_EVENT' && startsWith(p.kind === 'MOVE' ? p.parent : p.path, B2_PATH))).toHaveLength(0);
     expect(buttonOf('b2').querySelector('[data-testid="btn-icon"]')?.textContent).toBe('♥');
   });
@@ -461,6 +540,7 @@ describe('인스턴스 속성 편집 · override 표시 · ↻ (MF-12 ~ 15 · MF
     for (const [kind, glyph] of [['heart', '♥'], ['star', '★']] as const) {
       await choose('prop-icon', kind);
       expect(canvasCounts(instance.lastPatches)).toEqual({ SET_TEXT: 3 });
+      expect(toolbarCounts(instance.lastPatches)).toEqual({});
       expect(instance.lastPatches.filter((p) => p.kind !== 'SET_EVENT' && startsWith(p.kind === 'MOVE' ? p.parent : p.path, B2_PATH))).toHaveLength(0);
       expect(['main', 'b1', 'b3'].map((id) => buttonOf(id).querySelector('[data-testid="btn-icon"]')?.textContent)).toEqual([glyph, glyph, glyph]);
       expect(buttonOf('b2').querySelector('[data-testid="btn-icon"]')?.textContent).toBe('♥');
@@ -477,6 +557,7 @@ describe('인스턴스 속성 편집 · override 표시 · ↻ (MF-12 ~ 15 · MF
     await click(resetButton('hasIcon') as HTMLElement);
     expect(canvasCounts(instance.lastPatches)).toEqual({ REMOVE: 1 });
     expect(layerCounts(instance.lastPatches)).toEqual({});
+    expect(toolbarCounts(instance.lastPatches)).toEqual({});
     expect(renders - r1).toBe(1);
     expect(buttonOf('b2').querySelector('[data-testid="btn-icon"]')).toBeNull();
 
@@ -493,6 +574,7 @@ describe('인스턴스 속성 편집 · override 표시 · ↻ (MF-12 ~ 15 · MF
     await toggle('prop-hasicon', true);
     expect(canvasCounts(instance.lastPatches)).toEqual({ INSERT: 4 });
     expect(layerCounts(instance.lastPatches)).toEqual({});
+    expect(toolbarCounts(instance.lastPatches)).toEqual({});
     expect(buttons().map((b) => b.querySelector('[data-testid="btn-icon"]')?.textContent)).toEqual(['★', '★', '★', '★']);
   });
 
@@ -503,6 +585,7 @@ describe('인스턴스 속성 편집 · override 표시 · ↻ (MF-12 ~ 15 · MF
     await click(resetButton('label') as HTMLElement);
     expect(canvasCounts(instance.lastPatches)).toEqual({ SET_TEXT: 1 });
     expect(layerCounts(instance.lastPatches)).toEqual({ SET_TEXT: 1 });
+    expect(toolbarCounts(instance.lastPatches), '↻는 이미 켜진 [↶] 위의 새 단계').toEqual({});
     expect(renders - before).toBe(1);
     expect(labels()).toEqual(['버튼', '버튼', '취소', '삭제']);
     expect(overriddenRows()).toEqual([]);
@@ -520,9 +603,9 @@ describe('인스턴스 속성 편집 · override 표시 · ↻ (MF-12 ~ 15 · MF
     expect(labels()).toEqual(['버튼', '버튼', '취소', '버튼']);
     // 메인을 바꾸면 b3도 따라감
     await click(buttonOf('main'));
-    await choose('prop-color', 'green');
+    await pick('#05b169');
     await typeInto('prop-label', '저장');
-    expect(buttonOf('b3').classList.contains('btn-green')).toBe(true);
+    expect(bgOf('b3')).toBe(rgb('#05b169'));
     expect(labels()).toEqual(['저장', '저장', '취소', '저장']);
   });
 
@@ -559,18 +642,352 @@ describe('인스턴스 속성 편집 · override 표시 · ↻ (MF-12 ~ 15 · MF
 });
 
 // ---------------------------------------------------------------------------
+// Dev-3: 팔레트 판 — 칩 8개 + 직접 고르기 (FD-21 · 22 · 25, P-25 ~ P-27)
+// ---------------------------------------------------------------------------
+
+describe('팔레트 판 (Dev-3)', () => {
+  const PANEL_PREFIX: Path = PANEL_PREFIX_ALL;
+  /** 속성 패널 줄을 SET_EVENT만 빼고 종류별로 센다 (P-25만 팔레트 구조가 정해져 있어 센다) */
+  const panelCounts = (patches: readonly Patch[]): Record<string, number> => countsUnder(patches, PANEL_PREFIX);
+
+  beforeEach(async () => {
+    await click(buttonOf('main'));
+  });
+
+  it('메인을 고르면 칩 8개(data-color가 PALETTE와 같은 순서)가 있고 지금 색 칩만 aria-pressed="true", 나머지는 문자열 "false"다', () => {
+    expect(chips().map((c) => c.getAttribute('data-color'))).toEqual([...PALETTE]);
+    expect(PALETTE).toHaveLength(8);
+    expect(pressedChips()).toEqual(['#0052ff']);
+    expect(chips().filter((c) => c.getAttribute('aria-pressed') === 'false')).toHaveLength(7);
+    for (const chip of chips()) {
+      expect(chip.localName).toBe('button');
+      expect(chip.getAttribute('type')).toBe('button');
+      expect(chip.getAttribute('aria-label')).toBe(`색 ${chip.getAttribute('data-color')}`);
+      expect(chip.textContent).toBe('');
+      expect(chip.style.getPropertyValue('background-color')).toBe(rgb(chip.getAttribute('data-color') ?? ''));
+    }
+  });
+
+  it('색 입력칸(prop-color)은 type=color이고 값은 지금 색이며, 값 글자(color-hex)도 지금 색이다. 색 칸에 <select>가 없다', () => {
+    const input = byId('prop-color') as HTMLInputElement;
+    expect(input.localName).toBe('input');
+    expect(input.type).toBe('color');
+    expect(input.value).toBe('#0052ff');
+    expect(byId('color-hex').textContent).toBe('#0052ff');
+    expect(root.querySelector('[data-testid="color-palette"]')).not.toBeNull();
+    expect(root.querySelector('[data-testid="prop-row"][data-field="color"] select')).toBeNull();
+  });
+
+  it('칩을 누르면 onEdit로 메인 값 · 버튼 배경 · 칩 표시 · 입력칸 값 · 값 글자가 같이 바뀐다 (칩 8개 전부)', async () => {
+    for (const hex of PALETTE) {
+      await pick(hex);
+      expect(bgs().slice(0, 3), hex).toEqual([rgb(hex), rgb(hex), rgb(hex)]);
+      expect(bgOf('b3')).toBe(rgb('#cf202f'));
+      expect(pressedChips()).toEqual([hex]);
+      expect((byId('prop-color') as HTMLInputElement).value).toBe(hex);
+      expect(byId('color-hex').textContent).toBe(hex);
+      expect((slot(0) as typeof INITIAL_DOC).main.color).toBe(hex);
+    }
+  });
+
+  it('P-25 칩 #cf202f: 캔버스 { SET_STYLE: 3 } · 속성 패널 { SET_ATTR: 2(칩 두 개의 aria-pressed), SET_PROP: 1(색 입력칸 value), SET_TEXT: 1(color-hex 글자) } — 팔레트 판이 바뀐 곳만 고친다', async () => {
+    const before = chips();
+    const input = byId('prop-color');
+    await pick('#cf202f');
+    expect(toolbarCounts(instance.lastPatches), '첫 수정 = [↶]이 켜짐').toEqual({ SET_ATTR: 1 });
+    expect(canvasCounts(instance.lastPatches)).toEqual({ SET_STYLE: 3 });
+    expect(layerCounts(instance.lastPatches)).toEqual({});
+    expect(panelCounts(instance.lastPatches)).toEqual({ SET_ATTR: 2, SET_PROP: 1, SET_TEXT: 1 });
+    // 칩 · 입력칸은 같은 노드
+    expect(chips()).toEqual(before);
+    expect(byId('prop-color')).toBe(input);
+  });
+
+  it('P-26 색 입력칸 input 연속 #112233 → #223344 → #334455 → #ffee00: 각각 캔버스 { SET_STYLE: 3 }, 마지막만 { SET_STYLE: 6 }(글자색 흰 → 먹). past 1칸 (한 단계)', async () => {
+    const input = byId('prop-color');
+    let first = true;
+    for (const hex of ['#112233', '#223344', '#334455']) {
+      await typeInto('prop-color', hex);
+      expect(toolbarCounts(instance.lastPatches), `${hex} 도구 막대: 첫 input만 [↶]이 켜짐`).toEqual(first ? { SET_ATTR: 1 } : {});
+      first = false;
+      expect(layerCounts(instance.lastPatches), `${hex} 레이어`).toEqual({});
+      expect(canvasCounts(instance.lastPatches), hex).toEqual({ SET_STYLE: 3 });
+      expect(pressedChips(), `${hex}는 칩 8개 밖 색`).toEqual([]);
+    }
+    await typeInto('prop-color', '#ffee00');
+    expect(toolbarCounts(instance.lastPatches)).toEqual({});
+    expect(layerCounts(instance.lastPatches)).toEqual({});
+    expect(canvasCounts(instance.lastPatches)).toEqual({ SET_STYLE: 6 });
+    expect(['main', 'b1', 'b2'].map(fgOf)).toEqual([rgb('#0a0b0d'), rgb('#0a0b0d'), rgb('#0a0b0d')]);
+    expect(byId('color-hex').textContent).toBe('#ffee00');
+    expect(byId('prop-color')).toBe(input);
+    expect((slot(2) as UndoState).past).toHaveLength(1);
+    expect((slot(2) as UndoState).group).toEqual({ target: 'main', field: 'color' });
+  });
+
+  it('칩 연달아 + 입력칸이 같은 칸 묶음이다: past 1칸 · 묶음 { target: main, field: color }', async () => {
+    await pick('#cf202f');
+    await pick('#05b169');
+    await typeInto('prop-color', '#336699');
+    expect((slot(2) as UndoState).past).toHaveLength(1);
+    expect((slot(2) as UndoState).group).toEqual({ target: 'main', field: 'color' });
+    expect((slot(0) as typeof INITIAL_DOC).main.color).toBe('#336699');
+  });
+
+  it('같은 칩 다시 누르기 · 같은 색을 입력칸에 다시 input = 렌더 0번 · lastPatches 그대로 (P-20)', async () => {
+    await pick('#cf202f');
+    const patches = instance.lastPatches;
+    const before = renders;
+    await pick('#cf202f');
+    await typeInto('prop-color', '#cf202f');
+    expect(renders - before).toBe(0);
+    expect(instance.lastPatches).toBe(patches);
+    expect((slot(2) as UndoState).past).toHaveLength(1);
+  });
+
+  it('입력칸의 input에 대문자 값이 와도 상태에는 브라우저가 정리한 소문자만 들어간다 (#EEF0F3 → #eef0f3)', async () => {
+    await typeInto('prop-color', '#EEF0F3');
+    expect((slot(0) as typeof INITIAL_DOC).main.color).toBe('#eef0f3');
+    expect(byId('color-hex').textContent).toBe('#eef0f3');
+    expect(pressedChips()).toEqual(['#eef0f3']);
+    expect(bgOf('main')).toBe(rgb('#eef0f3'));
+  });
+
+  it('형식 밖 값이 와도 브라우저가 #000000으로 정리해 상태는 항상 #rrggbb다', async () => {
+    await typeInto('prop-color', 'not-a-color');
+    expect((slot(0) as typeof INITIAL_DOC).main.color).toMatch(/^#[0-9a-f]{6}$/);
+  });
+
+  it('인스턴스 b1(메인 따름)을 고르면 색 칸이 「메인 따름」이고 칩은 메인 색에 표시된다. 칩을 누르면 override(override 클래스 + ↻), 메인과 같은 색 칩도 override다 (MF-12)', async () => {
+    await click(buttonOf('b1'));
+    expect(followRows()).toContain('color');
+    expect(pressedChips()).toEqual(['#0052ff']);
+    await pick('#0052ff'); // 메인과 같은 값
+    expect(overriddenRows()).toEqual(['color']);
+    expect(resetButton('color')).not.toBeNull();
+    expect((slot(0) as typeof INITIAL_DOC).instances[0]).toEqual({ id: 'b1', color: '#0052ff' });
+    // 메인 색을 바꿔도 b1은 안 따라간다
+    await click(buttonOf('main'));
+    await pick('#05b169');
+    expect(bgOf('b1')).toBe(rgb('#0052ff'));
+    expect(bgOf('b2')).toBe(rgb('#05b169'));
+  });
+
+  it('↻ = 키 지우기: 인스턴스에 color 키가 없고(undefined 값도 없음) 메인 색을 다시 따라간다', async () => {
+    await click(buttonOf('b1'));
+    await pick('#05b169');
+    await click(resetButton('color') as HTMLElement);
+    expect((slot(0) as typeof INITIAL_DOC).instances[0]).toEqual({ id: 'b1' });
+    expect(Object.keys((slot(0) as typeof INITIAL_DOC).instances[0])).toEqual(['id']);
+    expect(followRows()).toContain('color');
+    expect(bgOf('b1')).toBe(rgb('#0052ff'));
+    expect(root.innerHTML).not.toContain('undefined');
+    await click(buttonOf('main'));
+    await pick('#f4b000');
+    expect(bgOf('b1')).toBe(rgb('#f4b000'));
+  });
+
+  it('P-27 b1(메인 따름) 선택 → 칩 #05b169: 캔버스 { SET_STYLE: 2 }(b1 버튼만 배경 + 글자색, 메인 · b2 · b3 줄 0) · 속성 패널 REPLACE 1줄 이상(「메인 따름」 <span> → ↻ <button>)', async () => {
+    await click(buttonOf('b1'));
+    await pick('#05b169');
+    expect(toolbarCounts(instance.lastPatches), '첫 수정 = [↶]이 켜짐').toEqual({ SET_ATTR: 1 });
+    expect(canvasCounts(instance.lastPatches)).toEqual({ SET_STYLE: 2 });
+    expect(layerCounts(instance.lastPatches)).toEqual({});
+    expect(instance.lastPatches.filter((p) => p.kind === 'REPLACE' && startsWith(p.path, PANEL_PREFIX)).length).toBeGreaterThanOrEqual(1);
+    expect(bgs()).toEqual([rgb('#0052ff'), rgb('#05b169'), rgb('#0052ff'), rgb('#cf202f')]);
+  });
+
+  it('칩을 누를 때 인스턴스 고르기를 오가도 색 입력칸 · 칩 노드를 다시 만들지 않는다 (같은 색 칸 안에서)', async () => {
+    const input = byId('prop-color');
+    const held = chips();
+    await pick('#05b169');
+    await pick('#a8acb3');
+    expect(byId('prop-color')).toBe(input);
+    expect(chips()).toEqual(held);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Dev-6: [↶ 되돌리기] · [↷ 다시 하기] 버튼 (FD-12, P-23 · P-24 · P-28)
+// ---------------------------------------------------------------------------
+
+describe('Undo/Redo 버튼 (Dev-6)', () => {
+  const undoButton = (): HTMLButtonElement => byId('undo-button') as HTMLButtonElement;
+  const redoButton = (): HTMLButtonElement => byId('redo-button') as HTMLButtonElement;
+  const keyDown = async (options: { shiftKey?: boolean } = {}): Promise<void> => {
+    document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'z', ctrlKey: true, bubbles: true, cancelable: true, ...options }));
+    await Promise.resolve();
+  };
+
+  it('처음에는 [↶] [↷] 모두 disabled 속성이 있고 글자는 「↶ 되돌리기」 · 「↷ 다시 하기」다. Hook은 그대로 useState 4칸 + useEffect 1칸이다', () => {
+    expect(undoButton().hasAttribute('disabled')).toBe(true);
+    expect(redoButton().hasAttribute('disabled')).toBe(true);
+    expect(undoButton().textContent).toBe('↶ 되돌리기');
+    expect(redoButton().textContent).toBe('↷ 다시 하기');
+    expect(Array.from(byId('toolbar').children).map(testId)).toEqual(['app-name', 'add-instance', 'undo-button', 'redo-button']);
+    // Hook 칸 순서 불변: doc · selectedId · history · nextId (+ keydown effect 1칸)
+    expect(slot(0)).toBe(INITIAL_DOC);
+    expect(slot(1)).toBeNull();
+    expect(slot(2)).toBe(EMPTY_UNDO);
+    expect(slot(3)).toBe(4);
+    expect(instance.hooks).toHaveLength(5);
+  });
+
+  it('수정하면 [↶]이 켜지고(disabled 없음) [↷]은 꺼진 채다. 고르기만 해서는 안 켜진다', async () => {
+    await click(buttonOf('b2'));
+    expect(undoButton().hasAttribute('disabled')).toBe(true);
+    await pick('#05b169');
+    expect(undoButton().hasAttribute('disabled')).toBe(false);
+    expect(redoButton().hasAttribute('disabled')).toBe(true);
+  });
+
+  it('P-23 삭제(P-17) 뒤 [↶] 버튼 = 캔버스 { INSERT: 1 } · 레이어 { INSERT: 1 } · 도구 막대 { SET_ATTR: 2 }, 렌더 1번. 문서 · 선택 · 기록이 키 Ctrl+Z와 같다', async () => {
+    await click(buttonOf('b2'));
+    await click(byId('delete-instance'));
+    const before = renders;
+    await click(undoButton());
+    expect(canvasCounts(instance.lastPatches)).toEqual({ INSERT: 1 });
+    expect(layerCounts(instance.lastPatches)).toEqual({ INSERT: 1 });
+    expect(toolbarCounts(instance.lastPatches)).toEqual({ SET_ATTR: 2 });
+    expect(renders - before).toBe(1);
+    expect(buttons().slice(1).map((b) => b.getAttribute('data-id'))).toEqual(['b1', 'b2', 'b3']);
+    expect(slot(0)).toEqual(INITIAL_DOC);
+    expect(slot(1)).toBeNull();
+    expect((slot(2) as UndoState).past).toHaveLength(0);
+    expect((slot(2) as UndoState).future).toHaveLength(1);
+    expect(undoButton().hasAttribute('disabled')).toBe(true);
+    expect(redoButton().hasAttribute('disabled')).toBe(false);
+  });
+
+  it('버튼과 키는 같은 함수를 쓴다: 같은 동작 순서의 결과(문서 · 선택 · 기록)가 서로 같다', async () => {
+    // 버튼으로 한 번
+    await click(buttonOf('main'));
+    await pick('#cf202f');
+    await click(undoButton());
+    const byButton = { doc: slot(0), selected: slot(1), past: (slot(2) as UndoState).past.length, future: (slot(2) as UndoState).future.length };
+    // 키로 다시 Redo 한 뒤 Undo 한 번 (같은 지점으로)
+    await keyDown({ shiftKey: true });
+    await keyDown();
+    expect({ doc: slot(0), selected: slot(1), past: (slot(2) as UndoState).past.length, future: (slot(2) as UndoState).future.length }).toEqual(byButton);
+    // [↷] 버튼 = Ctrl+Shift+Z와 같은 결과
+    await click(redoButton());
+    expect(bgs().slice(0, 3)).toEqual([rgb('#cf202f'), rgb('#cf202f'), rgb('#cf202f')]);
+    expect(slot(1)).toBe('main');
+  });
+
+  it('P-24 (P-19 뒤, Undo 상태) [↷] 버튼 = 캔버스 { SET_STYLE: 3 } · 도구 막대 { SET_ATTR: 2 }, 렌더 1번', async () => {
+    await click(buttonOf('main'));
+    await pick('#cf202f');
+    await click(undoButton());
+    const before = renders;
+    await click(redoButton());
+    expect(canvasCounts(instance.lastPatches)).toEqual({ SET_STYLE: 3 });
+    expect(layerCounts(instance.lastPatches)).toEqual({});
+    expect(toolbarCounts(instance.lastPatches)).toEqual({ SET_ATTR: 2 });
+    expect(renders - before).toBe(1);
+    expect(undoButton().hasAttribute('disabled')).toBe(false);
+    expect(redoButton().hasAttribute('disabled')).toBe(true);
+  });
+
+  it('P-28 수정 → Undo → 다른 칸 새 수정: [↷]이 꺼지고 [↶]이 켜진다 = 도구 막대 { SET_ATTR: 2 }', async () => {
+    await click(buttonOf('main'));
+    await choose('prop-size', 'L');
+    await click(undoButton());
+    expect(undoButton().hasAttribute('disabled')).toBe(true);
+    expect(redoButton().hasAttribute('disabled')).toBe(false);
+    await typeInto('prop-label', '새');
+    expect(toolbarCounts(instance.lastPatches)).toEqual({ SET_ATTR: 2 });
+    expect(undoButton().hasAttribute('disabled')).toBe(false);
+    expect(redoButton().hasAttribute('disabled')).toBe(true);
+    expect((slot(2) as UndoState).future).toHaveLength(0);
+  });
+
+  it('꺼진 [↶] [↷]를 눌러도 렌더 0번 · lastPatches 그대로다 (P-20): 처음 화면에서도, 끝까지 되돌린 뒤에도', async () => {
+    const patches = instance.lastPatches;
+    const before = renders;
+    await click(undoButton());
+    await click(redoButton());
+    expect(renders - before).toBe(0);
+    expect(instance.lastPatches).toBe(patches);
+    expect(slot(2)).toBe(EMPTY_UNDO);
+
+    await click(buttonOf('main'));
+    await choose('prop-size', 'L');
+    await click(undoButton());
+    const after = instance.lastPatches;
+    const count = renders;
+    await click(undoButton()); // 이제 꺼져 있다
+    expect(renders - count).toBe(0);
+    expect(instance.lastPatches).toBe(after);
+  });
+
+  it('Undo 한도 (Q17-2) 버튼판: [+ 인스턴스] 60번 뒤 [↶] 버튼 49번 = 처음 b1~b14, 그 뒤 [↶]은 꺼짐', async () => {
+    for (let i = 0; i < 60; i += 1) await click(byId('add-instance'));
+    expect((slot(2) as UndoState).past).toHaveLength(49);
+    expect(undoButton().hasAttribute('disabled')).toBe(false);
+    for (let i = 0; i < 49; i += 1) await click(undoButton());
+    expect((slot(0) as typeof INITIAL_DOC).instances.map((it) => it.id)).toEqual(Array.from({ length: 14 }, (_, i) => `b${i + 1}`));
+    expect(undoButton().hasAttribute('disabled')).toBe(true);
+    await click(undoButton());
+    expect((slot(0) as typeof INITIAL_DOC).instances).toHaveLength(14);
+  });
+
+  it('라벨 입력 중 첫 글자로 [↶]이 켜져도 라벨 입력칸 · [↶] 노드는 같은 참조다 (도구 막대는 disabled 속성만 바뀜)', async () => {
+    await click(buttonOf('main'));
+    const input = byId('prop-label');
+    const undoNode = undoButton();
+    await typeInto('prop-label', '버튼!');
+    expect(undoButton().hasAttribute('disabled')).toBe(false);
+    expect(byId('prop-label')).toBe(input);
+    expect(undoButton()).toBe(undoNode);
+    expect((input as HTMLInputElement).value).toBe('버튼!');
+  });
+
+  it('버튼을 눌러도 keydown 리스너는 1개다 (등록 − 해제 = 1)', async () => {
+    await click(buttonOf('main'));
+    await choose('prop-size', 'L');
+    await click(undoButton());
+    await click(redoButton());
+    expect(keydownListeners()).toBe(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Dev-9: 인스턴스 추가 · 삭제 · 메인 삭제 불가 (P-16 · P-17, MF-22 ~ 24)
 // ---------------------------------------------------------------------------
 
 describe('인스턴스 추가 · 삭제 (Dev-9)', () => {
   const addButton = (): HTMLElement => byId('add-instance');
+
+  it('[+ 인스턴스]는 도구 막대에만 있고 레이어 창 안에는 없다', () => {
+    expect(root.querySelectorAll('[data-testid="add-instance"]')).toHaveLength(1);
+    expect(addButton().closest('[data-testid="toolbar"]')).not.toBeNull();
+    expect(root.querySelector('[data-testid="layer-panel"] [data-testid="add-instance"]')).toBeNull();
+  });
+
+  it('도구 막대 안 자식 순서는 앱 이름 → [+ 인스턴스]이고 앱 이름 글자는 mini-figma다', () => {
+    const toolbar = byId('toolbar');
+    expect(Array.from(toolbar.children).map(testId).slice(0, 2)).toEqual(['app-name', 'add-instance']);
+    expect(byId('app-name').textContent).toBe('mini-figma');
+    expect(toolbar.localName).toBe('header');
+    expect(addButton().getAttribute('type')).toBe('button');
+  });
+
+  it('도구 막대의 [+ 인스턴스]도 새 단계 · 번호 nextId를 같은 규칙으로 쓴다 (b4 → 다음은 b5)', async () => {
+    await click(addButton());
+    expect(slot(3)).toBe(5);
+    expect((slot(2) as UndoState).past).toHaveLength(1);
+    await click(addButton());
+    expect((slot(0) as typeof INITIAL_DOC).instances.map((it) => it.id)).toEqual(['b1', 'b2', 'b3', 'b4', 'b5']);
+  });
   const deleteButton = (): HTMLElement => byId('delete-instance');
 
-  it('P-16 [+ 인스턴스] 한 번 = 캔버스 { INSERT: 1 } · 레이어 { INSERT: 1 }, 렌더 1번, 끝에 b4, 선택은 그대로', async () => {
+  it('P-16 도구 막대의 [+ 인스턴스] 한 번 = 캔버스 { INSERT: 1 } · 레이어 { INSERT: 1 }, 렌더 1번, 끝에 b4, 선택은 그대로 (동작은 MF-22 그대로)', async () => {
     const before = renders;
     await click(addButton());
     expect(canvasCounts(instance.lastPatches)).toEqual({ INSERT: 1 });
     expect(layerCounts(instance.lastPatches)).toEqual({ INSERT: 1 });
+    expect(toolbarCounts(instance.lastPatches), '첫 수정 = [↶]이 켜짐').toEqual({ SET_ATTR: 1 });
     expect(renders - before).toBe(1);
     expect(buttons().map((b) => b.getAttribute('data-id'))).toEqual(['main', 'b1', 'b2', 'b3', 'b4']);
     expect(layerNames()).toEqual(['버튼', '취소', '삭제', '버튼']);
@@ -596,7 +1013,8 @@ describe('인스턴스 추가 · 삭제 (Dev-9)', () => {
     await click(deleteButton());
     expect(canvasCounts(instance.lastPatches)).toEqual({ REMOVE: 1 });
     expect(layerCounts(instance.lastPatches)).toEqual({ REMOVE: 1 });
-    const panelReplaces = instance.lastPatches.filter((p) => p.kind === 'REPLACE' && startsWith(p.path, [0, 2]));
+    expect(toolbarCounts(instance.lastPatches)).toEqual({ SET_ATTR: 1 });
+    const panelReplaces = instance.lastPatches.filter((p) => p.kind === 'REPLACE' && startsWith(p.path, PANEL_PREFIX_ALL));
     expect(panelReplaces.length).toBeGreaterThanOrEqual(1);
     expect(heading.isConnected).toBe(false);
     expect(byId('property-empty').localName).toBe('p');
@@ -654,6 +1072,7 @@ describe('순서 바꾸기 (Dev-10)', () => {
     await click(moveButton('b1', 'down'));
     expect(canvasCounts(instance.lastPatches)).toEqual({ MOVE: 1 });
     expect(layerCounts(instance.lastPatches)).toEqual({ MOVE: 1 });
+    expect(toolbarCounts(instance.lastPatches)).toEqual({ SET_ATTR: 1 });
     expect(renders - before).toBe(1);
     expect(order()).toEqual(['b2', 'b1', 'b3']);
     expect(layerNames()).toEqual(['취소', '버튼', '삭제']);
@@ -782,9 +1201,10 @@ describe('키보드 · Undo/Redo (Dev-11)', () => {
     await press('Delete');
     expect(canvasCounts(instance.lastPatches)).toEqual({ REMOVE: 1 });
     expect(layerCounts(instance.lastPatches)).toEqual({ REMOVE: 1 });
-    expect(instance.lastPatches.filter((p) => p.kind === 'REPLACE' && startsWith(p.path, [0, 2])).length).toBeGreaterThanOrEqual(1);
+    expect(toolbarCounts(instance.lastPatches)).toEqual({ SET_ATTR: 1 });
+    expect(instance.lastPatches.filter((p) => p.kind === 'REPLACE' && startsWith(p.path, PANEL_PREFIX_ALL)).length).toBeGreaterThanOrEqual(1);
     expect(renders - before, '삭제 한 동작 = 렌더 1번').toBe(1);
-    console.log(`[P-17 키] 캔버스 ${JSON.stringify(canvasCounts(instance.lastPatches))} 레이어 ${JSON.stringify(layerCounts(instance.lastPatches))} 속성 패널 REPLACE ${instance.lastPatches.filter((p) => p.kind === 'REPLACE' && startsWith(p.path, [0, 2])).length}줄 렌더 +${renders - before}`);
+    console.log(`[P-17 키] 캔버스 ${JSON.stringify(canvasCounts(instance.lastPatches))} 레이어 ${JSON.stringify(layerCounts(instance.lastPatches))} 속성 패널 REPLACE ${instance.lastPatches.filter((p) => p.kind === 'REPLACE' && startsWith(p.path, PANEL_PREFIX_ALL)).length}줄 렌더 +${renders - before}`);
     expect(slot(1)).toBeNull();
     expect(ids()).toEqual(['b1', 'b3']);
     await click(buttonOf('b3'));
@@ -815,23 +1235,26 @@ describe('키보드 · Undo/Redo (Dev-11)', () => {
     await undoKey();
     expect(canvasCounts(instance.lastPatches)).toEqual({ INSERT: 1 });
     expect(layerCounts(instance.lastPatches)).toEqual({ INSERT: 1 });
+    expect(toolbarCounts(instance.lastPatches), '[↶] 꺼짐 + [↷] 켜짐').toEqual({ SET_ATTR: 2 });
     expect(renders - before, 'Undo 한 동작 = 렌더 1번').toBe(1);
     expect(ids()).toEqual(['b1', 'b2', 'b3']);
     expect(slot(1)).toBeNull();
   });
 
-  it('P-19 메인 색 빨강(1단계) → Undo = 캔버스 { SET_ATTR: 3 }(메인 · b1 · b2) · 레이어 { }, Redo로 다시 빨강', async () => {
+  it('P-19 메인 색 빨강(1단계) → Undo = 캔버스 { SET_STYLE: 3 }(메인 · b1 · b2 배경만) · 레이어 { }, Redo도 { SET_STYLE: 3 }으로 다시 빨강', async () => {
     await click(buttonOf('main'));
-    await choose('prop-color', 'red');
+    await pick('#cf202f');
     const before = renders;
     await undoKey();
-    expect(canvasCounts(instance.lastPatches)).toEqual({ SET_ATTR: 3 });
+    expect(canvasCounts(instance.lastPatches)).toEqual({ SET_STYLE: 3 });
     expect(layerCounts(instance.lastPatches)).toEqual({});
+    expect(toolbarCounts(instance.lastPatches), 'Undo = [↶] 꺼짐 + [↷] 켜짐').toEqual({ SET_ATTR: 2 });
     expect(renders - before).toBe(1);
-    expect(['main', 'b1', 'b2', 'b3'].map((id) => buttonOf(id).classList.contains('btn-blue'))).toEqual([true, true, true, false]);
+    expect(bgs()).toEqual([rgb('#0052ff'), rgb('#0052ff'), rgb('#0052ff'), rgb('#cf202f')]);
     await redoKey();
-    expect(canvasCounts(instance.lastPatches)).toEqual({ SET_ATTR: 3 });
-    expect(['main', 'b1', 'b2', 'b3'].map((id) => buttonOf(id).classList.contains('btn-red'))).toEqual([true, true, true, true]);
+    expect(canvasCounts(instance.lastPatches)).toEqual({ SET_STYLE: 3 });
+    expect(toolbarCounts(instance.lastPatches), 'Redo = [↶] 켜짐 + [↷] 꺼짐').toEqual({ SET_ATTR: 2 });
+    expect(bgs()).toEqual([rgb('#cf202f'), rgb('#cf202f'), rgb('#cf202f'), rgb('#cf202f')]);
     expect(slot(1)).toBe('main'); // 고르기는 그대로
   });
 
@@ -850,7 +1273,7 @@ describe('키보드 · Undo/Redo (Dev-11)', () => {
 
   it('한 키 입력 = 한 단계: 서로 다른 세 수정 뒤 Ctrl+Z 한 번은 마지막 묶음 하나만 되돌린다. 같은 칸을 연달아 고친 것은 한 번에 되돌아간다', async () => {
     await click(buttonOf('main'));
-    await choose('prop-color', 'red'); // 단계 1
+    await pick('#cf202f'); // 단계 1
     await choose('prop-size', 'L'); // 단계 2
     await typeInto('prop-label', '새'); // 단계 3
     await typeInto('prop-label', '새로'); // 단계 3에 묶임
@@ -858,13 +1281,13 @@ describe('키보드 · Undo/Redo (Dev-11)', () => {
     await undoKey();
     expect(labels()[0]).toBe('버튼'); // 단계 3 두 글자가 한 번에
     expect(buttonOf('main').classList.contains('btn-L')).toBe(true);
-    expect(buttonOf('main').classList.contains('btn-red')).toBe(true);
+    expect(bgOf('main')).toBe(rgb('#cf202f'));
     expect((slot(2) as UndoState).past).toHaveLength(2);
   });
 
   it('라벨 글자 칸(글자 input) 안의 keydown은 앱 동작이 없고 막지도 않는다 (Q18 ③) — 렌더 0번 · doc · history 그대로 · defaultPrevented false', async () => {
     await click(buttonOf('b2'));
-    await choose('prop-color', 'green');
+    await pick('#05b169');
     const doc = slot(0);
     const history = slot(2);
     const before = renders;
@@ -886,7 +1309,7 @@ describe('키보드 · Undo/Redo (Dev-11)', () => {
 
   it('선택 상자 · 체크박스 안의 Delete · Backspace는 무시하고 막지 않는다 (Q18) — 렌더 0번 · doc · history 그대로', async () => {
     await click(buttonOf('b2'));
-    await choose('prop-color', 'green');
+    await pick('#05b169');
     const doc = slot(0);
     const history = slot(2);
     const before = renders;
@@ -910,8 +1333,28 @@ describe('키보드 · Undo/Redo (Dev-11)', () => {
     expect(buttonOf('b2').classList.contains('btn-M')).toBe(true);
     expect(await press('Z', { ctrlKey: true, shiftKey: true }, byId('prop-size'))).toBe(true);
     expect(buttonOf('b2').classList.contains('btn-L')).toBe(true);
-    expect(await press('z', { metaKey: true }, byId('prop-color'))).toBe(true);
+    expect(await press('z', { metaKey: true }, byId('prop-icon'))).toBe(true);
     expect(buttonOf('b2').classList.contains('btn-M')).toBe(true);
+  });
+
+  it('색 입력칸(prop-color) 안의 Ctrl+Z · Ctrl+Shift+Z = 앱 Undo · Redo + preventDefault, Delete · Backspace는 무시하고 막지 않는다 (④-3, Q18 ② 확장)', async () => {
+    await click(buttonOf('b2'));
+    await pick('#05b169');
+    expect(bgOf('b2')).toBe(rgb('#05b169'));
+    const doc = slot(0);
+    const history = slot(2);
+    const before = renders;
+    expect(await press('Delete', {}, byId('prop-color'))).toBe(false);
+    expect(await press('Backspace', {}, byId('prop-color'))).toBe(false);
+    expect(renders - before, 'Delete · Backspace = 렌더 0번').toBe(0);
+    expect(slot(0)).toBe(doc);
+    expect(slot(2)).toBe(history);
+    expect(ids()).toEqual(['b1', 'b2', 'b3']);
+    expect(await press('z', { ctrlKey: true }, byId('prop-color'))).toBe(true);
+    expect(bgOf('b2')).toBe(rgb('#0052ff'));
+    expect(await press('Z', { ctrlKey: true, shiftKey: true }, byId('prop-color'))).toBe(true);
+    expect(bgOf('b2')).toBe(rgb('#05b169'));
+    expect(slot(1)).toBe('b2');
   });
 
   it('체크박스 안의 Ctrl+Z · Ctrl+Shift+Z = 앱 Undo · Redo + preventDefault (Q18 ②)', async () => {
@@ -927,11 +1370,11 @@ describe('키보드 · Undo/Redo (Dev-11)', () => {
 
   it('입력칸 밖(body)에서 cancelable Ctrl+Z · Ctrl+Shift+Z는 defaultPrevented true + 앱 Undo · Redo, 그 밖의 키(Delete · Escape · Ctrl+Y · Alt+Z)는 false (Q18 ①)', async () => {
     await click(buttonOf('main'));
-    await choose('prop-color', 'red');
+    await pick('#cf202f');
     expect(await press('z', { ctrlKey: true })).toBe(true);
-    expect(buttonOf('main').classList.contains('btn-blue')).toBe(true);
+    expect(bgOf('main')).toBe(rgb('#0052ff'));
     expect(await press('Z', { ctrlKey: true, shiftKey: true })).toBe(true);
-    expect(buttonOf('main').classList.contains('btn-red')).toBe(true);
+    expect(bgOf('main')).toBe(rgb('#cf202f'));
     // 되돌릴 것이 없어도 앱이 처리한 키이므로 막는다 (브라우저 기본 Undo가 남은 글자 기록에 적용되지 않게)
     await undoKey();
     expect(await undoKey()).toBe(true);
@@ -945,16 +1388,16 @@ describe('키보드 · Undo/Redo (Dev-11)', () => {
   it('입력칸 밖 Undo는 앱 한 단계만 되돌린다 — 글자 입력 뒤 색을 바꾸고 Ctrl+Z 하면 색만 돌아가고 글자는 그대로 (QA-29 단위판)', async () => {
     await click(buttonOf('main'));
     await typeInto('prop-label', '새');
-    await choose('prop-color', 'red');
+    await pick('#cf202f');
     expect(await undoKey()).toBe(true);
     expect(labels()[0]).toBe('새');
-    expect(buttonOf('main').classList.contains('btn-blue')).toBe(true);
+    expect(bgOf('main')).toBe(rgb('#0052ff'));
     expect((slot(2) as UndoState).past).toHaveLength(1);
   });
 
   it('수정키 조합은 아무 일 없다 (Q17-4): Shift+Delete · Ctrl+Backspace · Alt+Delete · Meta+Backspace · Alt+Z · Ctrl+Alt+Z · Ctrl+Y · Escape · z', async () => {
     await click(buttonOf('b2'));
-    await choose('prop-color', 'green');
+    await pick('#05b169');
     const doc = slot(0);
     const before = renders;
     await press('Delete', { shiftKey: true });

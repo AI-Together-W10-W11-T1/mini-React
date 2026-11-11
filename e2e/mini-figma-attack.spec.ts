@@ -22,6 +22,10 @@ import {
   pressRedo,
   installKeydownCounter,
   keydownListenerCount,
+  rgb,
+  bgOf,
+  colorsOf,
+  pickColor,
 } from './mini-figma-helpers';
 
 // [AI Note]: 공격적 시나리오 모음 (QA-A1 ~ A19). 앞 Dev에서 채울 수 있는 것은 그 Dev에서 썼다 (qa_todo 「Dev」 열): A1 · A2 = Dev-7, A3 ~ A5 = Dev-8, A16 = Dev-10,
@@ -61,6 +65,11 @@ test('QA-A2 아주 긴 글자: 공백 없는 200자를 넣어도 가로 스크�
 
   expect((await canvasLabels(page))[0]).toBe(long);
   expect(await noHorizontalScroll(page)).toBe(true);
+  // 인스턴스를 골라도 긴 이름(「인스턴스 · AAAA…」 머리 · 레이어 행)이 패널 밖으로 안 나가 가로 스크롤이 없다
+  await selectOnCanvas(page, 'b1');
+  await expect(page.getByTestId('property-title')).toHaveText(`인스턴스 · ${long}`);
+  expect(await noHorizontalScroll(page)).toBe(true);
+  await selectOnCanvas(page, 'main');
   // 모든 버튼의 오른쪽 끝이 캔버스 오른쪽 끝을 넘지 않는다
   const canvas = await page.getByTestId('canvas').boundingBox();
   if (canvas === null) throw new Error('캔버스가 안 보인다');
@@ -129,10 +138,10 @@ test('QA-A5 ↻ 뒤 메인 변경: b3가 메인을 다시 따라가고 `undefine
   await selectOnCanvas(page, 'b3');
   await page.locator(inRow('color', 'prop-reset')).click();
   await selectOnCanvas(page, 'main');
-  await page.getByTestId('prop-color').selectOption({ label: '초록' });
+  await pickColor(page, '#05b169');
 
-  const b3Class = (await page.locator(buttonSel('b3')).getAttribute('class')) ?? '';
-  expect(b3Class.split(' ')).toContain('btn-green');
+  // b3는 ↻로 메인을 다시 따라가므로 메인의 새 색(#05b169)을 그대로 쓴다
+  expect(await bgOf(page, 'b3')).toBe(rgb('#05b169'));
 
   await selectOnCanvas(page, 'b3');
   await page.locator(inRow('label', 'prop-reset')).click();
@@ -179,7 +188,9 @@ test('QA-A16 (선택 없음) 아무것도 안 고른 채 [↓]를 눌러도 선�
 // ---------------------------------------------------------------------------
 
 const instanceCount = (page: Page) => page.getByTestId('layer-item');
-const mainColorClass = async (page: Page): Promise<string> => (await page.locator(buttonSel('main')).getAttribute('class')) ?? '';
+const mainClass = async (page: Page): Promise<string> => (await page.locator(buttonSel('main')).getAttribute('class')) ?? '';
+/** 메인 버튼의 배경색 (`rgb(r, g, b)`) — 색은 클래스가 아니라 style이라 computed style로 읽는다 (FD-23) */
+const mainBg = (page: Page): Promise<string> => bgOf(page, 'main');
 
 test('QA-A6 고른 것이 Delete · Undo · Redo로 사라지면 선택이 풀린다: Delete 뒤 풀림, Ctrl+Z로 b2가 돌아와도 풀린 채, 다시 b2를 골라 Ctrl+Shift+Z로 지워지면 또 풀린다', async ({ page }) => {
   await page.goto(URL);
@@ -226,11 +237,11 @@ test('QA-A8 라벨 글자 칸 안의 키는 앱 동작이 없고, 선택 상자 
   await page.goto(URL);
   // Undo 한 단계: 메인 색 빨강 (앱 Undo가 돌면 이 색이 파랑으로 돌아간다)
   await selectOnCanvas(page, 'main');
-  await page.getByTestId('prop-color').selectOption({ label: '빨강' });
+  await pickColor(page, '#cf202f');
   await selectOnCanvas(page, 'b2');
 
   const appUntouched = async (where: string): Promise<void> => {
-    expect(await mainColorClass(page), `${where}: 메인 색`).toContain('btn-red');
+    expect(await mainBg(page), `${where}: 메인 색`).toBe(rgb('#cf202f'));
     await expect(page.getByTestId('figma-button'), `${where}: 버튼`).toHaveCount(4);
     await expect(instanceCount(page), `${where}: 레이어 행`).toHaveCount(3);
     expect(await selectedOnCanvas(page), `${where}: 선택`).toEqual(['b2']);
@@ -243,7 +254,7 @@ test('QA-A8 라벨 글자 칸 안의 키는 앱 동작이 없고, 선택 상자 
     for (const key of ['Delete', 'Backspace']) await page.keyboard.press(key);
     await appUntouched(where);
     await page.keyboard.press('Control+KeyZ');
-    expect(await mainColorClass(page), `${where}: Ctrl+Z → 앱 Undo`).toContain('btn-blue');
+    expect(await mainBg(page), `${where}: Ctrl+Z → 앱 Undo`).toBe(rgb('#0052ff'));
     await expect(page.getByTestId('figma-button'), `${where}: 버튼`).toHaveCount(4);
     expect(await selectedOnCanvas(page), `${where}: 선택`).toEqual(['b2']);
     expect((await canvasLabels(page))[2], `${where}: b2 글자`).toBe('취소');
@@ -268,7 +279,7 @@ test('QA-A8 라벨 글자 칸 안의 키는 앱 동작이 없고, 선택 상자 
   await page.keyboard.press('Control+KeyZ');
   await page.keyboard.press('Meta+KeyZ');
   // 이 뒤 글자는 Chromium의 글자 되돌리기라 단언하지 않는다. 앱 Undo가 안 일어남 = 메인 색 빨강 그대로
-  expect(await mainColorClass(page), '라벨 칸: 메인 색').toContain('btn-red');
+  expect(await mainBg(page), '라벨 칸: 메인 색').toBe(rgb('#cf202f'));
   await expect(page.getByTestId('figma-button'), '라벨 칸: 버튼').toHaveCount(4);
   await expect(instanceCount(page), '라벨 칸: 레이어 행').toHaveCount(3);
   expect(await selectedOnCanvas(page), '라벨 칸: 선택').toEqual(['b2']);
@@ -330,12 +341,11 @@ test('QA-A10 옛 state를 보는 키 핸들러 · 리스너 정리: Delete는 �
 
   // ② 메인 색 빨강 → 크기 L → Ctrl+Z(한 번): 되돌아가는 것은 가장 최근 단계(크기), 색은 남음
   await selectOnCanvas(page, 'main');
-  await page.getByTestId('prop-color').selectOption({ label: '빨강' });
+  await pickColor(page, '#cf202f');
   await page.getByTestId('prop-size').selectOption('L');
   await pressUndo(page);
-  const main = (await mainColorClass(page)).split(' ');
-  expect(main).toContain('btn-M');
-  expect(main).toContain('btn-red');
+  expect((await mainClass(page)).split(' ')).toContain('btn-M');
+  expect(await mainBg(page)).toBe(rgb('#cf202f'));
 
   // ③ 상태를 20번 넘게 바꾼다 (고르기 · 수정 섞어서): 등록 − 해제는 그대로
   for (let i = 0; i < 6; i += 1) {
@@ -359,11 +369,11 @@ test('QA-A10 옛 state를 보는 키 핸들러 · 리스너 정리: Delete는 �
 test('QA-A11 정해진 키 밖 · 수정키 조합은 아무 일도 안 한다 (Ctrl+Y · Escape · z · Alt+Z · Shift+Delete · Ctrl+Backspace · Alt+Backspace · Meta+Backspace), 수정키 없는 Delete는 b2를 지운다', async ({ page }) => {
   await page.goto(URL);
   await selectOnCanvas(page, 'main');
-  await page.getByTestId('prop-color').selectOption({ label: '빨강' });
+  await pickColor(page, '#cf202f');
   await blurFocus(page);
 
   const unchanged = async (where: string, selected: string): Promise<void> => {
-    expect(await mainColorClass(page), `${where}: 색`).toContain('btn-red');
+    expect(await mainBg(page), `${where}: 색`).toBe(rgb('#cf202f'));
     await expect(page.getByTestId('figma-button'), `${where}: 버튼`).toHaveCount(4);
     await expect(instanceCount(page), `${where}: 행`).toHaveCount(3);
     expect(await selectedOnCanvas(page), `${where}: 선택`).toEqual([selected]);
@@ -494,7 +504,7 @@ test('QA-A13 새로고침: 고치고 추가 · 삭제 · 순서까지 한 뒤 re
   await page.goto(URL);
   await selectOnCanvas(page, 'main');
   await page.getByTestId('prop-label').fill('고침');
-  await page.getByTestId('prop-color').selectOption({ label: '초록' });
+  await pickColor(page, '#05b169');
   await page.getByTestId('add-instance').click();
   await moveInLayer(page, 'b1', 'down');
   await selectOnCanvas(page, 'b2');
@@ -507,6 +517,7 @@ test('QA-A13 새로고침: 고치고 추가 · 삭제 · 순서까지 한 뒤 re
   expect(await canvasOrder(page)).toEqual(['b1', 'b2', 'b3']);
   expect(await layerOrder(page)).toEqual(['b1', 'b2', 'b3']);
   expect(await canvasLabels(page)).toEqual(['버튼', '버튼', '취소', '삭제']);
+  expect(await colorsOf(page)).toEqual([rgb('#0052ff'), rgb('#0052ff'), rgb('#0052ff'), rgb('#cf202f')]);
   await expect(page.getByTestId('property-empty')).toHaveCount(1);
   expect(await selectedOnCanvas(page)).toEqual([]);
   // Undo 기록도 비어 있어 Ctrl+Z를 눌러도 아무 일 없다
@@ -544,4 +555,36 @@ test('QA-A14 입력 100자: 한 글자씩 입력해도 입력칸 노드 · 포�
   await pressUndo(page);
   expect((await canvasLabels(page))[0]).toBe('버튼');
   await expect(input).toHaveValue('버튼');
+});
+
+test('QA-A27 새로고침: 색을 바꾸고 추가 · 삭제 · Undo까지 한 뒤 reload하면 시작 색 · 선택 없음 · [↶] [↷] 모두 꺼짐이고 Ctrl+Z · Ctrl+Shift+Z는 아무 일 없다', async ({ page }) => {
+  await page.goto(URL);
+  await selectOnCanvas(page, 'main');
+  await pickColor(page, '#05b169');
+  await page.getByTestId('add-instance').click();
+  await selectOnCanvas(page, 'b2');
+  await page.getByTestId('delete-instance').click();
+  await pressUndo(page); // 삭제를 되돌림 → [↷]도 켜진 상태
+  await expect(page.getByTestId('undo-button')).toBeEnabled();
+  await expect(page.getByTestId('redo-button')).toBeEnabled();
+
+  await page.reload();
+
+  // 시작 색(메인 #0052ff · b3 #cf202f), 선택 없음, 시작 목록
+  expect(await colorsOf(page)).toEqual([rgb('#0052ff'), rgb('#0052ff'), rgb('#0052ff'), rgb('#cf202f')]);
+  expect(await canvasOrder(page)).toEqual(['b1', 'b2', 'b3']);
+  await expect(page.getByTestId('property-empty')).toHaveCount(1);
+  expect(await selectedOnCanvas(page)).toEqual([]);
+  // [↶] [↷] 둘 다 꺼져 있고 키도 아무 일 없다
+  await expect(page.getByTestId('undo-button')).toBeDisabled();
+  await expect(page.getByTestId('redo-button')).toBeDisabled();
+  const watch = await watchApp(page);
+  await pressUndo(page);
+  await pressRedo(page);
+  expect((await watch.take()).body.total, 'Ctrl+Z · Ctrl+Shift+Z = DOM 변경 0').toBe(0);
+  expect(await colorsOf(page)).toEqual([rgb('#0052ff'), rgb('#0052ff'), rgb('#0052ff'), rgb('#cf202f')]);
+  // 번호도 처음부터: 추가하면 b4
+  await page.getByTestId('add-instance').click();
+  expect(await canvasOrder(page)).toEqual(['b1', 'b2', 'b3', 'b4']);
+  await expect(page.getByTestId('undo-button')).toBeEnabled();
 });

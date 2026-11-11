@@ -3,7 +3,8 @@
 // 루트의 setter가 같은 값(Object.is)으로 보고 다시 그리지 않고 Undo 기록에도 안 남게 한다 (phase2-app/todoOps.ts 방식).
 
 export type Size = 'S' | 'M' | 'L';
-export type Color = 'blue' | 'red' | 'green';
+/** 색 값 `#rrggbb` (소문자, FD-20). 이름('blue')이 아니라 값을 저장한다 — 칩 8개 밖의 색도 색 입력칸으로 고를 수 있어서 */
+export type Color = string;
 /** 아이콘 종류는 문자열로만 들고 있다. 문자열 → 컴포넌트(StarIcon · HeartIcon) 변환은 Canvas가 한다 (④-12) */
 export type IconKind = 'star' | 'heart';
 
@@ -27,10 +28,10 @@ export interface Doc {
   readonly instances: readonly Instance[];
 }
 
-/** MF-16: 시작 데이터. b1은 override 없음, b2는 라벨만, b3는 라벨 + 색 */
+/** MF-16: 시작 데이터. b1은 override 없음, b2는 라벨만, b3는 라벨 + 색 (FD-20: 메인 #0052ff, b3 #cf202f) */
 export const INITIAL_DOC: Doc = {
-  main: { label: '버튼', size: 'M', hasIcon: false, icon: 'star', color: 'blue' },
-  instances: [{ id: 'b1' }, { id: 'b2', label: '취소' }, { id: 'b3', label: '삭제', color: 'red' }],
+  main: { label: '버튼', size: 'M', hasIcon: false, icon: 'star', color: '#0052ff' },
+  instances: [{ id: 'b1' }, { id: 'b2', label: '취소' }, { id: 'b3', label: '삭제', color: '#cf202f' }],
 };
 
 /**

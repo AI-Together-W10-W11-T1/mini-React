@@ -1,5 +1,6 @@
 import { h } from '@mini-react/react';
 import type { Component, Props, VNode } from '@mini-react/shared';
+import { buttonStyle } from '../color';
 import type { Color, Size } from '../model';
 
 interface ButtonProps {
@@ -16,7 +17,8 @@ interface ButtonProps {
 // [AI Note]: 메인 컴포넌트 = 이 함수. 메인 버튼도 인스턴스 버튼도 같은 Button을 `h(Button, props)`로 부른다.
 // 부르는 쪽(Canvas)이 `{ ...main, ...instance }` 모양으로 합친 값을 넘기는데 그 안에는 `id`도 들어 있다.
 // 그래서 props를 통째로 DOM 속성으로 펼치지 않고, 쓸 5개(label · size · hasIcon · icon · color)와 id를 하나씩 꺼내 속성을 만든다 (dev_todo 공통 주의 2).
-// 크기 · 색은 인라인 style이 아니라 클래스(btn-S/M/L · btn-blue/red/green)로 그린다 (④-9).
+// 크기는 클래스(btn-S/M/L), 색은 인라인 `style`(배경색 + 글자색)로 칠한다 (FD-23 · 24) — 색은 값(`#rrggbb`)이라 클래스로 못 만들고,
+// 색을 바꾸면 엔진 diff가 클래스가 아니라 `SET_STYLE` 줄(항목별)만 만든다. props 이름 `color`(배경 hex)와 style 안 `color`(글자색)는 다른 것 — 글자색은 buttonStyle이 정한다 (공통 주의 6).
 //
 // [AI Note]: 버튼 안 자식은 모두 key를 가진다 (Q17-1): 아이콘 = 'icon', 글자 = 'label'.
 // 엔진 diff는 한 부모의 자식이 하나라도 key가 없으면 조용히 위치 비교로 돌아가서, 아이콘을 켜면 글자 <span>이 REPLACE되고 INSERT가 따로 생긴다.
@@ -29,7 +31,8 @@ export function Button(props: Props): VNode {
     {
       type: 'button',
       // 고른 버튼에는 클래스 selected가 더 붙는다 (바뀌면 class 속성만 고쳐지고 버튼 노드는 그대로)
-      class: `figma-button btn-${size} btn-${color}${selected ? ' selected' : ''}`,
+      class: `figma-button btn-${size}${selected ? ' selected' : ''}`,
+      style: buttonStyle(color),
       'data-id': id,
       'data-testid': 'figma-button',
       onClick: onSelect,

@@ -92,12 +92,14 @@ describe('keyAction — 글자 입력칸(글자 input · textarea) 안의 키는
   });
 });
 
-describe('keyAction — 선택 상자 · 체크박스 안: Undo/Redo는 앱 동작, Delete · Backspace는 무시 (Q18 ②)', () => {
+describe('keyAction — 선택 상자 · 체크박스 · 색 입력칸 안: Undo/Redo는 앱 동작, Delete · Backspace는 무시 (Q18 ②, 색 입력칸은 ④-3)', () => {
   describe.each<[string, string, string | null]>([
     ['SELECT', 'SELECT', null],
     ['select 소문자', 'select', null],
     ['INPUT checkbox', 'INPUT', 'checkbox'],
     ['input 소문자 · type 대문자 CHECKBOX', 'input', 'CHECKBOX'],
+    ['INPUT color (색 직접 고르기, ④-3)', 'INPUT', 'color'],
+    ['input 소문자 · type 대문자 COLOR', 'input', 'COLOR'],
   ])('target = %s', (_label, tag, type) => {
     const at = { targetTag: tag, targetType: type };
     it('Ctrl+z · Meta+z → undo, Ctrl+Shift+Z · Meta+Shift+Z → redo', () => {
@@ -115,6 +117,18 @@ describe('keyAction — 선택 상자 · 체크박스 안: Undo/Redo는 앱 동�
       expect(keyAction(press('y', { ...at, ctrlKey: true }))).toBeNull();
       expect(keyAction(press('z', at))).toBeNull();
     });
+  });
+});
+
+describe('keyAction — 글자 입력칸은 그대로 null (색 입력칸을 넓힌 뒤에도 ④-3)', () => {
+  it.each<[string, string, string | null]>([
+    ['INPUT text', 'INPUT', 'text'],
+    ['INPUT number', 'INPUT', 'number'],
+    ['INPUT range (색 입력칸만 넓힘 — 다른 type은 그대로)', 'INPUT', 'range'],
+    ['TEXTAREA', 'TEXTAREA', null],
+  ])('%s: Ctrl+z · Delete → null', (_label, tag, type) => {
+    expect(keyAction(press('z', { ctrlKey: true, targetTag: tag, targetType: type }))).toBeNull();
+    expect(keyAction(press('Delete', { targetTag: tag, targetType: type }))).toBeNull();
   });
 });
 

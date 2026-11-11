@@ -60,6 +60,12 @@ export function recordEdit(state: UndoState, current: Doc, next: Doc, group: Und
   return { past: pushPast(state.past, current), future: [], group };
 }
 
+/** [↶ 되돌리기] 버튼을 켤 것인가 = 되돌아갈 곳(past)이 있는가 (FD-12) */
+export const canUndo = (state: UndoState): boolean => state.past.length > 0;
+
+/** [↷ 다시 하기] 버튼을 켤 것인가 = 다시 할 곳(future)이 있는가 (FD-12) */
+export const canRedo = (state: UndoState): boolean => state.future.length > 0;
+
 /** 한 단계 되돌린다. past가 비면 무시(같은 상태 · 같은 Doc). 현재 Doc은 future로, 묶음은 끝난다 */
 export function undo(state: UndoState, current: Doc): UndoResult {
   if (state.past.length === 0) return { state, doc: current };

@@ -29,12 +29,18 @@ const instanceOf = (doc: Doc, id: string): Instance => {
 };
 
 describe('INITIAL_DOC — 시작 데이터 (MF-16)', () => {
-  it('메인 Button은 라벨 버튼 · 크기 M · 아이콘 꺼짐(star) · 파랑이다', () => {
-    expect(INITIAL_DOC.main).toEqual({ label: '버튼', size: 'M', hasIcon: false, icon: 'star', color: 'blue' });
+  it('메인 Button은 라벨 버튼 · 크기 M · 아이콘 꺼짐(star) · 파랑 #0052ff이다 (색은 이름이 아니라 값, FD-20)', () => {
+    expect(INITIAL_DOC.main).toEqual({ label: '버튼', size: 'M', hasIcon: false, icon: 'star', color: '#0052ff' });
+  });
+
+  it('색 칸 값은 전부 #rrggbb 글이고 이름 값(blue · red · green)이 남아 있지 않다', () => {
+    const colors = [INITIAL_DOC.main.color, ...INITIAL_DOC.instances.flatMap((it) => (it.color === undefined ? [] : [it.color]))];
+    for (const color of colors) expect(color).toMatch(/^#[0-9a-f]{6}$/);
+    expect(JSON.stringify(INITIAL_DOC)).not.toMatch(/blue|red|green/);
   });
 
   it('인스턴스는 b1 · b2 · b3 순서이고 바꾼 값만 가진다', () => {
-    expect(INITIAL_DOC.instances).toEqual([{ id: 'b1' }, { id: 'b2', label: '취소' }, { id: 'b3', label: '삭제', color: 'red' }]);
+    expect(INITIAL_DOC.instances).toEqual([{ id: 'b1' }, { id: 'b2', label: '취소' }, { id: 'b3', label: '삭제', color: '#cf202f' }]);
   });
 
   it('b1은 키가 id뿐이다 (override 없음)', () => {
@@ -47,11 +53,11 @@ describe('INITIAL_DOC — 시작 데이터 (MF-16)', () => {
 });
 
 describe('mergeProps — 키가 있으면 override (MF-12)', () => {
-  const main: MainProps = { label: '메인', size: 'M', hasIcon: false, icon: 'star', color: 'blue' };
+  const main: MainProps = { label: '메인', size: 'M', hasIcon: false, icon: 'star', color: '#0052ff' };
 
   it('키 없는 칸은 메인 값, 키 있는 칸은 인스턴스 값을 쓴다', () => {
-    const merged = mergeProps(main, { id: 'b2', label: '취소', color: 'red' });
-    expect(merged).toMatchObject({ label: '취소', size: 'M', hasIcon: false, icon: 'star', color: 'red' });
+    const merged = mergeProps(main, { id: 'b2', label: '취소', color: '#cf202f' });
+    expect(merged).toMatchObject({ label: '취소', size: 'M', hasIcon: false, icon: 'star', color: '#cf202f' });
   });
 
   it('override가 하나도 없으면 메인 값 전부이고 id가 함께 나온다', () => {
@@ -69,11 +75,11 @@ describe('mergeProps — 키가 있으면 override (MF-12)', () => {
   });
 
   it('메인을 바꾸면 override 없는 칸만 따라 바뀐다', () => {
-    const it1: Instance = { id: 'b3', color: 'red' };
-    const changedMain: MainProps = { ...main, size: 'L', color: 'green' };
+    const it1: Instance = { id: 'b3', color: '#cf202f' };
+    const changedMain: MainProps = { ...main, size: 'L', color: '#05b169' };
     const merged = mergeProps(changedMain, it1);
     expect(merged.size).toBe('L');
-    expect(merged.color).toBe('red');
+    expect(merged.color).toBe('#cf202f');
   });
 
   it('입력을 고치지 않는다', () => {
@@ -86,7 +92,7 @@ describe('mergeProps — 키가 있으면 override (MF-12)', () => {
 
 describe('isOverridden — 키가 있는지만 본다', () => {
   it('키가 있으면 true, 없으면 false', () => {
-    const it1: Instance = { id: 'b3', label: '삭제', color: 'red' };
+    const it1: Instance = { id: 'b3', label: '삭제', color: '#cf202f' };
     expect(isOverridden(it1, 'label')).toBe(true);
     expect(isOverridden(it1, 'color')).toBe(true);
     expect(isOverridden(it1, 'size')).toBe(false);
@@ -119,9 +125,9 @@ describe('setMainField — 메인 칸 바꾸기', () => {
   });
 
   it('메인을 바꾸면 override 없는 인스턴스만 보이는 값이 따라간다', () => {
-    const next = setMainField(INITIAL_DOC, 'color', 'green');
+    const next = setMainField(INITIAL_DOC, 'color', '#05b169');
     const colors = next.instances.map((it) => mergeProps(next.main, it).color);
-    expect(colors).toEqual(['green', 'green', 'red']);
+    expect(colors).toEqual(['#05b169', '#05b169', '#cf202f']);
   });
 
   it('입력을 고치지 않는다 (freeze)', () => {
@@ -202,8 +208,8 @@ describe('resetInstanceField — ↻ = 키 지우기 (MF-13)', () => {
 
   it('이후 메인을 바꾸면 다시 따라간다', () => {
     const reset = resetInstanceField(INITIAL_DOC, 'b3', 'color');
-    const changed = setMainField(reset, 'color', 'green');
-    expect(mergeProps(changed.main, instanceOf(changed, 'b3')).color).toBe('green');
+    const changed = setMainField(reset, 'color', '#05b169');
+    expect(mergeProps(changed.main, instanceOf(changed, 'b3')).color).toBe('#05b169');
     // 라벨은 아직 override
     expect(mergeProps(changed.main, instanceOf(changed, 'b3')).label).toBe('삭제');
   });
