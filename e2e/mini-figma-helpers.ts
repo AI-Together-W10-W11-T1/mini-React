@@ -124,14 +124,14 @@ export async function blurFocus(page: Page): Promise<void> {
   await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
 }
 
-/** Ctrl+Z (포커스를 먼저 뺀다 — 라벨 글자 칸 안의 키는 앱이 무시하므로) */
-export async function pressUndo(page: Page): Promise<void> {
+/** Ctrl+Z = 실제 영역 State History [뒤로] (포커스를 먼저 뺀다 — 라벨 글자 칸 안의 키는 앱이 무시하므로) */
+export async function pressBack(page: Page): Promise<void> {
   await blurFocus(page);
   await page.keyboard.press('Control+KeyZ');
 }
 
-/** Ctrl+Shift+Z (포커스를 먼저 뺀다) */
-export async function pressRedo(page: Page): Promise<void> {
+/** Ctrl+Shift+Z = 실제 영역 [앞으로] (포커스를 먼저 뺀다) */
+export async function pressForward(page: Page): Promise<void> {
   await blurFocus(page);
   await page.keyboard.press('Control+Shift+KeyZ');
 }
@@ -227,4 +227,155 @@ export async function watchSel(page: Page, name: string, selector: string): Prom
       }, slot);
     },
   };
+}
+
+// ---------------------------------------------------------------------------
+// 실제 영역 (patch-preview, task_006) — 두 영역 비교 · 깜빡임 기록
+// ---------------------------------------------------------------------------
+
+/** 실제 영역 버튼 하나 (`data-id`). testid는 테스트 영역과 겹치지 않게 `real-` 접두 */
+export function realButtonSel(id: string): string {
+  return `[data-testid="real-figma-button"][data-id="${id}"]`;
+}
+
+export interface ButtonLook {
+  id: string;
+  label: string;
+  icon: boolean;
+  /** class에서 `selected`를 뺀 글 (두 영역의 「같은 모습」 비교에서 고르기 표시는 일부러 다르다) */
+  cls: string;
+  bg: string;
+  fg: string;
+}
+
+/**
+ * 한 영역의 버튼 모습 목록 (위치 순). 두 영역이 「같은 모습」이라는 말은 이 목록이 같다는 뜻이다 (testid · selected는 일부러 다르다).
+ * `test` = 테스트 영역(캔버스), `real` = 실제 영역.
+ */
+export function areaSnapshot(page: Page, which: 'test' | 'real'): Promise<ButtonLook[]> {
+  const prefix = which === 'real' ? 'real-' : '';
+  return page.evaluate((pre) => {
+    return Array.from(document.querySelectorAll<HTMLElement>(`[data-testid="${pre}figma-button"]`)).map((b) => {
+      const cs = getComputedStyle(b);
+      return {
+        id: b.getAttribute('data-id') ?? '',
+        label: b.querySelector(`[data-testid="${pre}btn-label"]`)?.textContent ?? '',
+        icon: b.querySelector(`[data-testid="${pre}btn-icon"]`) !== null,
+        cls: (b.getAttribute('class') ?? '').split(/\s+/).filter((c) => c !== 'selected' && c !== '').join(' '),
+        bg: cs.backgroundColor,
+        fg: cs.color,
+      };
+    });
+  }, prefix);
+}
+
+/** 실제 영역 버튼들의 글자 (위치 순) */
+export function realLabels(page: Page): Promise<string[]> {
+  return page.getByTestId('real-btn-label').allTextContents();
+}
+
+export interface Box {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+export interface FlashRecord {
+  /** 깜빡임 박스(`.viz-box`)가 생길 때마다 쌓은 위치 · 크기 (문서 좌표) */
+  boxes: Box[];
+  /** 박스가 생긴 순간의 실제 영역 버튼 위치 (`data-id` → 문서 좌표). 박스와 같은 순간에 재서 스크롤에 안 흔들린다 */
+  buttons: Record<string, Box>;
+}
+
+export interface FlashWatcher {
+  /** 지금까지 생긴 박스 기록을 돌려주고 비운다 */
+  take(): Promise<FlashRecord>;
+}
+
+/**
+ * `real-overlay`에 박스(`.viz-box`)가 **생길 때마다** 그 위치 · 크기를 기록해 둔다. 깜빡임은 시간에 기대는 효과라 사라지는 시간은 재지 않는다.
+ * 박스는 몇백 ms 뒤 사라지므로 이 기록이 「박스가 생겼다 · 바뀐 노드 위에 있다」의 근거다. `page.goto` 뒤, 동작 전에 부른다.
+ */
+export async function watchFlash(page: Page): Promise<FlashWatcher> {
+  await page.evaluate(() => {
+    const layer = document.querySelector('[data-testid="real-overlay"]');
+    if (layer === null) throw new Error('real-overlay가 없다');
+    const store = { boxes: [] as Box[], buttons: {} as Record<string, Box> };
+    const toBox = (r: DOMRect): Box => ({ x: r.x + window.scrollX, y: r.y + window.scrollY, width: r.width, height: r.height });
+    const observer = new MutationObserver((list) => {
+      let added = false;
+      for (const record of list) {
+        for (const node of Array.from(record.addedNodes)) {
+          if (node instanceof HTMLElement && node.classList.contains('viz-box')) {
+            store.boxes.push(toBox(node.getBoundingClientRect()));
+            added = true;
+          }
+        }
+      }
+      if (added) {
+        for (const b of Array.from(document.querySelectorAll<HTMLElement>('[data-testid="real-figma-button"]'))) {
+          store.buttons[b.getAttribute('data-id') ?? ''] = toBox(b.getBoundingClientRect());
+        }
+      }
+    });
+    observer.observe(layer, { childList: true });
+    (window as unknown as { __flash: typeof store }).__flash = store;
+  });
+  return {
+    take() {
+      return page.evaluate(() => {
+        const store = (window as unknown as { __flash: FlashRecord }).__flash;
+        const out = { boxes: [...store.boxes], buttons: { ...store.buttons } };
+        store.boxes.length = 0;
+        store.buttons = {};
+        return out;
+      });
+    },
+  };
+}
+
+/** 박스 안에 들어 있나 (`tol`px 여유) */
+export function boxInside(inner: Box, outer: Box, tol = 1): boolean {
+  return inner.x >= outer.x - tol && inner.y >= outer.y - tol && inner.x + inner.width <= outer.x + outer.width + tol && inner.y + inner.height <= outer.y + outer.height + tol;
+}
+
+/** 두 상자가 겹치나 (닿기만 하는 것은 겹침이 아님) */
+export function boxOverlap(a: Box, b: Box): boolean {
+  return a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
+}
+
+/** 두 상자가 `tol`px 안에서 같은가 */
+export function boxSame(a: Box, b: Box, tol = 2): boolean {
+  return Math.abs(a.x - b.x) <= tol && Math.abs(a.y - b.y) <= tol && Math.abs(a.width - b.width) <= tol && Math.abs(a.height - b.height) <= tol;
+}
+
+/** 깜빡임 층의 `data-last-patch-count` · `data-last-flash-count` (아직 없으면 null) */
+export function overlayCounts(page: Page): Promise<{ patch: string | null; flash: string | null }> {
+  return page.getByTestId('real-overlay').evaluate((el) => ({ patch: el.getAttribute('data-last-patch-count'), flash: el.getAttribute('data-last-flash-count') }));
+}
+
+/** 실제 영역 버튼 3개의 켜짐 · 꺼짐 */
+export async function navState(page: Page): Promise<{ patch: boolean; back: boolean; forward: boolean }> {
+  return {
+    patch: await page.getByTestId('patch-button').isEnabled(),
+    back: await page.getByTestId('back-button').isEnabled(),
+    forward: await page.getByTestId('forward-button').isEnabled(),
+  };
+}
+
+/** 메인을 고르고 속성 패널 라벨 칸에 글자를 넣는다 (Playwright `fill`은 `input`을 보낸다) */
+export async function setMainLabel(page: Page, label: string): Promise<void> {
+  await selectOnCanvas(page, 'main');
+  await page.getByTestId('prop-label').fill(label);
+}
+
+/** 실제 영역 버튼 하나의 배경색 (`rgb(r, g, b)`) */
+export function realBgOf(page: Page, id: string): Promise<string> {
+  return page.locator(realButtonSel(id)).evaluate((el) => getComputedStyle(el).backgroundColor);
+}
+
+/** 실제 영역 버튼 하나의 class 글 */
+export async function realClassOf(page: Page, id: string): Promise<string> {
+  return (await page.locator(realButtonSel(id)).getAttribute('class')) ?? '';
 }

@@ -48,19 +48,19 @@ test('QA-40 어두운 바탕 · 한 단계 밝은 카드 24px · 그림자 없�
   expect((await styleOf(page, tid('prop-follow'), ['color'])).color, '「메인 따름」 글자').toBe(SOFT);
 
   // 그림자 없음 (도구 막대 · 두 패널 · 캔버스 · [+ 인스턴스] · 칩 · 버튼)
-  for (const sel of [tid('toolbar'), tid('layer-panel'), tid('property-panel'), tid('canvas'), tid('add-instance'), tid('undo-button'), tid('color-chip'), tid('figma-button')]) {
+  for (const sel of [tid('toolbar'), tid('layer-panel'), tid('property-panel'), tid('canvas'), tid('add-instance'), tid('back-button'), tid('color-chip'), tid('figma-button')]) {
     expect((await styleOf(page, sel, ['box-shadow']))['box-shadow'], `${sel} 그림자`).toBe('none');
   }
 
   // 캔버스: 점무늬 (radial-gradient)
   expect((await styleOf(page, tid('canvas'), ['background-image']))['background-image']).toContain('radial-gradient');
 
-  // 알약 버튼: [+ 인스턴스] 파랑 배경 · 흰 글자 · 100px, [↶] [↷]도 100px
+  // 알약 버튼: [+ 인스턴스] 파랑 배경 · 흰 글자 · 100px, [뒤로] [앞으로]도 100px
   const add = await styleOf(page, tid('add-instance'), ['background-color', 'border-radius', 'color']);
   expect(add['background-color']).toBe(BLUE);
   expect(add['border-radius']).toBe('100px');
   expect(add.color).toBe(WHITE);
-  for (const id of ['undo-button', 'redo-button']) expect((await styleOf(page, tid(id), ['border-radius']))['border-radius'], id).toBe('100px');
+  for (const id of ['back-button', 'forward-button']) expect((await styleOf(page, tid(id), ['border-radius']))['border-radius'], id).toBe('100px');
 
   // 입력칸 12px
   expect((await styleOf(page, tid('prop-label'), ['border-radius']))['border-radius']).toBe('12px');
@@ -165,11 +165,11 @@ test('QA-42 배치: desktop은 도구 막대가 맨 위에서 가로 전체 + �
   expect(await noHorizontalScroll(page)).toBe(true);
 });
 
-test('QA-A26 좁은 화면 도구 막대: 앱 이름 · 버튼 4개([+ 인스턴스] · [↶] · [↷] · [Patch])가 화면 밖으로 안 나가고(모자라면 줄바꿈) 눌러지는 크기이며, [+ 인스턴스] 20번 뒤에도 맨 위 첫 자식 · [↶]이 켜져 있다', async ({ page }) => {
+test('QA-A26 좁은 화면 도구 막대: 앱 이름 · 버튼 4개([+ 인스턴스] · [뒤로] · [앞으로] · [Patch])가 화면 밖으로 안 나가고(모자라면 줄바꿈) 눌러지는 크기이며, [+ 인스턴스] 20번 뒤에도 맨 위 첫 자식 · [Patch]가 켜져 있다', async ({ page }) => {
   await page.goto(URL);
   const width = page.viewportSize()?.width ?? 0;
   const check = async (where: string): Promise<void> => {
-    for (const id of ['app-name', 'add-instance', 'undo-button', 'redo-button', 'patch-button']) {
+    for (const id of ['app-name', 'add-instance', 'back-button', 'forward-button', 'patch-button']) {
       const b = await page.getByTestId(id).boundingBox();
       if (b === null) throw new Error(`${where}: ${id}가 안 보인다`);
       expect(b.x, `${where}: ${id} 왼쪽`).toBeGreaterThanOrEqual(0);
@@ -184,7 +184,7 @@ test('QA-A26 좁은 화면 도구 막대: 앱 이름 · 버튼 4개([+ 인스턴
   await check('20번 추가 뒤');
   const first = await page.locator('[data-testid="app-root"] > .app').evaluate((app) => app.children[0].getAttribute('data-testid'));
   expect(first).toBe('toolbar');
-  await expect(page.getByTestId('undo-button')).toBeEnabled();
+  await expect(page.getByTestId('patch-button')).toBeEnabled();
   // 도구 막대는 맨 위에 그대로 (페이지를 안 내려도 보이는 위치)
   const top = await page.getByTestId('toolbar').boundingBox();
   expect(top?.y ?? 999).toBeLessThanOrEqual(24);

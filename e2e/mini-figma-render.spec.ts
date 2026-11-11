@@ -46,9 +46,10 @@ test('QA-1 처음 연다: 레이어 행 · 캔버스 버튼 · 글자 · 색 · 
     Array.from(el.children).map((c) => ({ tag: c.localName, cls: c.className, kids: Array.from(c.children).map((k) => k.getAttribute('data-testid')) })),
   );
   expect(top).toEqual([{ tag: 'div', cls: 'app', kids: ['toolbar', 'layer-panel', 'canvas', 'property-panel', 'real-section'] }]);
-  // 기록이 없어서 [↶ 되돌리기] [↷ 다시 하기]는 꺼져 있다 (FD-12)
-  await expect(page.getByTestId('undo-button')).toBeDisabled();
-  await expect(page.getByTestId('redo-button')).toBeDisabled();
+  // 실제 영역 기록이 없어서 [뒤로] [앞으로]는 꺼져 있다 ([↶] [↷]는 없앴다, patch-preview)
+  await expect(page.getByTestId('back-button')).toBeDisabled();
+  await expect(page.getByTestId('forward-button')).toBeDisabled();
+  await expect(page.getByTestId('undo-button')).toHaveCount(0);
 
   expect(await noHorizontalScroll(page)).toBe(true);
   expectNoConsoleWarnings(page);
