@@ -140,7 +140,14 @@
       /* 입력칸: 12px 모서리, 포커스는 2px 파랑 테두리 (글자 칸 · 선택 상자). 포커스 때 테두리가 굵어지는 만큼 안쪽 여백을 줄여 칸이 안 움직인다 */
       .prop-row input[type='text'], .prop-row select { flex: 1 1 auto; min-width: 0; min-height: 44px; padding: 7px 13px; border: 1px solid var(--line); border-radius: 12px; background: var(--bg); color: var(--ink); }
       .prop-row input[type='text']:focus, .prop-row select:focus { padding: 6px 12px; border: 2px solid var(--accent); outline: none; }
-      .prop-row input[type='checkbox'] { width: 20px; height: 20px; accent-color: var(--accent); }
+      /* 아이콘 보이기 = 켜기/끄기 스위치 모양 (요소는 그대로 <input type="checkbox">, 브라우저 기본 모양만 지움).
+         꺼짐 = 바탕색 + 회색 손잡이 왼쪽, 켜짐 = 파랑 + 흰 손잡이 오른쪽. 알약 모양(100px)은 버튼 · 입력칸과 같은 디자인 */
+      .prop-row input[type='checkbox'] { appearance: none; position: relative; flex: 0 0 auto; width: 40px; height: 24px; margin: 0; border: 1px solid var(--line); border-radius: 100px; background: var(--bg); cursor: pointer; transition: background-color 0.15s, border-color 0.15s; }
+      .prop-row input[type='checkbox']::before { content: ''; position: absolute; top: 3px; left: 3px; width: 16px; height: 16px; border-radius: 50%; background: var(--ink-soft); transition: transform 0.15s, background-color 0.15s; }
+      .prop-row input[type='checkbox']:checked { border-color: var(--accent); background: var(--accent); }
+      .prop-row input[type='checkbox']:checked::before { background: var(--ink); transform: translateX(16px); }
+      /* 꺼진 선택 상자(아이콘 보이기가 꺼졌을 때 아이콘 종류): 흐리게 + 못 누름 표시 */
+      .prop-row select:disabled { opacity: 0.4; cursor: not-allowed; }
 
       /* 팔레트 판: 칩 8개는 원(테두리로 어두운 칩도 보임), 지금 색 칩은 파랑 바깥 테두리. 색 입력칸 + 값 글자(고정폭)는 그 아래 */
       .palette { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 10px; }

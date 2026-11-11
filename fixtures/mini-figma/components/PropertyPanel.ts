@@ -56,13 +56,13 @@ function propRow(field: Field, name: string, control: VNode, override: OverrideI
 // 열 때마다 불린다 (Chromium은 select · checkbox도 input 이벤트를 낸다, dev_todo 공통 주의 4). 값은 `value` / `checked` 프로퍼티로 그려서
 // 입력칸을 다시 만들지 않고 그 자리에서 고친다 → 한 글자마다 바로 반영돼도 포커스 · 커서가 유지된다 (MF-15).
 function propRows(values: MainProps, onEdit: PropertyPanelProps['onEdit'], override: OverrideInfo | null, variables: readonly Variable[], fallback: string | undefined): VNode[] {
-  const select = <T extends string>(field: Field, testId: string, label: string, current: T, options: readonly (readonly [T, string])[]): VNode =>
+  const select = <T extends string>(field: Field, testId: string, label: string, current: T, options: readonly (readonly [T, string])[], disabled = false): VNode =>
     propRow(
       field,
       label,
       h(
         'select',
-        { 'aria-label': label, 'data-testid': testId, value: current, onInput: (event: Event) => onEdit(field, (event.target as HTMLSelectElement).value as MainProps[Field]) },
+        { 'aria-label': label, 'data-testid': testId, value: current, disabled, onInput: (event: Event) => onEdit(field, (event.target as HTMLSelectElement).value as MainProps[Field]) },
         options.map(([value, text]) => h('option', { value }, text)),
       ),
       override,
@@ -94,7 +94,9 @@ function propRows(values: MainProps, onEdit: PropertyPanelProps['onEdit'], overr
       override,
       'beside',
     ),
-    select('icon', 'prop-icon', '아이콘 종류', values.icon, ICON_OPTIONS),
+    // [AI Note]: 아이콘이 꺼져 있으면(보이는 값 기준 — 인스턴스는 메인 값 위에 합친 값) 아이콘 종류는 골라도 화면에 안 보이므로 선택 상자를 끈다.
+    // `disabled`는 보통 속성이라 켜고 끌 때 SET_ATTR 한 줄이고, 선택 상자 노드는 그대로다. ↻(override 되돌리기)는 꺼져 있어도 누를 수 있다.
+    select('icon', 'prop-icon', '아이콘 종류', values.icon, ICON_OPTIONS, !values.hasIcon),
     // [AI Note]: 색 칸 = 팔레트 판(칩 8개 + 직접 고르기). 고른 색 `#rrggbb`를 그대로 onEdit('color', hex)로 올린다 — 다른 칸과 같은 경로 (FD-21 · 22 · 25).
     // [AI Note]: 값 칸에는 푼 hex를 보이고, 연결 중이면 변수 id를 `link`로 알린다 (없는 id는 연결 아닌 것처럼 — 푼 색 · 상자 「없음」). 팔레트가 올리는 `var:<id>` · hex를 그대로 onEdit('color', …)로 올린다.
     (() => {
