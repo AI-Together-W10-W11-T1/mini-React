@@ -69,7 +69,7 @@ describe('cellsOf — 한 행의 칸 글 (QA-20이 읽는 data-col)', () => {
   });
 
   it('기록판 직접 쓰기(logPanelWrites)가 있으면 비고에 따로 적고 기본 집계에서 뺀 것임을 밝힌다', () => {
-    const base = row({ id: 'B-07', run: { ...row().run, counts: { actions: 13, renders: 16 } } });
+    const base = row({ id: 'B-07', run: { ...row().run, counts: { actions: 13, renders: 13 } } });
     const dom = { patchLines: 212, byKind: { SET_TEXT: 30 }, mutationRecords: 36, nodesAdded: 4, nodesRemoved: 2, logPanelWrites: 48 };
     const cells = cellsOf({ ...base, dom });
     expect(cells.extra).toContain('기록판 직접 쓰기 48건');
@@ -103,10 +103,10 @@ describe('cellsOf — 한 행의 칸 글 (QA-20이 읽는 data-col)', () => {
   });
 
   it('비고: 개수(counts)를 시나리오 모양대로 적고, 반복마다 달라지면 알린다', () => {
-    const b06 = cellsOf(row({ id: 'B-06', run: { ...row().run, counts: { setters: 10, renders: 10 } } }));
-    expect(b06.extra).toBe('setter 10번 → 렌더 10번');
-    const b07 = cellsOf(row({ id: 'B-07', run: { ...row().run, counts: { actions: 13, renders: 16 } } }));
-    expect(b07.extra).toBe('동작 13번 → 렌더 16번');
+    const b06 = cellsOf(row({ id: 'B-06', run: { ...row().run, counts: { setters: 10, renders: 1 } } }));
+    expect(b06.extra).toBe('setter 10번 → 렌더 1번');
+    const b07 = cellsOf(row({ id: 'B-07', run: { ...row().run, counts: { actions: 13, renders: 13 } } }));
+    expect(b07.extra).toBe('동작 13번 → 렌더 13번');
     expect(cellsOf(row()).extra).toBe('측정 반복마다 patch 5줄');
     expect(cellsOf(row({ run: { ...row().run, countsStable: false } })).extra).toContain('반복마다 개수가 달라졌습니다');
   });

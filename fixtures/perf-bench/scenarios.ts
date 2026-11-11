@@ -7,7 +7,7 @@ import type { PatchObserver } from '@mini-react/react-dom-bindings';
 import type { Patch, VNode } from '@mini-react/shared';
 import { BenchApp, describeTree, makeItem, makeState } from './benchApp';
 import type { BenchState, TreeInfo } from './benchApp';
-import { runScenario } from './runner';
+import { runScenario, runScenarioAsync } from './runner';
 import type { ScenarioResult } from './runner';
 import { App } from '../phase2-app/App';
 import { counts as appCounts, engine as appEngine } from '../phase2-app/counts';
@@ -23,6 +23,9 @@ import { counts as appCounts, engine as appEngine } from '../phase2-app/counts';
 //  - 계측 패널 밖: 이 파일은 측정 영역(area)만 만진다. 결과 표 · 진행 표시는 main.ts가 영역 밖에 그린다.
 //  - B-06 · B-07(Dev-26)은 엔진 경로(render + setter · 이벤트)를 그대로 지난다: 단계별 시간은 엔진 update() 안에서 한 덩어리라 따로 못 재고,
 //    전체 시간(M-07 = setter · 이벤트 호출부터 DOM 반영 완료까지)만 잰다. 이 시간은 화면 표시(페인트) 완료가 아니다 (PRD §7).
+//  - 마이크로태스크 Batching(결정 9 B, task_003): setter · 이벤트가 만든 렌더는 그 코드가 끝난 직후(마이크로태스크)에 돈다. 그래서 B-06 · B-07은
+//    act가 마이크로태스크를 기다리는 async이고(runScenarioAsync), 사용자 클릭 하나하나는 서로 다른 틱이므로 B-07은 이벤트마다 마이크로태스크를 비운다.
+//    (한 번에 몰면 렌더가 1번으로 합쳐지고, 입력 이벤트가 앞 입력값 렌더 전에 처리되어 화면이 틀어진다.) task_002 즉시 동기 때와 렌더 횟수가 다르다.
 
 export const DEFAULT_ITEM_COUNT = 100;
 
@@ -321,8 +324,8 @@ export interface EngineRun {
   mount(area: Element, onPatch?: PatchObserver): void;
   /** M-03 보존 대상 노드 (mount 직후에 부른다) */
   targets(area: Element): Node[];
-  /** 잴 구간: setter · 이벤트로 상태를 바꾼다. 돌려주는 값 = 반복마다 같아야 하는 개수 */
-  act(area: Element): Record<string, number>;
+  /** 잴 구간: setter · 이벤트로 상태를 바꾸고 렌더가 끝나기(마이크로태스크)를 기다린다. 돌려주는 값 = 반복마다 같아야 하는 개수 */
+  act(area: Element): Promise<Record<string, number>>;
   /** act 뒤 화면이 상태와 맞는가 (정확성) */
   verify(area: Element): boolean;
   /** 앱 정리 (unmount, 바꿔 둔 전역 되돌리기) */
@@ -354,12 +357,16 @@ function describeDom(area: Element): TreeInfo {
 
 const SERIAL_SETTERS = 10; // B-06: setter를 연달아 부르는 횟수
 
-// B-06 연속 상태 변경: 루트(Hook 있음) 하나가 카운터 state를 setter로 10번 연달아 올린다. 즉시 동기라 렌더도 10번이다 (결정 9 A).
+// [AI Note]: 렌더가 끝나기를 기다린다. setter · 이벤트가 예약한 렌더(마이크로태스크)는 이 await의 이어짐보다 먼저 큐에 있으므로 먼저 돈다.
+// 이 앱들의 effect는 setter를 부르지 않아 렌더가 한 번 돌면 끝난다 (effect가 렌더를 연달아 부르는 앱이면 더 기다려야 한다).
+const settle = (): Promise<void> => Promise.resolve();
+
+// B-06 연속 상태 변경: 루트(Hook 있음) 하나가 카운터 state를 setter로 10번 연달아 올린다. 같은 틱의 setter를 모아 렌더는 1번이다 (결정 9 B, task_002 즉시 동기 때는 10번).
 const B06: EngineScenario = {
   kind: 'engine',
   id: 'B-06',
   title: '연속 상태 변경',
-  what: `setter를 ${SERIAL_SETTERS}번 연달아 부른다(함수형 setter로 카운터 +1씩). 최종 카운터 · 렌더 횟수 · 전체 처리시간(M-07)을 본다`,
+  what: `setter를 ${SERIAL_SETTERS}번 연달아 부른다(함수형 setter로 카운터 +1씩, 같은 틱 = Batching으로 렌더 1번). 최종 카운터 · 렌더 횟수 · 전체 처리시간(M-07)을 본다`,
   create(itemCount) {
     let setState: ((next: (prev: BenchState) => BenchState) => void) | null = null;
     let renders = 0;
@@ -377,17 +384,18 @@ const B06: EngineScenario = {
         instance = render(Root, area, onPatch === undefined ? {} : { onPatch });
       },
       targets: (area) => collectNodes(area),
-      act() {
+      async act() {
         const before = renders;
         for (let i = 0; i < SERIAL_SETTERS; i++) setState!((prev) => ({ ...prev, counter: prev.counter + 1 }));
+        await settle(); // 모은 렌더가 돈다
         lastDelta = renders - before;
         return { setters: SERIAL_SETTERS, renders: lastDelta };
       },
       verify(area) {
-        // 최종 화면 = 카운터 10인 state를 처음부터 다시 그린 것, 렌더 횟수 = setter 횟수
+        // 최종 화면 = 카운터 10인 state를 처음부터 다시 그린 것, 렌더 횟수 = 1 (setter 10번을 모음)
         const expected = document.createElement('div');
         renderAreaChildren(expected, [resolveComponents(h(BenchApp, { state: { ...makeState(itemCount), counter: SERIAL_SETTERS } }))]);
-        return area.innerHTML === expected.innerHTML && lastDelta === SERIAL_SETTERS;
+        return area.innerHTML === expected.innerHTML && lastDelta === 1;
       },
       stop() {
         instance?.unmount();
@@ -396,23 +404,26 @@ const B06: EngineScenario = {
   },
 };
 
-function fire(element: Element | null, event: Event): void {
+// 이벤트 하나를 보내고 렌더가 끝나기를 기다린다: 사용자 이벤트는 서로 다른 틱이라 이벤트마다 렌더가 따로 돈다
+async function fire(element: Element | null, event: Event): Promise<void> {
   if (element === null) throw new Error('B-07: 화면에 필요한 요소가 없습니다');
   element.dispatchEvent(event);
+  await settle();
 }
-const click = (element: Element | null): void => fire(element, new MouseEvent('click', { bubbles: true }));
-function typeInto(element: Element | null, value: string): void {
+const click = (element: Element | null): Promise<void> => fire(element, new MouseEvent('click', { bubbles: true }));
+async function typeInto(element: Element | null, value: string): Promise<void> {
   if (element === null) throw new Error('B-07: 입력창이 없습니다');
   (element as HTMLInputElement).value = value;
-  fire(element, new Event('input', { bubbles: true }));
+  await fire(element, new Event('input', { bubbles: true }));
 }
 
 // B-07 개인 앱 대표 동작: 검증 페이지(phase2-app) App을 그대로 쓴다. [+1] 3번 · 이름 입력 2글자 · 할 일 3개 추가 · [위로] 1번 · 체크 1번.
+// 이벤트 하나 = 렌더 하나 (이벤트마다 마이크로태스크를 비움): 3 + 2 + (입력 1 + [추가] 1) × 3 + 2 = 렌더 13번.
 const B07: EngineScenario = {
   kind: 'engine',
   id: 'B-07',
   title: '개인 앱 대표 동작',
-  what: '검증 페이지 App으로 [+1] 3번 · 이름 입력 2번 · 할 일 3개 추가 · [위로] 1번 · 체크 1번(클릭 · 입력 이벤트 13번). 렌더 횟수 · 전체 처리시간 · 입력창 노드 유지 · 화면 = 상태',
+  what: '검증 페이지 App으로 [+1] 3번 · 이름 입력 2번 · 할 일 3개 추가 · [위로] 1번 · 체크 1번(클릭 · 입력 이벤트 13번, 이벤트마다 렌더). 렌더 횟수 · 전체 처리시간 · 입력창 노드 유지 · 화면 = 상태',
   create() {
     let instance: FunctionComponent | null = null;
     let titleBefore = '';
@@ -437,20 +448,20 @@ const B07: EngineScenario = {
           if (node === null) throw new Error(`B-07: ${id}가 없습니다`);
           return node;
         }),
-      act(area) {
+      async act(area) {
         const before = appCounts.renderRuns;
         let actions = 0;
-        for (let i = 0; i < 3; i++, actions++) click(byId(area, 'counter-plus1'));
-        typeInto(byId(area, 'name-input'), '민');
-        typeInto(byId(area, 'name-input'), '민수');
+        for (let i = 0; i < 3; i++, actions++) await click(byId(area, 'counter-plus1'));
+        await typeInto(byId(area, 'name-input'), '민');
+        await typeInto(byId(area, 'name-input'), '민수');
         actions += 2;
         for (const text of ['가', '나', '다']) {
-          typeInto(byId(area, 'todo-input'), text);
-          click(byId(area, 'todo-add'));
+          await typeInto(byId(area, 'todo-input'), text);
+          await click(byId(area, 'todo-add'));
           actions += 2;
         }
-        click(area.querySelectorAll('[data-testid="todo-up"]')[2] ?? null); // 세 번째 항목(다)을 위로
-        click(area.querySelectorAll('[data-testid="todo-check"]')[0] ?? null); // 첫 항목 체크
+        await click(area.querySelectorAll('[data-testid="todo-up"]')[2] ?? null); // 세 번째 항목(다)을 위로
+        await click(area.querySelectorAll('[data-testid="todo-check"]')[0] ?? null); // 첫 항목 체크
         actions += 2;
         renderDelta = appCounts.renderRuns - before;
         return { actions, renders: renderDelta };
@@ -492,7 +503,7 @@ interface EngineCount {
 }
 
 // 집계 실행 (시간은 안 잼): 단계 시나리오의 countPass와 같은 지표를 엔진 경로에서 센다. onPatch는 update의 patch만 알린다 (처음 그리기 제외)
-function countEnginePass(area: Element, scenario: EngineScenario, itemCount: number): EngineCount {
+async function countEnginePass(area: Element, scenario: EngineScenario, itemCount: number): Promise<EngineCount> {
   const run = scenario.create(itemCount);
   area.replaceChildren();
   const byKind: Record<string, number> = {};
@@ -504,10 +515,13 @@ function countEnginePass(area: Element, scenario: EngineScenario, itemCount: num
     run.mount(area, onPatch);
     const fixture = { items: run.items, ...describeDom(area) };
     const targets = run.targets(area);
-    observer = new MutationObserver(() => {});
+    // [AI Note]: act가 마이크로태스크를 기다리는 동안 observer 콜백이 먼저 기록을 가져가 버리므로(takeRecords가 빈 목록이 됨) 콜백에서 모아 둔다.
+    // 이렇게 하지 않으면 렌더가 Batching으로 마이크로태스크에서 돌 때 변경 기록이 전부 0건으로 잡힌다.
+    const collected: MutationRecord[] = [];
+    observer = new MutationObserver((list) => void collected.push(...list));
     observer.observe(area, { subtree: true, childList: true, attributes: true, characterData: true });
-    run.act(area);
-    const records = observer.takeRecords();
+    await run.act(area);
+    const records = [...collected, ...observer.takeRecords()];
     let nodesAdded = 0;
     let nodesRemoved = 0;
     let logPanelWrites = 0;
@@ -545,17 +559,17 @@ function countEnginePass(area: Element, scenario: EngineScenario, itemCount: num
 }
 
 /** B-06 · B-07 한 시나리오: 집계 실행 1번(시간 안 잼) + 시간 측정(준비 5 · 측정 30, 매 반복 앱을 새로 만듦) */
-export function runEngineScenario(area: Element, scenario: EngineScenario, options: BenchOptions = {}): BenchRow {
+export async function runEngineScenario(area: Element, scenario: EngineScenario, options: BenchOptions = {}): Promise<BenchRow> {
   const itemCount = options.itemCount ?? DEFAULT_ITEM_COUNT;
   let counted: EngineCount | null = null;
   let countError: string | null = null;
   try {
-    counted = countEnginePass(area, scenario, itemCount);
+    counted = await countEnginePass(area, scenario, itemCount);
   } catch (error) {
     countError = messageOf(error);
   }
 
-  const run = runScenario<EngineRun>({
+  const run = await runScenarioAsync<EngineRun>({
     warmup: options.warmup,
     runs: options.runs,
     setup: () => {
@@ -564,7 +578,7 @@ export function runEngineScenario(area: Element, scenario: EngineScenario, optio
       fresh.mount(area); // 처음 그리기는 잰 구간 밖 (관찰 콜백도 없음)
       return fresh;
     },
-    step: (fresh) => ({ counts: fresh.act(area) }),
+    step: async (fresh) => ({ counts: await fresh.act(area) }),
     teardown: (fresh) => {
       fresh.stop();
       area.replaceChildren();
@@ -586,7 +600,7 @@ export function runEngineScenario(area: Element, scenario: EngineScenario, optio
 }
 
 /** 화면이 부르는 하나의 입구: B-01 ~ B-07 아무 id나 같은 모양(BenchRow)을 돌려준다 */
-export function runScenarioById(area: Element, id: ScenarioId, options: BenchOptions = {}): BenchRow {
+export async function runScenarioById(area: Element, id: ScenarioId, options: BenchOptions = {}): Promise<BenchRow> {
   const found = ALL_SCENARIOS.find((scenario) => scenario.id === id);
   if (found === undefined) throw new Error(`알 수 없는 시나리오: ${id}`);
   return found.kind === 'stages' ? runStageScenario(area, found, options) : runEngineScenario(area, found, options);

@@ -42,7 +42,8 @@ export class FunctionComponent {
   private mounted = false;
   private unmounted = false;
   // [AI Note]: effect는 렌더 중에 "실행할 목록"에만 올리고, host 반영이 끝난 뒤에 돌린다 (patch 직후 실행).
-  // 슬롯마다 가장 최근에 예약된 것(latest)만 유효하다 — 같은 목록의 뒤쪽 effect가 안쪽(중첩) 렌더로 먼저 처리되면 옛 클로저로 다시 돌지 않게 한다.
+  // 슬롯마다 가장 최근에 예약된 것(latest)만 유효하다 — 더 최근 렌더가 대신 처리했거나 취소한 effect가 옛 클로저로 다시 돌지 않게 하는 보호 장치다.
+  // (결정 9 B Batching부터 렌더가 effect 안에서 중첩되지 않아 이 보호가 실제로 작동할 일은 드물지만, 회귀 위험 때문에 지우지 않았다 — task_003 결정.)
   private pendingEffects: PendingEffect[] = [];
   // [AI Note]: 렌더 중에 만든 예약은 여기(staged)에만 담고, 렌더가 성공한 뒤에야 pendingEffects · latestPending에 반영한다 (검수 NB-2).
   // 렌더가 실패하면 staged를 버리기만 하면 되므로 앞 렌더가 남긴 예약(latestPending)이 흔들리지 않는다.
@@ -227,9 +228,9 @@ export class FunctionComponent {
   }
 
   // [AI Note]: effect 실행 순서 = 이전 cleanup → 본문 → 돌려준 함수를 cleanup에 저장. 선언 순서대로.
-  // 본문 안에서 setter를 부르면 렌더가 이 호출 안에서 중첩된다 (결정 9 A) — 그래서 deps를 본문 실행 "전에" 저장해야
-  // 안쪽 렌더가 자기 자신을 또 실행하지 않는다. 안쪽 렌더가 같은 effect를 이미 다시 돌렸다면(run 번호가 바뀜)
-  // 이 본문이 늦게 돌려준 cleanup은 대신 바로 부른다 (잃어버리지 않기 위해).
+  // 본문 안에서 setter를 부르면 렌더가 새로 예약되고 이 호출이 끝난 뒤 마이크로태스크로 돈다 (결정 9 B — 렌더가 중첩되지 않고 연달아 이어진다).
+  // deps를 본문 실행 "전에" 저장하는 것과 run 번호 확인(같은 effect가 도는 사이 다시 돌았다면 늦게 돌려준 cleanup을 바로 부름)은
+  // 결정 9 A(즉시 동기, 렌더 중첩) 때 필요했던 보호 코드다. Batching에서는 작동할 일이 드물지만 지우지 않고 남겼다 (task_003 결정).
   private runEffects(list: readonly PendingEffect[]): void {
     for (const pending of list) {
       if (this.unmounted) return;
@@ -271,14 +272,15 @@ export class FunctionComponent {
     return slot.value as T;
   }
 
-  // [AI Note]: setter = 값을 바꾸고 즉시 동기 렌더 (알고리즘 결정 9 A). 같은 값(Object.is)이면 아무 일 없음.
-  // 한 핸들러에서 여러 번 부르면 그 수만큼 렌더한다. 함수형 setter는 가장 최근 값을 받는다.
+  // [AI Note]: setter = 칸 값을 바로 바꾸고 렌더는 scheduler에 예약 (알고리즘 결정 9 B, 마이크로태스크 Batching). 같은 값(Object.is)이면 예약하지 않음.
+  // 같은 틱에서 여러 번 불러도 렌더(update)는 컴포넌트당 한 번이고, 함수형 setter는 가장 최근 값(앞 setter가 쓴 값)을 받는다.
+  // 렌더 중 setter 오류 · unmount 뒤 무시는 예약 전에 걸러 낸다. task_002(결정 9 A 즉시 동기)에서는 여기서 곧바로 update()를 불렀다.
   private setState(slot: StateHook, next: unknown): void {
     if (this.unmounted) return; // unmount() 뒤 setter는 무시 (함수형 setter의 함수도 부르지 않는다)
     if (this.rendering) throw new Error('렌더 중에는 setter를 부를 수 없습니다');
     const value = typeof next === 'function' ? (next as (prev: unknown) => unknown)(slot.value) : next;
     if (Object.is(value, slot.value)) return;
     slot.value = value;
-    scheduleRender(() => this.update());
+    scheduleRender(this, () => this.update());
   }
 }

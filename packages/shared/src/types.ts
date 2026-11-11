@@ -10,7 +10,7 @@ export const COMMENT_NODE = '#comment';
 /** State History 보관 한도 (§3.3). 넘으면 가장 오래된 기록부터 뺀다 */
 export const HISTORY_LIMIT = 50;
 
-/** 무한 렌더 안전장치 (task_002 정책): 렌더가 연달아(중첩) 이 횟수를 넘으면 오류 */
+/** 무한 렌더 안전장치 (task_003 결정 9 B): effect → setter → 렌더가 연달아 이 횟수를 넘으면 오류 (task_002 즉시 동기 때는 "중첩 50번") */
 export const NESTED_RENDER_LIMIT = 50;
 
 /** 목록 비교용 key. h()가 props에서 꺼내 VNode에 둔다 (Key 확장: 데이터의 고유 id. Phase 1 검증 페이지는 쓰지 않음) */

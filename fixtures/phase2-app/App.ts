@@ -49,7 +49,7 @@ export function App(): VNode {
   const onAdd = () => {
     const text = draft.trim();
     if (text === '') return; // 빈 글 · 공백만: 상태 그대로 (렌더 0번)
-    // 한 번의 [추가] = setter 두 번 (렌더 2번): 목록에 붙이고, 입력창을 비운다
+    // 한 번의 [추가] = setter 두 번 (모아서 렌더 1번): 목록에 붙이고, 입력창을 비운다
     setTodoList((list) => addTodo(list, text));
     setDraft('');
   };
@@ -65,7 +65,7 @@ export function App(): VNode {
         count,
         // [+1]: 함수형 setter 한 번
         onPlus1: () => setCount((c) => c + 1),
-        // [+3]: 함수형 setter 세 번 연달아 → 3 증가, 렌더도 3번 (즉시 동기 정책)
+        // [+3]: 함수형 setter 세 번 연달아 → 3 증가, 같은 핸들러라 모아서 렌더는 1번 (마이크로태스크 Batching, 결정 9 B. task_002 즉시 동기 때는 렌더 3번)
         onPlus3: () => {
           setCount((c) => c + 1);
           setCount((c) => c + 1);

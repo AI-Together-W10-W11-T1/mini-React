@@ -84,7 +84,7 @@ async function runAll(): Promise<void> {
     for (const scenario of ALL_SCENARIOS) {
       setStatus('running', `${scenario.id} 실행 중…`);
       await tick(); // 상태 글을 먼저 그리게 한다 (이 뒤 한 시나리오가 끝날 때까지 계측 패널은 안 건드린다)
-      const row = runScenarioById(area, scenario.id);
+      const row = await runScenarioById(area, scenario.id);
       const tr = el('tr');
       tr.setAttribute('data-testid', `bench-row-${row.id}`);
       const cells = cellsOf(row);

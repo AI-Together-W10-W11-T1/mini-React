@@ -13,7 +13,7 @@
 | 번호 | 작업자 | 작업명 | 대상 패키지 | QA 결과 | 폴더 |
 | --- | --- | --- | --- | --- | --- |
 | 001 | ryuuuu5618 | phase1 | `shared` · `react-dom-bindings` · `react-reconciler` · `react-dom` · `fixtures/phase1-vdom-playground` | desktop 48 · mobile 48 PASS (시나리오 45개: QA-1~33 · QA-A1~A12) · 사람 확인 ✓ | `.agent_workflow/tasks/task_001_ryuuuu5618_phase1/` |
-| 002 | ryuuuu5618 | phase2 | `react` · `react-reconciler` · `react-dom-bindings` · `react-dom` · `scheduler` · `shared` · `fixtures/phase2-app` · `fixtures/perf-bench` (확장 1) | desktop 77 · mobile 77 PASS (QA-1~20 · QA-A1~A9) · QA-21 Batching 미구현 · 사람 확인 ✓ | `.agent_workflow/tasks/task_002_ryuuuu5618_phase2/` |
+| 002 | ryuuuu5618 | phase2 | `react` · `react-reconciler` · `react-dom-bindings` · `react-dom` · `scheduler` · `shared` · `fixtures/phase2-app` · `fixtures/perf-bench` (확장 1) | desktop 77 · mobile 77 PASS (QA-1~20 · QA-A1~A9) · QA-21 Batching 미구현(task_002 당시, task_003에서 구현) · 사람 확인 ✓ | `.agent_workflow/tasks/task_002_ryuuuu5618_phase2/` |
 
 (출처: task_001 · task_002 `04_qa_evidence/qa_todo_result.md`, `05_execution_timeline.log`)
 
@@ -21,8 +21,8 @@
 
 | 항목 | task_001 phase1 | task_002 phase2 |
 | --- | --- | --- |
-| 범위 | Phase 1 필수 P1-01~34 · 공통 T-01~08 + 확장 Key 비교 · Diff 시각화 | Phase 2 필수 P2-01~24 · 공통 T-09~16 + 확장 1 성능 대시보드. 확장 2 Batching 구현 안 함 |
-| Dev 완료 | 26개 (필수 20 + 확장 6) | 25개 (필수 21 + 확장 4 = 대시보드). Dev-27 · 28(Batching) 미구현 |
+| 범위 | Phase 1 필수 P1-01~34 · 공통 T-01~08 + 확장 Key 비교 · Diff 시각화 | Phase 2 필수 P2-01~24 · 공통 T-09~16 + 확장 1 성능 대시보드. 확장 2 Batching은 task_002 당시 구현 안 함 (task_003에서 구현) |
+| Dev 완료 | 26개 (필수 20 + 확장 6) | 25개 (필수 21 + 확장 4 = 대시보드). Dev-27 · 28(Batching)은 당시 미구현 → task_003 Dev-1~4로 구현 |
 | 개발 검수 | REJECT 2회 → 재작업 → 마스터 확인 (3회차 Opus 없음, 사용자 선택) | 1회차 APPROVE → 경량 검수 1회차 REJECT → 재작업 → 2회차 APPROVE |
 | 최종 검증 | vitest 16 files · 432 passed · tsc 0 · playwright 96 passed | vitest 36 files · 776 passed · tsc 0 · playwright 154 passed |
 | main 병합 | 74c82c5 (`--no-ff`, 로컬, push 없음) | 55c18c9 (`--no-ff`, 로컬, push 없음) |
@@ -40,5 +40,5 @@
 ## 남은 일 (기록 기준)
 
 - SVG 미지원 — 사용자 결정으로 구현 안 함 (CLAUDE.md 「내 설계 결정」 · task_002 `00_master_dialogue.md` 마무리)
-- Batching(확장 2) 미구현 — 사용자 결정 "배칭은 구현하지 말자" (task_002 `01_request_spec.md` 확장 2 · `00_master_dialogue.md` 마무리)
+- Batching(확장 2) — task_002 마무리 때는 "배칭은 구현하지 말자"였고(task_002 `01_request_spec.md` 확장 2 · `00_master_dialogue.md` 마무리), 그 뒤 task_003에서 구현하기로 바꿨다 (결정 9 B: "리액트를 공부할려면 배칭 구현하는게 맞는 거 같아서", task_003 `01_request_spec.md`)
 - 피그마 같은 시연 앱 — 미니 리액트 구현이 끝난 뒤 따로 만든다 (task_002 `01_request_spec.md` 「구현 제외 범위」)

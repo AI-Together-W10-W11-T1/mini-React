@@ -42,7 +42,7 @@ test('QA-2 [+1]을 누르면 카운터가 1이 되고(D-01), 렌더 1 → 2, 붙
   expect(await counterText(page)).toBe('2');
 });
 
-test('QA-3 [+3]을 누르면 카운터가 3이 되고(함수형 setter 세 번) 렌더 횟수는 3 늘어 4가 된다. 이어서 [+1] → 4', async ({ page }) => {
+test('QA-3 [+3]을 누르면 카운터가 3이 되고(함수형 setter 세 번) 렌더 횟수는 1 늘어 2가 된다(Batching). 이어서 [+1] → 4', async ({ page }) => {
   await page.goto(URL);
   expect(await renderCount(page)).toBe(1);
 
@@ -50,8 +50,8 @@ test('QA-3 [+3]을 누르면 카운터가 3이 되고(함수형 setter 세 번) 
 
   expect(await counterText(page)).toBe('3');
   await expect(page).toHaveTitle('카운터 3 - Phase 2');
-  // 즉시 동기 정책: setter 하나에 렌더 하나 (PRD §4.2 "렌더링 횟수는 스케줄링 정책과 함께 기록")
-  expect(await renderCount(page)).toBe(4);
+  // Batching(결정 9 B): 같은 핸들러의 setter 3번을 모아 렌더 1번 (PRD §4.2 "렌더링 횟수는 스케줄링 정책과 함께 기록"). task_002 즉시 동기 때는 4
+  expect(await renderCount(page)).toBe(2);
 
   await page.getByTestId('counter-plus1').click();
   expect(await counterText(page)).toBe('4');

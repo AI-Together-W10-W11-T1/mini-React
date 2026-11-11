@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { runScenario } from '../runner';
+import { runScenario, runScenarioAsync } from '../runner';
 
 // [AI Note]: 시계를 가짜로 꽂아 결정적으로 시험한다. now()를 부를 때마다 준비해 둔 값을 차례로 돌려준다.
 function fakeClock(ticks: number[]): () => number {
@@ -178,5 +178,120 @@ describe('runScenario — 인자 검사', () => {
     expect(() => runScenario({ runs: 0, setup: () => undefined, step: () => undefined })).toThrow('runs');
     expect(() => runScenario({ runs: 2.5, setup: () => undefined, step: () => undefined })).toThrow('runs');
     expect(() => runScenario({ warmup: -1, setup: () => undefined, step: () => undefined })).toThrow('warmup');
+  });
+});
+
+// [AI Note]: Batching(결정 9 B)에서는 setter · 이벤트 뒤 렌더가 마이크로태스크로 돌아서 "잴 구간"도 기다려야 한다. 같은 규칙(준비 · 측정 · 오류 · setup/teardown)을 async step에 그대로 적용하는지 본다.
+describe('runScenarioAsync — async step도 같은 규칙으로 잰다 (Batching, PRD §8.2)', () => {
+  it('기본값은 준비 5회 + 측정 30회, 준비는 결과에서 빠지고 측정 30회만 요약된다', async () => {
+    const step = vi.fn(async () => {});
+    const result = await runScenarioAsync({ setup: () => undefined, step });
+    expect(step).toHaveBeenCalledTimes(35);
+    expect(result.warmup).toBe(5);
+    expect(result.runs).toBe(30);
+    expect(result.samples).toHaveLength(30);
+    expect(result.errors).toBe(0);
+  });
+
+  it('step이 끝나기를(Promise가 풀리기를) 기다린 뒤에 시간을 잰다 — 마이크로태스크로 돈 렌더가 구간 안에 들어간다', async () => {
+    const done: string[] = [];
+    // now() 호출은 step 시작 전 · step이 끝난 뒤 한 쌍. step이 끝나기 전에는 두 번째 now()를 부르지 않는다
+    const ticks = [100, 130];
+    let i = 0;
+    const now = (): number => {
+      done.push(`now${i}`);
+      return ticks[i++];
+    };
+    const result = await runScenarioAsync({
+      warmup: 0,
+      runs: 1,
+      now,
+      setup: () => undefined,
+      step: async () => {
+        await Promise.resolve();
+        done.push('step 끝');
+      },
+    });
+    expect(done).toEqual(['now0', 'step 끝', 'now1']);
+    expect(result.samples).toEqual([30]);
+  });
+
+  it('동기 step도 받는다 (같은 모양의 결과)', async () => {
+    const result = await runScenarioAsync({ warmup: 1, runs: 2, setup: () => undefined, step: () => ({ counts: { n: 1 } }) });
+    expect(result.samples).toHaveLength(2);
+    expect(result.counts).toEqual({ n: 1 });
+    expect(result.countsStable).toBe(true);
+  });
+
+  it('step이 돌려준 단계별 시간 · 개수를 요약하고, 개수가 반복마다 다르면 countsStable = false', async () => {
+    let i = 0;
+    const result = await runScenarioAsync({
+      warmup: 0,
+      runs: 3,
+      setup: () => undefined,
+      step: async () => ({ timings: { patch: ++i }, counts: { patches: i } }),
+    });
+    expect(result.metrics.patch).toMatchObject({ n: 3, min: 1, max: 3 });
+    expect(result.countsStable).toBe(false);
+  });
+
+  it('매 반복 전에 setup, 반복이 끝나면(step이 던져도) teardown이 불리고 ctx가 그대로 간다', async () => {
+    const order: string[] = [];
+    let serial = 0;
+    await runScenarioAsync({
+      warmup: 1,
+      runs: 1,
+      setup: () => {
+        const id = ++serial;
+        order.push(`setup${id}`);
+        return id;
+      },
+      step: async (ctx) => {
+        order.push(`step${ctx}`);
+        if (ctx === 2) throw new Error('boom');
+      },
+      teardown: (ctx) => void order.push(`teardown${ctx}`),
+    });
+    expect(order).toEqual(['setup1', 'step1', 'teardown1', 'setup2', 'step2', 'teardown2']);
+  });
+
+  it('step이 reject한 반복은 samples에서 빠지되 errors 개수와 메시지로 남고, 준비 중 오류는 warmupErrors로 센다', async () => {
+    let i = 0;
+    const result = await runScenarioAsync({
+      warmup: 2,
+      runs: 4,
+      setup: () => undefined,
+      step: async () => {
+        i++;
+        if (i === 1) throw new Error('warm boom');
+        if (i > 2 && i % 2 === 0) throw new Error(`boom ${i}`);
+      },
+    });
+    expect(result.warmupErrors).toBe(1);
+    expect(result.errors).toBe(2);
+    expect(result.errorMessages).toEqual(['boom 4', 'boom 6']);
+    expect(result.metrics.total.n + result.errors).toBe(result.runs);
+  });
+
+  it('setup이 던진 반복도 오류로 센다 (step · teardown은 부르지 않음)', async () => {
+    const step = vi.fn(async () => {});
+    const teardown = vi.fn();
+    const result = await runScenarioAsync({
+      warmup: 0,
+      runs: 2,
+      setup: () => {
+        throw new Error('setup boom');
+      },
+      step,
+      teardown,
+    });
+    expect(result.errors).toBe(2);
+    expect(step).not.toHaveBeenCalled();
+    expect(teardown).not.toHaveBeenCalled();
+  });
+
+  it('runs가 1보다 작거나 warmup이 음수면 오류 (Promise가 reject)', async () => {
+    await expect(runScenarioAsync({ runs: 0, setup: () => undefined, step: async () => {} })).rejects.toThrow('runs');
+    await expect(runScenarioAsync({ warmup: -1, setup: () => undefined, step: async () => {} })).rejects.toThrow('warmup');
   });
 });

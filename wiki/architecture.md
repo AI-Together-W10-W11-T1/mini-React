@@ -11,7 +11,7 @@
 | `packages/react-reconciler` | `diff` · `invertPatches` (Phase 1), `FunctionComponent` (`hooks` · `mount()` · `update()` · `unmount()` · `lastPatches`), `resolveComponents`, Hook 정책 | ✕ | `src/diff.ts`, `src/invertPatches.ts`, `src/FunctionComponent.ts`, `src/resolveComponents.ts`, `src/deps.ts` |
 | `packages/react-dom-bindings` | `domToVNode` · `readAreaChildren` · `renderVNode` · `renderAreaChildren` · `patch` · `vnodesToHtml` · `setAreaHtml` · `checkHtml` · `setEventHandler` · `applyDomProp` | ○ (유일) | `src/client/domToVNode.ts`, `renderVNode.ts`, `patch.ts`, `sanitize.ts`, `checkHtml.ts`, `htmlScan.ts`, `vnodesToHtml.ts`, `events.ts`, `domProps.ts` |
 | `packages/react-dom` | `render(component, container, options?)`, `History` (양방향 연결 리스트), `createVDomRoot` (`snapshot` · `update` · `back` · `forward`) | 바인딩 경유 | `src/render.ts`, `src/history.ts`, `src/createVDomRoot.ts` |
-| `packages/scheduler` | `scheduleRender(task)` — 지금은 즉시 동기 실행 + 중첩 깊이 셈 (Batching 미구현) | ✕ | `src/scheduler.ts` |
+| `packages/scheduler` | `scheduleRender(owner, task)` — `queueMicrotask`로 컴포넌트(owner)당 렌더 예약 1번 (Batching, 결정 9 B) + 연달아 50번 안전장치 + 렌더 오류 처리 함수 `setRenderErrorHandler`(기본 = 다시 던지기) | ✕ | `src/scheduler.ts` |
 | `fixtures/phase1-vdom-playground` | Phase 1 검증 페이지: 실제 영역 · 테스트 영역(편집창 + 미리보기), Patch · 뒤로 · 앞으로, 시각화 오버레이 | ○ | `main.ts`, `overlay.ts`, `patchErrorMessage.ts` |
 | `fixtures/phase2-app` | Phase 2 검증 페이지: 루트 `App` + 칸 4개 | ○ | `App.ts`, `components/*.ts`, `todoOps.ts`, `counts.ts`, `main.ts` |
 | `fixtures/perf-bench` (확장 1) | 성능 대시보드: 시나리오 B-01~B-07 반복 측정 | ○ | `scenarios.ts`, `runner.ts`, `stats.ts`, `format.ts` |
@@ -46,7 +46,7 @@
 ### Phase 2: FunctionComponent · Hooks
 
 ```
-setter 호출 → 즉시 동기 렌더 (App() 재실행 → 새 VNode) → resolveComponents (자식 컴포넌트를 그 자리에서 풀기)
+setter 호출 → 칸 값을 바로 바꾸고 렌더 예약 (`queueMicrotask`, 컴포넌트당 1번) → 지금 코드가 끝난 직후 렌더 (App() 재실행 → 새 VNode) → resolveComponents (자식 컴포넌트를 그 자리에서 풀기)
             → diff(저장한 이전 VNode, 새 VNode) → patch (바뀐 곳만) → effect (의존성 기준)
 ```
 
@@ -67,7 +67,7 @@ setter 호출 → 즉시 동기 렌더 (App() 재실행 → 새 VNode) → resol
 | ③ 목록 | `TodoPanel` · `TodoRow` | 추가 · 체크 · [위로] · [아래로] · [삭제], "전체 n개 · 완료 m개" (`useMemo`). key = 항목 id (`todo-1` …, 지운 번호 재사용 안 함) | [위로] · [아래로] 뒤 같은 key 노드 유지 (MOVE), `checked` · `click`, D-03 · D-04 |
 | ④ 기록판 | `LogPanel` | 렌더 · effect · memo 횟수, 마지막 update의 patch 줄 수, 탭 제목에 카운터 값 | effect 실행 조건 · DOM 반영 뒤 실행 · 부분 갱신 |
 
-(출처: task_002 `01_request_spec.md` 「검증 페이지」) 횟수는 상태가 아닌 바깥 변수로 센다. [+3]은 렌더 3번이 된다 (정책으로 기록, PRD §4.2). (출처: task_002 `01_request_spec.md` 4절)
+(출처: task_002 `01_request_spec.md` 「검증 페이지」) 횟수는 상태가 아닌 바깥 변수로 센다. [+3]은 렌더 1번이 된다 (Batching, 정책으로 기록, PRD §4.2. task_002 즉시 동기 때는 렌더 3번). (출처: task_002 `01_request_spec.md` 4절 · task_003 `01_request_spec.md`)
 
 ## 알고리즘 결정 요약
 
@@ -85,7 +85,7 @@ setter 호출 → 즉시 동기 렌더 (App() 재실행 → 새 VNode) → resol
 | 8 Key 출처 (확장) | Phase 1 화면은 key 없음 (위치 기반만). Key 엔진은 단위 테스트로 검증, 화면 시연은 Phase 2 데이터 id (`todo-1` …) | "사용자가 key값 수정 방지 위해" | 엔진 번호 + 편집창 `data-key` 보이기 — 편집창이 지저분 / 숨기고 엔진이 기억했다 다시 넣기 — 짝지을 단서가 위치 · 내용뿐 | task_001 `01_request_spec.md` 「Key 출처」 · `00_master_dialogue.md` Q13 |
 | 9 Diff 시각화 (확장) | 스위치(기본 꺼짐) + 실제 영역 위 오버레이로 바뀐 노드만 깜빡임 (Patch · 뒤로 · 앞으로) | "diff는 사용자 입장에서 필요 없기에 on off로 선택" | 빼기 / 실제 노드에 class 붙이기 — 측정 오염, 연속 Patch 때 엉킴 / 고칠 일 목록 패널 — 깜빡임만으로 충분 | task_001 `01_request_spec.md` 「확장」 · `00_master_dialogue.md` Q14 |
 | 10 이벤트 props (결정 8) | B. 리스너 하나 + 핸들러 교체. `on` + 대문자 · 함수 값 = 이벤트 (`onClick` → `click`) | "바뀐 곳만 고친다는 원칙을 지키려고" (1차 A 선택 → 표 비교 뒤 B로 바꿈) | A 바뀔 때마다 remove · add — 렌더마다 핸들러가 새 함수라 등록 취소 · 등록이 생김 / C 루트 위임 — 구현량, 항목 수가 적어 불필요 | task_002 `01_request_spec.md` 결정 8 · `00_master_dialogue.md` Q5 |
-| 11 재렌더 시점 (결정 9) | A. 즉시 동기 — setter를 부르면 바로 렌더 + diff + patch | "마감이 빠듯해서 시간이 남으면 배칭 구현한다고 메모해줘" / 마지막: "배칭은 구현하지 말자" | B. 마이크로태스크 Batching (`queueMicrotask`) — 마감, 테스트에 `await` 필요 / C. `requestAnimationFrame` — 최대 약 16ms 늦음, jsdom 테스트 불편 | task_002 `01_request_spec.md` 결정 9 · `00_master_dialogue.md` Q4 · 마무리 |
+| 11 재렌더 시점 (결정 9) | **B. 마이크로태스크 Batching** (task_003에서 변경) — setter는 칸 값을 바로 바꾸고 렌더는 `queueMicrotask`로 컴포넌트당 한 번 예약, 지금 실행 중인 코드가 끝난 직후 한 번 렌더 + diff + patch + effect. (task_002는 A 즉시 동기였음) | "리액트를 공부할려면 배칭 구현하는게 맞는 거 같아서" (task_003). task_002 당시 A를 고른 말: "마감이 빠듯해서 시간이 남으면 배칭 구현한다고 메모해줘" / 마지막: "배칭은 구현하지 말자" | A. 즉시 동기 — task_002의 선택, 연속 setter마다 렌더 / C. `requestAnimationFrame` — 최대 약 16ms 늦음, jsdom 테스트 불편 | task_003 `01_request_spec.md` 결정 9 · `00_master_dialogue.md` / task_002 `01_request_spec.md` 결정 9 · `00_master_dialogue.md` Q4 · 마무리 |
 | 12 Hook 정책 묶음 1~5 | 부른 순서로 `hooks` 배열 · 함수형 setter · 같은 값 무시 · 지연 초기화 · effect 의존성 3종 · cleanup · 무한 렌더 50번 · `useMemo` 의존성 · 자식 풀기 · key = 항목 id · `h()` 입력 규칙 | 추천안 수용 ("응") — 사용자 별도 이유 없음 | 버린 후보 기록 없음 (추천안 표로만 확정) | task_002 `00_master_dialogue.md` 「빠르게: 추천안 표」 · `01_request_spec.md` 정책 |
 
 ## 실제 React와 차이
@@ -96,7 +96,7 @@ setter 호출 → 즉시 동기 렌더 (App() 재실행 → 새 VNode) → resol
 | 같은 key 재정렬 (`[a,b,c]→[b,c,a]`) | MOVE 2번 (보충 설명 기준) | 이미 순서가 맞는 항목은 두어 1번 (보충 설명 기준) | task_001 `00_master_dialogue.md` CheckPoint 2026-11-11T04:17 보충 |
 | key가 없는 자식 | 위치 기반 비교 (key 없음 · 중복 key도 위치 비교) | 위치로 짝짓고 경고 (보충 설명 기준) | task_001 `01_request_spec.md` 결정 2 · `00_master_dialogue.md` CheckPoint 2026-11-11T04:17 보충 |
 | History | 있음. 패치 · 역패치 + VNode 기록, 양방향 연결 리스트 | 없음. 공식 튜토리얼은 앱이 상태 스냅샷을 쌓는 방식 (보충 설명 기준) | task_001 `00_master_dialogue.md` CheckPoint 2026-11-11T04:17 보충 |
-| 재렌더 시점 | setter마다 즉시 동기 렌더 (결정 9 A). Batching 미구현 | setter 호출을 모아 한 번 렌더 (18 이후, 마스터 설명) | task_002 `00_master_dialogue.md` Q4 · `01_request_spec.md` 결정 9 |
+| 재렌더 시점 | 같은 틱의 setter를 모아 컴포넌트당 한 번 렌더 (결정 9 B, `queueMicrotask`). 우선순위 · 시간 분할 없음. (task_002 당시는 setter마다 즉시 동기 렌더 · Batching 미구현) | setter 호출을 모아 한 번 렌더 (18 이후, 마스터 설명) | task_003 `01_request_spec.md` 결정 9 · task_002 `00_master_dialogue.md` Q4 |
 
 같은 점: 고칠 목록을 만들고, 목록을 바탕으로 수정된 부분만 고친다 (사용자 한 줄 요약). (출처: task_001 `00_master_dialogue.md` CheckPoint 2026-11-11T04:17)
 
@@ -114,15 +114,22 @@ setter 호출 → 즉시 동기 렌더 (App() 재실행 → 새 VNode) → resol
 
 - 시나리오 B-01~B-07을 준비 5회 · 측정 30회 이상으로 반복, p50 · p95 기록. 측정 조건(브라우저 · 기기 · 화면 크기 · 빌드 모드)을 함께 적는다. (출처: task_002 `01_request_spec.md` 확장 1 · `04_qa_evidence/qa_todo_result.md` 캡처 ⑦)
 - 계측 패널의 DOM 변경은 측정에서 뺀다. 검수 1회차에서 B-07 집계에 기록판 쓰기가 섞인 것을 찾아, 세 칸을 따로 셈 (BLOCKING → 재작업 → APPROVE). (출처: task_002 `03_development/code_review_log.md`)
-- Batching 비교 시나리오는 제외. (출처: task_002 `01_request_spec.md` 확장 1)
-- 실제로 한 번 측정한 값 (2026-11-11, Playwright 헤드리스 Chromium 158 · Windows, 1280 × 800, Vite dev 서버, CPU 제한 없음, 준비 5 · 측정 30, `performance.now()` 해상도 약 0.1ms). 실행마다 값이 달라 알고리즘 우열 판단에 쓰지 않는다. (출처: task_002 `03_development/dev_todo.md` Dev-26 근거 · 「경량 검수 1회차 반영」)
+- Batching 전후를 한 화면에서 비교하는 시나리오는 없다 (제외 범위). task_003에서 B-06 · B-07 값을 Batching 기준으로 다시 쟀다. (출처: task_002 `01_request_spec.md` 확장 1 · task_003 `03_development/dev_todo.md` Dev-2)
+- 실제로 한 번 측정한 값 (2026-11-11, Playwright 헤드리스 Chromium 158 · Windows, 1280 × 800, Vite dev 서버, CPU 제한 없음, 준비 5 · 측정 30, `performance.now()` 해상도 약 0.1ms). 실행마다 값이 달라 알고리즘 우열 판단에 쓰지 않는다. 아래 표는 **task_002 당시(즉시 동기)** 값이다. (출처: task_002 `03_development/dev_todo.md` Dev-26 근거 · 「경량 검수 1회차 반영」)
 
   | 시나리오 | 전체 M-07 p50 / p95 | patch 줄 | 노드 유지 M-03 |
   | --- | --- | --- | --- |
   | B-02 텍스트 하나 변경 (노드 507개) | 0.300 / 0.600 ms | 1 (SET_TEXT 1) | 507 / 507 |
   | B-05 여러 위치 동시 변경 | 0.300 / 0.800 ms | 5 | 507 / 507 |
-  | B-06 setter 10번 연달아 (렌더 10번) | 2.700 / 3.210 ms | 10 | 507 / 507 |
-  | B-07 검증 페이지 대표 동작 13번 (렌더 16번) | 1.400 / 2.410 ms (재측정) | 212 (그중 SET_EVENT 168, DOM을 바꾸지 않음) | 7 / 7 |
+  | B-06 setter 10번 연달아 (렌더 10번, task_002 당시 즉시 동기) | 2.700 / 3.210 ms | 10 | 507 / 507 |
+  | B-07 검증 페이지 대표 동작 13번 (렌더 16번, task_002 당시 즉시 동기) | 1.400 / 2.410 ms (재측정) | 212 (그중 SET_EVENT 168, DOM을 바꾸지 않음) | 7 / 7 |
+
+- Batching(결정 9 B)으로 다시 쟀다 (task_003, 같은 조건, 2026-11-11, 대시보드를 3번 돌린 것 중 첫 번째 실행. 실행마다 값이 달라 우열 판단에 쓰지 않으며, B-06은 `performance.now()` 해상도(약 0.1ms)에 가까운 값이다). (출처: task_003 `03_development/dev_todo.md` Dev-2 근거)
+
+  | 시나리오 | 전체 M-07 p50 / p95 | patch 줄 | 노드 유지 M-03 |
+  | --- | --- | --- | --- |
+  | B-06 setter 10번 연달아 (렌더 1번, Batching) | 0.300 / 0.830 ms | 1 (SET_TEXT 1) | 507 / 507 |
+  | B-07 검증 페이지 대표 동작 13번 (렌더 13번, 이벤트마다 렌더) | 1.200 / 1.955 ms | 167 (그중 SET_EVENT 126, DOM을 바꾸지 않음) | 7 / 7 |
 
 ## 검증 결과
 

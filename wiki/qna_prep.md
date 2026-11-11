@@ -86,10 +86,10 @@
   - 출처: task_001 `01_request_spec.md` 정책 「§5 HTML · SVG 범위」 · `00_master_dialogue.md` Q11-4
 
 - Q: 재렌더는 언제 하나? setter를 부르면 바로 화면이 바뀌나? (결정 9)
-  - A(사용자 말): "그냥 setter 부를 때마다 바로 렌더와 패치를 진행하자." · 이유: "마감이 빠듯해서 시간이 남으면 배칭 구현한다고 메모해줘"
-  - 버린 후보: 마이크로태스크 Batching (마감 · 테스트에 `await` 필요) / `requestAnimationFrame` (최대 약 16ms 늦음, jsdom 테스트 불편)
-  - 결과: Batching은 구현하지 않음 (사용자 "배칭은 구현하지 말자")
-  - 출처: task_002 `01_request_spec.md` 결정 9 · `00_master_dialogue.md` Q4 · 마무리
+  - A(task_002 당시 사용자 말): "그냥 setter 부를 때마다 바로 렌더와 패치를 진행하자." · 이유: "마감이 빠듯해서 시간이 남으면 배칭 구현한다고 메모해줘"
+  - 버린 후보(task_002 당시): 마이크로태스크 Batching (마감 · 테스트에 `await` 필요) / `requestAnimationFrame` (최대 약 16ms 늦음, jsdom 테스트 불편)
+  - 결과: task_002 마무리 때는 "배칭은 구현하지 말자"였다가, task_003에서 **B. 마이크로태스크 Batching**으로 바꿨다. 이유(사용자 말): "리액트를 공부할려면 배칭 구현하는게 맞는 거 같아서". 지금은 setter가 칸 값을 바로 바꾸고 렌더는 `queueMicrotask`로 컴포넌트당 한 번, 지금 실행 중인 코드가 끝난 직후에 돈다.
+  - 출처: task_003 `01_request_spec.md` 결정 9 · `00_master_dialogue.md` / task_002 `01_request_spec.md` 결정 9 · `00_master_dialogue.md` Q4 · 마무리
 
 - Q: 이벤트 핸들러를 왜 "리스너 하나 + 핸들러 교체"로 했나? (결정 8)
   - A(사용자 말): "바뀐 곳만 고친다는 원칙을 지키려고"
@@ -127,11 +127,11 @@
   - 출처: task_002 `00_master_dialogue.md` 「이해 체크포인트」 · `07_pr_body.md` 「동작 원리」
 
 - Q: `setter`를 여러 번 부르면 렌더는 몇 번 일어나나? ([+3])
-  - A: 즉시 동기 정책이라 setter 수만큼 렌더한다. [+3]은 렌더 3번. 같은 값(`Object.is`)이면 렌더 0번.
-  - 출처: task_002 `01_request_spec.md` 4절 · 「정책」 표 「렌더 횟수 기록」
+  - A: Batching이라 같은 핸들러(같은 틱)의 setter는 모아서 렌더 1번이다. [+3]은 렌더 1번(task_002 즉시 동기 때는 3번). 같은 값(`Object.is`)이면 예약하지 않아 렌더 0번.
+  - 출처: task_003 `01_request_spec.md` 「정책」 · task_002 `01_request_spec.md` 4절 「렌더 횟수 기록」
 
 - Q: effect에서 setter를 부르면 무한 반복되지 않나?
-  - A: 렌더 중첩이 50번을 넘으면 오류. 의존성 배열로 실행 조건을 건다. 렌더 본문에서 setter를 부르면 오류.
+  - A: effect → setter → 렌더가 연달아 50번을 넘으면 오류 (task_003 Batching 기준. task_002 즉시 동기 때는 "중첩 50번"). 의존성 배열로 실행 조건을 건다. 렌더 본문에서 setter를 부르면 오류.
   - 출처: task_002 `01_request_spec.md` 정책 · `00_master_dialogue.md` Q4-1 (의존성 개념 질문)
 
 ## 실제 React와 차이
@@ -141,8 +141,8 @@
   - 출처: task_001 `00_master_dialogue.md` CheckPoint 2026-11-11T04:17 · `01_request_spec.md`
 
 - Q: 재렌더 시점은 React와 어떻게 다른가?
-  - A: 우리는 setter마다 즉시 동기 렌더. React 18 이후는 setter를 모아 한 번 렌더 (배칭). 우리 Batching은 구현하지 않음.
-  - 출처: task_002 `00_master_dialogue.md` Q4 · `01_request_spec.md` 결정 9
+  - A: 우리도 같은 틱의 setter를 모아 한 번 렌더한다 (결정 9 B, `queueMicrotask`, 컴포넌트당 1번). React 18 이후도 setter를 모아 한 번 렌더 (배칭). 우리는 우선순위 · 시간 분할 없이 마이크로태스크 한 가지다. (task_002 당시는 setter마다 즉시 동기 렌더였음)
+  - 출처: task_003 `01_request_spec.md` 결정 9 · task_002 `00_master_dialogue.md` Q4
 
 ## 아직 답이 약한 질문
 
