@@ -31,12 +31,12 @@
 
 - 변경 감지: 이전 · 새 VNode 비교 → 고칠 일 목록 → 목록대로 바뀐 곳만 DOM 반영 (위치 기반 필수 · key 확장 MOVE)
 - 되돌리기: 기록마다 VNode · 패치 · 역패치 저장 (양방향 연결 리스트, 한도 50), 뒤로 = 역패치를 역순 적용
-- Hooks · 재렌더 · 이벤트: `hooks` 배열에 부른 순서로 저장, `if` 안 Hook 금지, setter마다 즉시 동기 렌더 (Batching 미구현), 요소마다 리스너 한 번 + 핸들러 교체
-- 실제 React와 차이: 고칠 목록 대신 노드마다 표시 · React에는 History 없음 · React는 setter를 모아 한 번에 렌더
+- Hooks · 재렌더 · 이벤트: `hooks` 배열에 부른 순서로 저장, `if` 안 Hook 금지, setter는 칸 값을 바로 바꾸고 렌더는 마이크로태스크로 컴포넌트당 한 번 모음 (Batching, 같은 핸들러의 setter 3번 = 렌더 1번), 요소마다 리스너 한 번 + 핸들러 교체
+- 실제 React와 차이: 고칠 목록 대신 노드마다 표시 · React에는 History 없음 · 우리 Batching은 `queueMicrotask` 한 가지뿐 (우선순위 · 시간 분할 없음)
 - Reflow / Repaint와 VDOM (마스터가 쓰고 사용자 확인, 2026-11-11):
   - 브라우저는 DOM이 바뀌면 스타일 계산 → **reflow**(위치 · 크기 다시 계산) → **repaint**(픽셀 다시 그리기)를 한다. 글자 · 크기가 바뀌면 reflow + repaint, 색만 바뀌면 repaint만 일어난다.
   - VDOM이 reflow를 없애 주지는 않는다. 우리 엔진이 하는 일은 ① diff로 **바뀐 곳만** 실제 DOM에 쓰고(텍스트 하나면 SET_TEXT 1줄), ② patch 도중 `offsetWidth` 같은 레이아웃 값을 **읽지 않아서** 브라우저가 JS가 끝난 뒤 reflow · repaint를 한 번에 하게 두는 것이다.
-  - 즉시 동기 렌더라 [+3]은 렌더 · diff · patch가 3번 돌지만, 그리기는 클릭 처리 JS가 끝난 뒤 한 번이다. 비용이 늘어나는 곳은 JS(diff · patch) 쪽이다.
+  - Batching이라 [+3]은 setter 3번을 모아 렌더 · diff · patch가 1번만 돌고(task_002 즉시 동기 때는 3번), 그리기는 클릭 처리 JS가 끝난 뒤 한 번이다. 비용이 생기는 곳은 JS(diff · patch) 쪽이다.
   - 그래서 VDOM이 항상 빠른 것은 아니다. 바뀔 곳을 미리 아는 직접 DOM 수정이 더 싸고, VDOM은 그 비교 비용을 내고 "바뀐 곳 찾기"를 자동으로 해 준다 (PRD §8.2 "Virtual DOM이 항상 빠르다는 결론을 전제로 두지 않는다"). 대시보드 M-07은 DOM 반영까지 시간이라 reflow · repaint 시간은 들어 있지 않다.
 
 ## AI 워크플로 운영 결과
