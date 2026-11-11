@@ -169,3 +169,4 @@
   - 1: 보관 한도 50 이유 기록 (task_001 명세 정책 · qna_prep)
   - 2: Reflow / Repaint 마스터 초안을 README · qna_prep에 넣고 확인을 물음
   - 3: `/usage`(AI 작업 비용)와 다른 요청 — 바닐라 직접 DOM vs 미니 React 렌더 비용 비교(PRD §8.2 선택 실험). 새 측정 작업이 필요해 진행 여부를 물음
+- 3번 다시 (원문): "3번을 그럼 해당 영역을 구현하는데 사용한 토큰량을 적자" → 비교 실험(task_003)은 하지 않음. 세션 · 서브에이전트 transcript usage를 task 구간별로 합쳐 README 표로 기록

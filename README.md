@@ -46,8 +46,19 @@
 | task 수 · 검수 회차 | task 2개 · task_001 검수 2회 (둘 다 REJECT, 2회차 뒤 마스터 확인) · task_002 검수 3회 (개발 1회 APPROVE · 경량 2회: REJECT → APPROVE) |
 | QA 실패 분류 (구현 · 테스트 · 명세) | QA 실패 0건 (두 task 모두) — 3갈래 분류 대상 없음. 개발 검수 BLOCKING 5건(task_001 4 · task_002 1)은 모두 작업자 재작업으로 해결 (`code_review_log.md`) |
 | 자동 테스트 (최종) | task_001: vitest 432 · playwright 96 / task_002: vitest 776 · playwright 154 / tsc 오류 0 |
-| `/usage` 비용 (하네스 적용 전 / 후) | [확인 필요: 마스터가 측정값 전달] |
+| 구현에 쓴 토큰량 | 아래 표 (`/usage` 전후 비교는 하지 않음) |
 
 - 위키 · 상세 기록: [wiki/index.md](wiki/index.md) · [wiki/qna_prep.md](wiki/qna_prep.md)
+
+
+### 구현에 쓴 토큰량
+
+세션 · 서브에이전트 기록(`~/.claude/projects/…/<세션>.jsonl` · `subagents/*.jsonl`)의 `usage`를 메시지마다 한 번씩 더한 값. 구간은 각 task 타임라인의 시작 ~ 병합 시각(KST). 합계의 약 97%는 캐시 읽기(이미 읽은 맥락을 다시 쓰는 것)다.
+
+| 구간 | 마스터 (Opus) | 작업자 (Sonnet) | 검수자 (Opus) | QA (Sonnet) | 위키 (Haiku) | 합계 | 그중 출력 |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| task_001 Phase 1 (11-10 18:39 ~ 11-11 04:28) | 8,701만 | 4,359만 | 177만 | 101만 | - | **1억 3,338만** | 70.3만 |
+| task_002 Phase 2 (11-11 04:30 ~ 13:48) | 5,195만 | 5,283만 | 603만 | 78만 | - | **1억 1,160만** | 51.8만 |
+| 4단계 위키 · README (13:49 ~ 14:10 무렵) | 약 860만 | - | - | - | 310만 | **약 1,212만** | 11.4만 |
 
 <!-- mini-react-kit:readme:end -->
