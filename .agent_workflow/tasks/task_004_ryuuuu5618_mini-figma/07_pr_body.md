@@ -1,7 +1,7 @@
 # 07 PR 본문 초안: mini-figma
 
 - 제목: `feat(mini-figma): 미니 React로 만든 Figma Components 시연 앱`
-- 브랜치: `feature/mini-figma` → `main` (원격 없음, 로컬 병합. 커밋 33개)
+- 브랜치: `feature/mini-figma` → `main` (원격 없음, 로컬 병합. 커밋 33개) — **병합 완료 634304e**
 - 레포에 `.github/pull_request_template.md`가 없어 PRD §9 항목에 맞춰 적는다.
 
 ## 변경 요약

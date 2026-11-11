@@ -112,3 +112,6 @@
 - mr-wiki PASS (wiki 3파일 + README 표시 구간), 마스터 확인: README 변경은 표시 구간 안만, Ctrl+Y 한계 문장을 검수 기록대로 정확히 고침, [확인 필요] 2건(CP1 · CP2 한 줄 요약, CP3) 보여 줌
 - A (원문): "너가 알아서 채워줘" → 마스터가 기록으로 채움: CP1 · CP2 = 사용자 자기 말 답으로 갈음, CP3 = 테스트 기록의 정답(SET_TEXT 4줄, P-8) + 사용자 답 없음 · 발표 전 다시 할 후보. 4단계 승인으로 봄
 
+
+## 병합 (2026-11-11T20:06)
+- A (원문): "어어 병합해줘" → `feature/mini-figma` → `main` 병합 커밋 634304e (no-ff, push 안 함). main에서 vitest 41 files · 1064 passed, tsc 0, playwright 272 passed, `packages/` diff 비어 있음, 남은 서버 없음
