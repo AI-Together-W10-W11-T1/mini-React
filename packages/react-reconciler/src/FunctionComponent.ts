@@ -44,6 +44,9 @@ export class FunctionComponent {
   // [AI Note]: effect는 렌더 중에 "실행할 목록"에만 올리고, host 반영이 끝난 뒤에 돌린다 (patch 직후 실행).
   // 슬롯마다 가장 최근에 예약된 것(latest)만 유효하다 — 같은 목록의 뒤쪽 effect가 안쪽(중첩) 렌더로 먼저 처리되면 옛 클로저로 다시 돌지 않게 한다.
   private pendingEffects: PendingEffect[] = [];
+  // [AI Note]: 렌더 중에 만든 예약은 여기(staged)에만 담고, 렌더가 성공한 뒤에야 pendingEffects · latestPending에 반영한다 (검수 NB-2).
+  // 렌더가 실패하면 staged를 버리기만 하면 되므로 앞 렌더가 남긴 예약(latestPending)이 흔들리지 않는다.
+  private staged: { list: PendingEffect[]; latest: Map<EffectHook, PendingEffect | null> } = { list: [], latest: new Map() };
   private readonly latestPending = new WeakMap<EffectHook, PendingEffect>();
   private readonly runCount = new WeakMap<EffectHook, number>();
   // 첫 렌더가 끝났을 때의 Hook 수. 이후 렌더가 이 수와 다르면 오류 (null = 아직 첫 렌더 전)
@@ -116,19 +119,26 @@ export class FunctionComponent {
       } else if (this.hookIndex !== this.expectedHookCount) {
         throw new Error(`${ORDER_ERROR}: 첫 렌더 ${this.expectedHookCount}개, 이번 ${this.hookIndex}개`);
       }
+      // 렌더 성공: 이제서야 effect 예약을 반영한다 (슬롯마다 최근 예약 = null이면 취소)
+      this.pendingEffects = this.staged.list;
+      for (const [slot, pending] of this.staged.latest) {
+        if (pending === null) this.latestPending.delete(slot);
+        else this.latestPending.set(slot, pending);
+      }
       return next;
     } catch (error) {
       this.hooks.length = saved.length;
       saved.forEach((copy, i) => Object.assign(this.hooks[i], copy));
-      this.pendingEffects = [];
       throw error;
+    } finally {
+      this.staged = { list: [], latest: new Map() };
     }
   }
 
   // 컴포넌트를 실행해 새 VNode를 만들고 자식 컴포넌트를 풀어 요소 · 글자만 남긴다
   private render(): VNode {
     this.hookIndex = 0;
-    this.pendingEffects = [];
+    this.staged = { list: [], latest: new Map() };
     const previousDispatcher = setHookDispatcher(this.dispatcher);
     this.rendering = true;
     try {
@@ -184,10 +194,10 @@ export class FunctionComponent {
     }
     if (changed) {
       const pending: PendingEffect = { slot, effect, deps };
-      this.pendingEffects.push(pending);
-      this.latestPending.set(slot, pending);
+      this.staged.list.push(pending);
+      this.staged.latest.set(slot, pending);
     } else {
-      this.latestPending.delete(slot); // 이번 렌더는 안 돌린다 → 앞 렌더가 남긴 예약이 있으면 취소
+      this.staged.latest.set(slot, null); // 이번 렌더는 안 돌린다 → (렌더가 성공하면) 앞 렌더가 남긴 예약이 있으면 취소
     }
   }
 

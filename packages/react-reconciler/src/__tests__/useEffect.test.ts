@@ -344,3 +344,38 @@ describe('useEffect — effect 안에서 setter (렌더 중첩, 결정 9 A)', ()
     expect(seen).toEqual([1]); // 0으로 한 번, 1로 한 번이 아니라 최신 값으로만
   });
 });
+
+describe('실패한 렌더는 effect 예약을 되돌린다 (검수 1회차 NB-2 · 정책 「§4.2 렌더 실패」)', () => {
+  it('effect 안 setter가 일으킨 안쪽 렌더가 (effect를 예약한 뒤) 실패해 예외를 삼켜도, 바깥의 뒤쪽 effect가 그 회차에 빠지지 않는다', () => {
+    const calls: string[] = [];
+    let boom = false;
+    let setN: Setter<number> = () => {};
+    const App = (): VNode => {
+      const [n, s] = useState(0);
+      setN = s;
+      useEffect(() => {
+        calls.push(`A${n}`);
+        if (n === 1) {
+          boom = true;
+          try {
+            s(5); // 안쪽 렌더(n=5)가 실패한다 — 예외를 삼킨다
+          } catch {
+            /* 삼킴 */
+          }
+          boom = false;
+        }
+      }); // 의존성 생략: 매 렌더 예약
+      useEffect(() => {
+        calls.push(`B${n}`);
+      });
+      if (boom) throw new Error('inner render boom'); // effect 두 개를 예약한 "뒤"에 실패
+      return h('p', null, String(n));
+    };
+    const fc = new FunctionComponent(App, {}, { mount: () => {}, apply: () => {} });
+    fc.mount();
+    calls.length = 0;
+    setN(1);
+    // 바깥 렌더(n=1)의 effect A · B가 둘 다 돈다. A 안의 안쪽 렌더(n=5)는 실패해 없었던 일이다
+    expect(calls).toEqual(['A1', 'B1']);
+  });
+});
