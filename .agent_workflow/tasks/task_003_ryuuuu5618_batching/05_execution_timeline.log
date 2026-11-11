@@ -1,0 +1,3 @@
+2026-11-11T14:09 | stage=0 | agent=master | round=- | signal=START | task_003 생성 (ryuuuu5618, batching), 가벼운 모드, task_002 Dev-27 · 28 · QA-21 범위
+2026-11-11T14:11 | stage=0 | agent=master | round=- | signal=APPROVE | 추천안 표 "응", 결정 9 A → B 이유 기록, 01_request_spec.md 승인
+2026-11-11T14:11 | stage=0.5 | agent=master | round=- | signal=PASS | feature/batching, types.ts NESTED_RENDER_LIMIT 주석 의미 변경, CLAUDE.md 결정 9 B
