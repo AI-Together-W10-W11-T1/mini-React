@@ -18,7 +18,7 @@ import type { DocTrack } from './previewDocs';
 // [AI Note]: 루트 컴포넌트. 모든 useState · useEffect · useMemo는 이 파일에서만 부른다 (MF-04 · P2-07 · P2-08).
 // 자식(Toolbar · LayerPanel · Canvas · PropertyPanel)은 props만 받는 순수 함수이고, 바꾸고 싶은 것은 루트가 내려 주는 콜백 props로 알린다 (Lifting State Up).
 // 상태 칸은 3개(+ 실제 영역용 3칸 + keydown effect 1칸 + 레이어 펼침 1칸, 아래)고 렌더마다 같은 순서로 부른다 (Hook 개수가 달라지면 엔진이 오류, dev_todo 공통 주의 9):
-//   doc        = { main, instances } 한 칸
+//   doc        = { main, instances, variables } 한 칸
 //   selectedId = 'main' | 인스턴스 id | null (처음은 null, ④-2)
 //   nextId     = 새 인스턴스 번호 — 지운 번호를 다시 쓰지 않는다 (b4 추가 → 삭제 → 다시 추가 = b5, Q17-3)
 // patch-preview(task_006)에서 앱 편집 Undo/Redo(history 칸 · undo.ts)를 없앴다: Ctrl/Cmd+Z · Shift+Z는 이제 실제 영역 State History의 [실행 취소] · [다시 실행]다.

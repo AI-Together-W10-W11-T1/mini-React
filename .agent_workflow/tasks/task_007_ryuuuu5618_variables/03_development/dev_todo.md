@@ -142,6 +142,7 @@ e2e/mini-figma-helpers.ts        변수 도우미 (variableSel · setVariableVal
   - 회귀: `npx vitest run` 전체 · `npx tsc --noEmit` · `npx playwright test` 전체(Phase 1 · 2 + mini-figma 전 스펙, desktop · mobile) · `git diff --stat main -- packages/` 비어 있음 · `rootOnlyHooks`(Hook은 `App`만, 자식은 props만)
   - 완료 근거로 남길 것: 각 명령 결과 (건수), `git diff --stat main -- packages/` 빈 출력, 커밋 해시
   - **완료 근거 (Evidence)**: e2e QA-72 ~ 75 · A45 · A52 · A53 · A55 (`mini-figma-variables.spec.ts`, 변수 스펙 전체 44 passed), 단위 `preview.test.ts` RV-1 ~ 4 · `previewDocs.test.ts` PD-6 · `app.test.ts` U-8(+ 편집 버림 · 무변경 Patch), `mini-figma-palette.spec.ts` QA-35 단언 정정. 깨뜨려 보기 3건: ① `resolveColor`가 `var:`를 안 풂 → QA-66 실패 ② 칩 클릭이 연결을 안 풂 → QA-68 실패 ③ `setVariableValue`가 같은 값도 새 Doc → A44 실패(렌더 예약 1번) — 각각 되돌리고 `git status` 깨끗 확인. 깨끗한 HEAD(622116d) 사본에서 `npx vitest run` 47 files 1249 passed · `npx tsc --noEmit` 오류 0 · `npx playwright test` 376 passed(desktop · mobile) · `git diff --stat main -- packages/` 빈 출력. 커밋 622116d
+  - **검수 1회차 반영 (NON-BLOCKING 1 · 2 · 4 · 5)**: A46에 [Patch] → 무변경 단언 · QA-63에 레이어 접기 뒤 변수 구역 3줄 단언 · `App.ts` 주석에 `variables` · `setVariableValue` 대문자 hex 소문자 저장 + 단위 V-3b. `npx vitest run` 47 files 1250 passed · `npx tsc --noEmit` 오류 0 · `npx playwright test e2e/mini-figma-variables.spec.ts` 44 passed. 커밋은 최종 보고 참고
 
 ## 작업자 정정 (개발 중 발견)
 

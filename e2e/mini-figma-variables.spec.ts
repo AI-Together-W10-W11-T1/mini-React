@@ -64,6 +64,12 @@ test('QA-63 처음 화면: layer-panel 안 인스턴스 목록 아래에 「변�
   expect(await colorsOf(page), '캔버스 버튼 4개 색은 처음 그대로 (VR-08)').toEqual(ORIGINAL);
   // div.app 최상위 자식은 그대로 5개 (경로 접두 불변)
   expect(await page.locator('[data-testid="app-root"] > .app > *').count()).toBe(5);
+
+  // 레이어 하위 목록을 접어도 변수 구역은 그대로 보이고 줄 3개
+  await page.getByTestId('layer-toggle').click();
+  await expect(page.getByTestId('layer-toggle')).toHaveAttribute('aria-expanded', 'false');
+  await expect(page.getByTestId('variable-panel')).toBeVisible();
+  expect((await variableRows(page)).map((r) => r.name)).toEqual(['Primary', 'Danger', 'Success']);
 });
 
 test('QA-76 변수 구역 배치: layer-panel 박스 안(넘침 0) · 가로 스크롤 없음 · 입력칸 터치 목표 32px 이상 · 줄 3개가 화면 폭 안', async ({ page }, testInfo) => {
@@ -118,7 +124,7 @@ test('QA-76 변수 구역 배치: layer-panel 박스 안(넘침 0) · 가로 스
   }
 });
 
-test('A46 연결이 없는 채 Primary 값을 바꾸면 변수 줄만 바뀌고 캔버스 버튼 노드 · style 변경은 0이다 (VP-11)', async ({ page }) => {
+test('A46 연결이 없는 채 Primary 값을 바꾸면 변수 줄만 바뀌고 캔버스 버튼 노드 · style 변경은 0이고, [Patch]해도 무변경이다 (VP-11)', async ({ page }) => {
   await page.goto(URL);
   const ids = ['main', 'b1', 'b2', 'b3'];
   const nodes = Object.fromEntries(ids.map((id) => [id, buttonSel(id)]));
@@ -138,6 +144,11 @@ test('A46 연결이 없는 채 Primary 값을 바꾸면 변수 줄만 바뀌고 
   }
   for (const w of watchers) expect((await w.take()).total, '캔버스 버튼 DOM 변경 0').toBe(0);
   expect(await bgOf(page, 'main')).toBe(rgb('#0052ff'));
+
+  // [Patch]해도 실제 영역은 바뀐 게 없고 기록도 안 쌓인다 ([실행 취소] 꺼짐 그대로)
+  await patchNow(page);
+  expect(await colorsOf(page)).toEqual(ORIGINAL);
+  expect(await navState(page)).toEqual({ patch: true, back: false, forward: false });
 });
 
 // ---------------------------------------------------------------------------

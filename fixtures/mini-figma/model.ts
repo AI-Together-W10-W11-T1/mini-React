@@ -130,12 +130,15 @@ export function moveInstance(doc: Doc, id: string, delta: -1 | 1): Doc {
 /**
  * 변수 하나의 값을 바꾼다 (VR-06). 같은 값 · 없는 id · `#rrggbb`가 아닌 값이면 같은 Doc (렌더 없음).
  * [AI Note]: 바뀐 변수 하나만 새 객체이고 다른 변수 · main · instances는 같은 참조 — 연결 안 된 버튼은 그릴 때 입력이 같아 patch 줄이 0이다.
- * 형식 검사는 방어용이다 (색 입력칸은 늘 소문자 `#rrggbb`를 낸다).
+ * 형식 검사는 방어용이다 (색 입력칸은 늘 소문자 `#rrggbb`를 낸다). 대문자 hex는 소문자로 바꿔 저장한다.
  */
 export function setVariableValue(doc: Doc, id: string, value: Color): Doc {
   const index = doc.variables.findIndex((v) => v.id === id);
-  if (index === -1 || !isHexColor(value) || doc.variables[index].value === value) return doc;
-  return { ...doc, variables: doc.variables.map((v, i) => (i === index ? { ...v, value } : v)) };
+  if (index === -1 || !isHexColor(value)) return doc;
+  // [AI Note]: 대문자 hex(#F4B000)는 소문자로 바꿔 저장한다 — 값은 늘 소문자 `#rrggbb` 하나로 통일 (같은 색이면 같은 Doc)
+  const lower = value.toLowerCase();
+  if (doc.variables[index].value === lower) return doc;
+  return { ...doc, variables: doc.variables.map((v, i) => (i === index ? { ...v, value: lower } : v)) };
 }
 
 /**

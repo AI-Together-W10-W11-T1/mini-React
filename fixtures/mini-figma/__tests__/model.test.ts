@@ -461,6 +461,13 @@ describe('변수 (V-1 ~ V-5, A56)', () => {
     expect(next.instances).toBe(doc.instances);
   });
 
+  it('V-3b 대문자 hex는 소문자로 저장하고, 같은 색(대소문자만 다름)이면 같은 Doc', () => {
+    const doc = cloneDoc();
+    const next = setVariableValue(doc, 'primary', '#F4B000');
+    expect(next.variables[0].value).toBe('#f4b000');
+    expect(setVariableValue(doc, 'primary', '#0052FF')).toBe(doc);
+  });
+
   it('V-4 같은 값 · 없는 id · 형식 밖 값은 같은 Doc (A56)', () => {
     const doc = cloneDoc();
     expect(setVariableValue(doc, 'primary', '#0052ff')).toBe(doc);
