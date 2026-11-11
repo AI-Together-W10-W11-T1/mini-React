@@ -1,6 +1,7 @@
 import { h, useState } from '@mini-react/react';
 import type { VNode } from '@mini-react/shared';
 import { CounterPanel } from './components/CounterPanel';
+import { GreetingPanel } from './components/GreetingPanel';
 import { counts } from './counts';
 
 // [AI Note]: 루트 컴포넌트. 모든 useState · useEffect · useMemo는 이 파일에서만 부른다 (P2-07 · P2-08).
@@ -8,6 +9,7 @@ import { counts } from './counts';
 export function App(): VNode {
   counts.renderRuns += 1;
   const [count, setCount] = useState(0);
+  const [name, setName] = useState('');
 
   return h(
     'main',
@@ -28,6 +30,10 @@ export function App(): VNode {
         },
         // [그대로]: 지금과 같은 값 → 다시 그리지 않음
         onSame: () => setCount(count),
+      }),
+      h(GreetingPanel, {
+        name,
+        onNameInput: (event: Event) => setName((event.target as HTMLInputElement).value),
       }),
     ),
   );

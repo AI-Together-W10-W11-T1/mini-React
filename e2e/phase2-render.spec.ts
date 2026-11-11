@@ -13,6 +13,10 @@ test('QA-1 페이지를 처음 연다: 칸 · 버튼 · 렌더/Patch 버튼 없�
   expect(await counterText(page)).toBe('0');
   expect(await renderCount(page)).toBe(1);
 
+  // ② 이름 입력창(비어 있음)과 인사 글
+  await expect(page.getByTestId('name-input')).toHaveValue('');
+  await expect(page.getByTestId('greeting-text')).toHaveText('이름을 입력해 주세요');
+
   // 페이지 어디에도 "렌더" · "Patch" 버튼이 없다: 버튼은 [+1] · [+3] · [그대로]뿐이다 (상태를 바꾸면 화면이 저절로 갱신된다)
   const buttonTexts = await page.getByRole('button').allTextContents();
   expect(buttonTexts.map((t) => t.trim())).toEqual(['+1', '+3', '그대로']);
