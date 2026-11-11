@@ -50,6 +50,9 @@ export class FunctionComponent {
   private expectedHookCount: number | null = null;
   // 이번 렌더에서 지금까지 부른 Hook 수 = 다음 Hook이 쓸 hooks 배열 번호 (렌더마다 0번부터)
   private hookIndex = 0;
+  // [AI Note]: 렌더 도중(컴포넌트 본문 · 자식 풀기) 표시. 이 동안 setter는 오류 — 안쪽 렌더가 hookIndex · 예약 목록을 덮어써 상태 · 화면이 어긋나기 때문 (검수 NB-1).
+  // effect · cleanup · 이벤트 핸들러는 렌더가 끝난 뒤에 돌아 이 표시가 꺼져 있으므로 setter가 허용된다.
+  private rendering = false;
 
   constructor(component: Component, props: Props, host: FunctionComponentHost) {
     this.component = component;
@@ -127,13 +130,13 @@ export class FunctionComponent {
     this.hookIndex = 0;
     this.pendingEffects = [];
     const previousDispatcher = setHookDispatcher(this.dispatcher);
-    let result: VNode;
+    this.rendering = true;
     try {
-      result = this.component(this.props);
+      return resolveComponents(this.component(this.props));
     } finally {
+      this.rendering = false;
       setHookDispatcher(previousDispatcher);
     }
-    return resolveComponents(result);
   }
 
   // [AI Note]: 루트 컴포넌트가 렌더 중에 부르는 Hook 구현 (useState · useEffect · useMemo).
@@ -243,6 +246,7 @@ export class FunctionComponent {
   // 한 핸들러에서 여러 번 부르면 그 수만큼 렌더한다. 함수형 setter는 가장 최근 값을 받는다.
   private setState(slot: StateHook, next: unknown): void {
     if (this.unmounted) return; // unmount() 뒤 setter는 무시 (함수형 setter의 함수도 부르지 않는다)
+    if (this.rendering) throw new Error('렌더 중에는 setter를 부를 수 없습니다');
     const value = typeof next === 'function' ? (next as (prev: unknown) => unknown)(slot.value) : next;
     if (Object.is(value, slot.value)) return;
     slot.value = value;

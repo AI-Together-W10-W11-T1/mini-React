@@ -310,3 +310,126 @@ describe('무한 렌더 안전장치 (정책: 연달아 50번 넘으면 오류)'
     expect(patches.length).toBe(1);
   });
 });
+
+describe('렌더 중 setter 호출은 오류 (검수 1회차 NB-1 · 정책 「§4.2 렌더 중 setter」)', () => {
+  const MSG = '렌더 중에는 setter를 부를 수 없습니다';
+
+  it('컴포넌트 본문에서 setter를 부르면 오류이고, 상태 · DOM 반영은 그대로다', () => {
+    let boom = false;
+    let renders = 0;
+    const { host, patches } = makeHost();
+    const fc = new FunctionComponent(
+      (): VNode => {
+        renders++;
+        const [n, setN] = useState(0);
+        if (boom) setN(5); // 본문 안 setter = 정책 밖 사용
+        return h('p', null, String(n));
+      },
+      {},
+      host,
+    );
+    fc.mount();
+    boom = true;
+    expect(() => fc.update()).toThrow(MSG);
+    expect(renders).toBe(2); // 안쪽 렌더가 또 돌지 않음
+    expect(fc.hooks[0]).toMatchObject({ kind: 'state', value: 0 }); // 5가 남지 않음
+    expect(patches).toHaveLength(0);
+    boom = false;
+    expect(() => fc.update()).not.toThrow(); // 다음 렌더는 정상
+  });
+
+  it('함수형 setter도 렌더 중이면 오류이고 그 함수는 부르지 않는다', () => {
+    const updater = vi.fn((c: number) => c + 1);
+    let boom = false;
+    const fc = new FunctionComponent(
+      (): VNode => {
+        const [n, setN] = useState(0);
+        if (boom) setN(updater);
+        return h('p', null, String(n));
+      },
+      {},
+      makeHost().host,
+    );
+    fc.mount();
+    boom = true;
+    expect(() => fc.update()).toThrow(MSG);
+    expect(updater).not.toHaveBeenCalled();
+  });
+
+  it('렌더 중 setter 오류 뒤에도 앱이 산다 (깊이 · 렌더 표시 복구, 이후 setter 정상)', () => {
+    let boom = true;
+    let setN: Setter<number> = () => {};
+    const { host, patches } = makeHost();
+    const fc = new FunctionComponent(
+      (): VNode => {
+        const [n, s] = useState(0);
+        setN = s;
+        if (boom && n === 0) s(9);
+        return h('p', null, String(n));
+      },
+      {},
+      host,
+    );
+    expect(() => fc.mount()).toThrow(MSG);
+    boom = false;
+    const ok = new FunctionComponent((): VNode => {
+      const [n, s] = useState(0);
+      setN = s;
+      return h('p', null, String(n));
+    }, {}, host);
+    ok.mount();
+    setN(1);
+    expect(patches).toHaveLength(1);
+  });
+
+  it('effect 안(렌더가 끝난 뒤) setter는 지금처럼 허용된다', () => {
+    const fc = new FunctionComponent(
+      (): VNode => {
+        const [n, setN] = useState(0);
+        useEffect(() => {
+          if (n < 2) setN(n + 1);
+        }, [n]);
+        return h('p', null, String(n));
+      },
+      {},
+      makeHost().host,
+    );
+    expect(() => fc.mount()).not.toThrow();
+    expect(fc.hooks[0]).toMatchObject({ value: 2 });
+  });
+
+  it('자식 컴포넌트가 (props로 받은) setter를 렌더 중에 불러도 오류', () => {
+    let boom = false;
+    const Child = ({ set }: Props): VNode => {
+      if (boom) (set as () => void)();
+      return h('i', null);
+    };
+    const fc = new FunctionComponent(
+      (): VNode => {
+        const [n, setN] = useState(0);
+        return h('div', null, h(Child, { set: () => setN(n + 1) }));
+      },
+      {},
+      makeHost().host,
+    );
+    fc.mount();
+    boom = true;
+    expect(() => fc.update()).toThrow(MSG);
+  });
+
+  it('cleanup 안 setter도 렌더 밖이라 허용된다', () => {
+    let setN: Setter<number> = () => {};
+    const fc = new FunctionComponent(
+      (): VNode => {
+        const [n, s] = useState(0);
+        setN = s;
+        useEffect(() => () => {}, [n]);
+        return h('p', null, String(n));
+      },
+      {},
+      makeHost().host,
+    );
+    fc.mount();
+    expect(() => setN(1)).not.toThrow();
+  });
+});
