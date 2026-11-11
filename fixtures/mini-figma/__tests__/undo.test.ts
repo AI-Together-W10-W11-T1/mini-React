@@ -170,9 +170,10 @@ describe('undo · redo', () => {
   it('Undo 뒤 새 수정이면 future를 버린다 (Redo 불가)', () => {
     const { state, docs } = stack(3);
     const back = undo(state, docs[3]); // → d2, future [d3]
-    const edited = recordEdit(back.state, back.doc, docOf(99), null);
+    const d99 = docOf(99);
+    const edited = recordEdit(back.state, back.doc, d99, null);
     expect(edited.future).toEqual([]);
-    expect(redo(edited, docOf(99)).doc).toEqual(docOf(99));
+    expect(redo(edited, d99).doc).toBe(d99);
   });
 
   it('Undo 때문에 묶음이 끝난다: Undo 뒤 같은 칸 수정은 새 단계', () => {

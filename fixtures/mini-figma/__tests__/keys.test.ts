@@ -24,6 +24,8 @@ describe('keyAction — 정해진 키 (MF-33)', () => {
     ['Ctrl+Shift+Z (key가 대문자로 옴)', press('Z', { ctrlKey: true, shiftKey: true }), 'redo'],
     ['Meta+Shift+z', press('z', { metaKey: true, shiftKey: true }), 'redo'],
     ['Meta+Shift+Z (key가 대문자로 옴)', press('Z', { metaKey: true, shiftKey: true }), 'redo'],
+    ['Ctrl+Meta+z (둘 다 눌림)', press('z', { ctrlKey: true, metaKey: true }), 'undo'],
+    ['Ctrl+Meta+Shift+Z (둘 다 눌림)', press('Z', { ctrlKey: true, metaKey: true, shiftKey: true }), 'redo'],
   ])('%s → %s', (_name, info, expected) => {
     expect(keyAction(info)).toBe(expected);
   });

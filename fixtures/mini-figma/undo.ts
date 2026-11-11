@@ -14,6 +14,7 @@ const MAX_PAST = UNDO_LIMIT - 1;
 
 /** 한 단계로 묶는 기준: 같은 대상('main' 또는 인스턴스 id) + 같은 칸 */
 export interface UndoGroup {
+  /** 'main'(메인 컴포넌트) 또는 인스턴스 id(예: 'b2'). 타입은 string이지만 'main'이 특별한 값이라는 뜻을 남겨 둔 표기 */
   readonly target: 'main' | string;
   readonly field: Field;
 }
