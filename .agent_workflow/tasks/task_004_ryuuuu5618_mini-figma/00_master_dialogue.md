@@ -61,6 +61,21 @@
 - 결정 요약(①~⑤)을 보여 줌 → A (원문): "그리고 Delete, Backspace로 수정하자" → 요약 확인 + 지우기 키 = Delete · Backspace (맥 delete 키 = Backspace)
 - 명세 승인 (2026-11-11T17:36) → A (원문): "승인". 0.5단계 생략(types.ts 변경 없음), CLAUDE.md 패키지 역할 · 내 설계 결정에 앱 결정 추가도 함께 승인
 
+## 1단계 기획 검수 1회차 뒤 결정 (2026-11-11T17:58)
+- 검수 1회차 REJECT (BLOCKING 3 · NON-BLOCKING 8, `02_planning_review/02_reviewer_reject.md`) → 마스터가 「사용자 결정 필요」를 추천안 표(Q17)로 보여 줌
+- Q17 → A (원문): "응" → 추천안 그대로 (이유 미기재)
+  1. 아이콘 자리 = B 버튼 안 자식에 key (`icon` · `label`), 켜기 · 끄기 = INSERT · REMOVE 1줄
+  2. Undo 50 = Phase 1과 같음: 처음 상태 포함 기록 50개 = Undo 49번
+  3. `nextId` 따로, Undo로 되돌리지 않음 (지운 번호 재사용 안 함)
+  4. Delete · Backspace는 수정키(Ctrl · Cmd · Alt · Shift)가 없을 때만
+  5. 캔버스는 줄바꿈(`flex-wrap`), 가로 스크롤 없음
+  6. Undo 버튼 없음 (단축키만, 명세대로)
+  - 나머지 ④-2 · 3 · 4 · 7 · 9 · 10 · 12 · 13은 작업자 추천대로
+
+## 테스트 케이스 확인 (2026-11-11T18:13)
+- 기획 2회차 APPROVE 뒤 마스터가 보여 준 것: 인수 QA-1~28(묶음 7개), 공격 QA-A1~A19, 단위 5파일(app.test.ts patch 기대 표 P-1~21), 회귀, e2e로 못 덮는 것(MF-02 · 렌더 횟수 · 터치 기기 Undo 없음 · History 동기화 해당 없음), 키 세부 3개(④-8 ②~④: Alt+Z 무시 · `preventDefault` 안 함 · `repeat` 그대로) · 검수 NON-BLOCKING 1~4 반영 예정
+- A (원문): "응" → 테스트 케이스 확정, ④-8 ②~④도 추천 수용, NON-BLOCKING 1~4는 개발 첫 묶음 전에 기획 문서에 반영
+
 ## 알고리즘 결정 문답
 
 ## 이해 체크포인트

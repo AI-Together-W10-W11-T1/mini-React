@@ -19,7 +19,7 @@ ID 열의 `MF-xx`는 이 task 안에서만 쓰는 번호다 (PRD ID 아님).
 | --- | --- | --- | --- |
 | MF-01 | 앱 자리 | `fixtures/mini-figma/`, Vite 개발 서버의 `/mini-figma/`로 열림. `@mini-react/*`로 엔진을 가져다 씀 | `fixtures/mini-figma/` |
 | MF-02 | 엔진 무수정 | `packages/` 아래 파일 변경 0. 기존 vitest · playwright 전부 그대로 통과 | — |
-| MF-03 | 세 영역 | 레이어 창 · 캔버스 · 속성 패널. desktop(1280)은 가로 배치, mobile(375)은 위아래로 쌓음, 가로 스크롤 없음 | `fixtures/mini-figma/` |
+| MF-03 | 세 영역 | 레이어 창 · 캔버스 · 속성 패널. desktop(1280)은 가로 배치, mobile(375)은 위아래로 쌓음, 가로 스크롤 없음 (캔버스 버튼은 줄바꿈 `flex-wrap`, Q17-5) | `fixtures/mini-figma/` |
 | MF-04 | 컴포넌트 나누기 (P2-02 · P2-09) | `App` → `LayerPanel` · `Canvas`(→ `Button` × N) · `PropertyPanel`. Hook은 `App`에만, 자식은 props와 콜백 props만 | 〃 |
 | MF-05 | patch 비표시 | 앱 화면에 patch 목록 · 줄 수를 보여 주지 않음 | 〃 |
 
@@ -27,7 +27,7 @@ ID 열의 `MF-xx`는 이 task 안에서만 쓰는 번호다 (PRD ID 아님).
 
 | ID | 요구사항 | 수용 기준 |
 | --- | --- | --- |
-| MF-10 | 루트 state (P2-07) | `App`의 state: `main`, `instances`(배열, 인스턴스마다 `id` + 바꾼 값만), `selectedId`(`'main'` / 인스턴스 id / `null`), Undo 기록 |
+| MF-10 | 루트 state (P2-07) | `App`의 state: `main`, `instances`(배열, 인스턴스마다 `id` + 바꾼 값만), `selectedId`(`'main'` / 인스턴스 id / `null`), Undo 기록, 다음 번호 `nextId`(Undo로 되돌리지 않음, Q17-3). `main` · `instances`는 한 칸(`doc`)으로 묶어도 됨 |
 | MF-11 | 그리기 (P2-10) | 인스턴스마다 `h(Button, { key: it.id, ...main, ...it })`. 인스턴스에 없는 값은 메인 값 |
 | MF-12 | override 판단 | **키가 있으면 override**. 빈 글자 `''` · 메인과 같은 값도 override. 메인을 바꿔도 override 값은 그대로 |
 | MF-13 | override 되돌리기 (↻) | 그 칸의 키를 지움 (`undefined`를 넣지 않음) → 메인 값을 따름 |
@@ -51,10 +51,10 @@ ID 열의 `MF-xx`는 이 task 안에서만 쓰는 번호다 (PRD ID 아님).
 
 | ID | 요구사항 | 수용 기준 |
 | --- | --- | --- |
-| MF-30 | Undo / Redo | `main` · `instances`만 기록(선택은 기록 안 함), 최대 50개. Undo 뒤 새 수정을 하면 Redo 기록은 버림 |
+| MF-30 | Undo / Redo | `main` · `instances`만 기록(선택은 기록 안 함), Phase 1과 같이 처음 상태 포함 기록 50개 = Undo 49번 (Q17-2). Undo 뒤 새 수정을 하면 Redo 기록은 버림 |
 | MF-31 | 한 단계 묶음 | 같은 대상의 같은 칸이 연달아 바뀌면 한 단계 (「삭제」→「지우기」 입력 후 Undo 한 번 = 「삭제」). 시간 기준 없음. 다른 칸 · 다른 대상을 고치면 묶음이 끝남. 추가 · 삭제 · 순서 · ↻ · Undo/Redo는 각각 한 단계이자 묶음을 끝냄 |
 | MF-32 | Undo 뒤 선택 | 되돌려서 고른 인스턴스가 사라지면 선택이 풀림(`null`) |
-| MF-33 | 단축키 | Delete · Backspace = 고른 인스턴스 지우기, Ctrl+Z · Cmd+Z = 되돌리기, Ctrl+Shift+Z · Cmd+Shift+Z = 다시 하기 |
+| MF-33 | 단축키 | Delete · Backspace(수정키 없을 때만, Q17-4) = 고른 인스턴스 지우기, Ctrl+Z · Cmd+Z = 되돌리기, Ctrl+Shift+Z · Cmd+Shift+Z = 다시 하기 |
 | MF-34 | 키 받는 방법 | `App`의 `useEffect`에서 `document.addEventListener('keydown')`, cleanup에서 `removeEventListener`. 핸들러가 쓰는 state를 의존성에 넣어 옛 값을 보지 않게 함. 입력칸(`input` · `select` · `textarea`) 안에서 누른 키는 무시(브라우저 기본 동작 그대로) |
 
 ## 3. 구현 제외 범위
@@ -65,7 +65,7 @@ ID 열의 `MF-xx`는 이 task 안에서만 쓰는 번호다 (PRD ID 아님).
 - Phase 1 · Phase 2 검증 페이지 · 성능 대시보드 변경 (회귀만)
 
 ## 4. 주의사항 · 열린 질문
-- **아이콘 자리 (기획에서 정함)**: 아이콘(Boolean)을 글자 앞에 두면 위치 비교 때문에 아이콘 하나를 끄는데 `REPLACE` + `REMOVE` 두 줄이 생김. 자리 · 방법은 1단계 기획에서 제안하고 검수 · 테스트 케이스 확인 때 정한다
+- **아이콘 자리 (Q17-1로 정함)**: 글자 앞에 두되 버튼 안 자식에 key(`icon` · `label`) → 켜기 · 끄기 = `INSERT` · `REMOVE` 1줄, 글자 노드 유지. Undo 버튼은 두지 않음 (Q17-6)
 - **Instance swap**: 엔진이 diff 전에 컴포넌트를 풀어서, ★ → ♥ 교체가 같은 태그면 글자 변경으로만 보임. 정상 동작이며 테스트에 그대로 적는다
 - **이벤트 교체 줄**: 렌더마다 핸들러가 새 함수라 `SET_EVENT` 줄이 생기는 것은 task_002의 알려진 한계 그대로
 - **Batching**: 한 동작 안의 여러 setter(예: 삭제 + 선택 풀기 + 기록 추가)는 렌더 한 번 (알고리즘 결정 9 B)
@@ -100,12 +100,13 @@ ID 열의 `MF-xx`는 이 task 안에서만 쓰는 번호다 (PRD ID 아님).
 | 앱 자리 · 엔진 무수정 | `fixtures/mini-figma/` | 추천안 수용 (이유 미기재) |
 | 속성 칸 5개 · 시작 데이터 | MF-14 · MF-16 | 추천안 수용 (이유 미기재) |
 | 단축키 | Delete · Backspace · Ctrl/Cmd+Z · Ctrl/Cmd+Shift+Z | 사용자가 고름 ("cmd키는 넣자", "Delete, Backspace로 수정하자") |
+| 기획 검수 뒤 6개 (Q17) | 아이콘 key · Undo 49번 · `nextId` · 수정키 없을 때만 지움 · 줄바꿈 · Undo 버튼 없음 | 추천안 수용 ("응", 이유 미기재) |
 
 ## 6. 수용 기준 연결
 - 인수: MF-01 ~ MF-34 → `e2e/mini-figma-*.spec.ts` desktop · mobile. 관련 PRD: P2-02 · P2-09 · P2-10 · P2-22 · P2-24 (T-14 · T-16 형식의 화면 기능 테스트)
 - 단위: override 합치기 · 되돌리기, 순서 · 추가 · 삭제 함수, Undo 묶음 · 50개 제한, 키 판정 → `fixtures/mini-figma/__tests__/`
 - 회귀: 기존 vitest · playwright 전부 (엔진 무수정 확인)
-- 테스트 케이스 확인: (1단계 끝에 기록)
+- 테스트 케이스 확인: 2026-11-11T18:13 사용자 "응" — 인수 QA-1~28 · 공격 QA-A1~A19 · 단위 5파일 · 회귀 그대로, 키 세부(Alt+Z 무시 · `preventDefault` 안 함 · `repeat` 그대로) 추천 수용 (`00_master_dialogue.md`)
 
 ## 7. [고정] 필수 제약
 - task_002 `01_request_spec.md` 7절과 같음. 외부 UI 프레임워크 금지, DOM은 `react-dom-bindings` · fixture에서만, Fiber · 우선순위 스케줄러 금지
