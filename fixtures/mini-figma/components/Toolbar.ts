@@ -19,13 +19,13 @@ interface ToolbarProps {
 // [실행 취소] [다시 실행]는 실제 영역 기록용 State History 버튼이고, Ctrl/Cmd+Z · Ctrl/Cmd+Shift+Z 단축키(App의 keydown effect)가 같은 기록을 움직인다. 켜짐 여부는 루트가 nav에서 계산해 내려 준다(canBack · canForward, 새 Hook 아님).
 // 꺼진 버튼은 `disabled` 속성만 바뀌므로 Patch로 기록이 처음 쌓이는 때 도구 막대 patch는 SET_ATTR 1줄뿐이다.
 // 꺼진 `<button>`은 눌러도 click이 오지 않으므로(브라우저) 핸들러에 「꺼진 상태 검사」를 따로 두지 않는다 — 경계 이동은 엔진이 무시하고 nav는 같은 객체를 돌려준다.
-// 앱 이름은 「mini-figma」 — 디자인 문서의 회사 이름 · 로고는 쓰지 않는다 (FD-07).
+// 앱 이름은 「Mini-Figma」 — 디자인 문서의 회사 이름 · 로고는 쓰지 않는다 (FD-07).
 export function Toolbar(props: Props): VNode {
   const { onAdd, canBack, canForward, onBack, onForward, onPatch } = props as unknown as ToolbarProps;
   return h(
     'header',
     { class: 'toolbar', 'data-testid': 'toolbar' },
-    h('span', { class: 'app-name', 'data-testid': 'app-name' }, 'mini-figma'),
+    h('span', { class: 'app-name', 'data-testid': 'app-name' }, 'Mini-Figma'),
     h('button', { type: 'button', class: 'btn-primary', 'data-testid': 'add-instance', onClick: () => onAdd() }, '+ 인스턴스'),
     // [AI Note]: `disabled`는 보통 속성이다 — true면 속성 값 "", false면 속성 없음 (diff는 SET_ATTR null ↔ "" 한 줄)
     h('button', { type: 'button', class: 'btn-secondary', 'data-testid': 'back-button', disabled: !canBack, onClick: () => onBack() }, '실행 취소'),

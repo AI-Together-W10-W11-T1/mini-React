@@ -189,11 +189,13 @@ export function overriddenFields(page: Page): Promise<PropField[]> {
     .evaluateAll((els) => els.map((el) => el.getAttribute('data-field') as PropField));
 }
 
-/** 지금 「메인 따름」 글자가 있는 칸들 (칸 순서대로) */
+/** 지금 메인을 따르는 칸들 (칸 순서대로) = 인스턴스를 골랐을 때 override 표시가 없는 칸. 「메인 따름」 글자는 없앴다 — 표시 없음이 곧 메인 따름. 메인을 골랐으면 빈 배열 */
 export function followingFields(page: Page): Promise<PropField[]> {
-  return page
-    .locator('[data-testid="prop-row"]')
-    .evaluateAll((els) => els.filter((el) => el.querySelector('[data-testid="prop-follow"]') !== null).map((el) => el.getAttribute('data-field') as PropField));
+  return page.locator('[data-testid="property-panel"]').evaluate((panel) =>
+    panel.querySelector('[data-testid="property-title"]')?.textContent?.startsWith('인스턴스')
+      ? Array.from(panel.querySelectorAll('[data-testid="prop-row"]:not(.override)')).map((el) => el.getAttribute('data-field') as PropField)
+      : [],
+  );
 }
 
 export interface NodeWatcher {

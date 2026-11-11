@@ -117,7 +117,7 @@ test('QA-12 b1 라벨 ↻를 누르면 메인 값 `저장`을 따르고(글자�
   expect(await canvasLabels(page)).toEqual(['저장', '저장', '취소', '삭제']);
   await expect(page.getByTestId('prop-label')).toHaveValue('저장');
   expect(await overriddenFields(page)).toEqual([]);
-  await expect(page.locator(inRow('label', 'prop-follow'))).toHaveCount(1);
+  expect(await followingFields(page)).toContain('label');
   await expect(page.getByTestId('prop-reset')).toHaveCount(0);
 
   await selectOnCanvas(page, 'main');
@@ -157,7 +157,7 @@ test('QA-13 b2 · b3 · b1을 차례로 고르면 override 칸만 색 구분 + �
   await expect(page.getByTestId('prop-hasicon')).not.toBeChecked();
   await expect(page.getByTestId('prop-icon')).toHaveValue('star');
 
-  // 메인을 고르면 override 표시가 없다 (「메인 따름」도 ↻도 없음)
+  // 메인을 고르면 override 표시가 없다 (↻ 없음, 「메인 따름」 글자는 어디에도 없음)
   await selectOnCanvas(page, 'main');
   await expect(page.getByTestId('prop-reset')).toHaveCount(0);
   await expect(page.getByTestId('prop-follow')).toHaveCount(0);
@@ -235,14 +235,14 @@ test('QA-28 b2의 아이콘 보이기 ↻로 아이콘이 사라지고, 종류 �
   // 아이콘 보이기 ↻ → 메인(꺼짐)을 따라 b2의 아이콘이 사라진다
   await page.locator(inRow('hasIcon', 'prop-reset')).click();
   expect(await iconsOf(page, 'b2')).toEqual([]);
-  await expect(page.locator(inRow('hasIcon', 'prop-follow'))).toHaveCount(1);
+  expect(await followingFields(page)).toContain('hasIcon');
   await expect(page.getByTestId('prop-hasicon')).not.toBeChecked();
 
-  // 아이콘 종류 ↻ → 꺼진 상태라 눈에 보이는 변화 없음, 그 칸만 「메인 따름」
+  // 아이콘 종류 ↻ → 꺼진 상태라 눈에 보이는 변화 없음, 그 칸만 메인 따름(override 표시 없음)
   const watcher = await watchApp(page, 'canvas');
   await page.locator(inRow('icon', 'prop-reset')).click();
   expect((await watcher.take()).body.total).toBe(0);
-  await expect(page.locator(inRow('icon', 'prop-follow'))).toHaveCount(1);
+  expect(await followingFields(page)).toContain('icon');
   await expect(page.getByTestId('prop-icon')).toHaveValue('star');
   expect(await overriddenFields(page)).toEqual(['label']);
 

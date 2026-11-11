@@ -25,25 +25,26 @@ interface OverrideInfo {
   readonly onReset: (field: Field) => void;
 }
 
+/** ↻ 자리: 'inside' = 입력칸 · 선택 상자 안 오른쪽에 겹침, 'beside' = 체크박스 바로 옆, 'row' = 칸 끝(색 팔레트) */
+type ResetPlace = 'inside' | 'beside' | 'row';
+
 /**
- * 칸 하나: 이름 + 입력 부품 (+ 인스턴스면 ↻ 또는 「메인 따름」). 칸마다 data-field로 어느 칸인지 적는다.
- * [AI Note]: override인 칸 = 클래스 `override`(색 구분) + ↻ 버튼, 아닌 칸 = 「메인 따름」 글자 (MF-21). 판단은 model.isOverridden(키가 있는가)이다.
- * ↻ 버튼과 「메인 따름」은 같은 자리(3번째 자식)에 다른 태그로 와서 override가 생기고 사라질 때 그 자리만 교체되고 입력 부품은 그대로 남는다.
+ * 칸 하나: 이름 + 입력 부품 (+ 인스턴스의 override 칸이면 ↻). 칸마다 data-field로 어느 칸인지 적는다.
+ * [AI Note]: override인 칸 = 클래스 `override`(입력 부품에 파랑 표시) + ↻ 버튼, 아닌 칸은 표시 없음 = 메인 따름 (MF-21, 「메인 따름」 글자는 없앰).
+ * 판단은 model.isOverridden(키가 있는가)이다. ↻는 언제나 입력 부품 뒤 자리에 붙고 떨어지므로(INSERT · REMOVE) 입력 부품 노드는 그대로 남아 포커스 · 커서가 유지된다.
+ * 색 칸만 ↻가 칸 끝(행의 3번째 자식)에 있고, 나머지는 입력 부품과 ↻를 `.prop-field`로 감싸 그 안에 둔다.
  */
-function propRow(field: Field, name: string, control: VNode, override: OverrideInfo | null): VNode {
+function propRow(field: Field, name: string, control: VNode, override: OverrideInfo | null, place: ResetPlace = 'inside'): VNode {
   const overridden = override !== null && isOverridden(override.instance, field);
-  const tail =
-    override === null
-      ? null
-      : overridden
-        ? h('button', { type: 'button', class: 'prop-reset', 'aria-label': `${name} 되돌리기`, 'data-testid': 'prop-reset', onClick: () => override.onReset(field) }, '↻')
-        : h('span', { class: 'prop-follow', 'data-testid': 'prop-follow' }, '메인 따름');
+  const reset = overridden
+    ? h('button', { type: 'button', class: 'prop-reset', 'aria-label': `${name} 되돌리기`, 'data-testid': 'prop-reset', onClick: () => override.onReset(field) }, '↻')
+    : null;
   return h(
     'div',
     { class: overridden ? 'prop-row override' : 'prop-row', 'data-field': field, 'data-testid': 'prop-row' },
     h('span', { class: 'prop-name' }, name),
-    control,
-    tail,
+    place === 'row' ? control : h('span', { class: place === 'beside' ? 'prop-field prop-field-beside' : 'prop-field' }, control, reset),
+    place === 'row' ? reset : null,
   );
 }
 
@@ -87,17 +88,18 @@ function propRows(values: MainProps, onEdit: PropertyPanelProps['onEdit'], overr
         onInput: (event: Event) => onEdit('hasIcon', (event.target as HTMLInputElement).checked),
       }),
       override,
+      'beside',
     ),
     select('icon', 'prop-icon', '아이콘 종류', values.icon, ICON_OPTIONS),
     // [AI Note]: 색 칸 = 팔레트 판(칩 8개 + 직접 고르기). 고른 색 `#rrggbb`를 그대로 onEdit('color', hex)로 올린다 — 다른 칸과 같은 경로 (FD-21 · 22 · 25).
-    propRow('color', '색', h(ColorPalette, { value: values.color, onPick: (hex: string) => onEdit('color', hex) }), override),
+    propRow('color', '색', h(ColorPalette, { value: values.color, onPick: (hex: string) => onEdit('color', hex) }), override, 'row'),
   ];
 }
 
 // [AI Note]: 속성 패널 — props만 받는 순수 함수. 아무것도 안 골랐으면 빈 상태 <p>, 골랐으면 머리 <h2> (「메인 Button」 / 「인스턴스 · 이름」) + 5칸.
 // 같은 자리(패널의 0번 자식)에서 <p> ↔ <h2>로 태그가 달라서 고르기 · 삭제 때 엔진이 노드를 통째로 바꾼다 (D-05 REPLACE).
 // 인스턴스 이름은 그 인스턴스의 지금 글자이고 빈 글자면 id (④-3). 인스턴스를 골랐을 때 칸에 보이는 값은 mergeProps(메인 값 위에 인스턴스 값) 결과다.
-// 메인 · 인스턴스가 같은 5칸 부품을 쓰고, 인스턴스일 때만 칸마다 override 표시 + ↻가 붙는다.
+// 메인 · 인스턴스가 같은 5칸 부품을 쓰고, 인스턴스의 override 칸에만 파랑 표시 + ↻가 붙는다.
 export function PropertyPanel(props: Props): VNode {
   const { main, instances, selectedId, onEdit, onReset, onDelete } = props as unknown as PropertyPanelProps;
   const target = selectedId === 'main' ? null : instances.find((it) => it.id === selectedId);

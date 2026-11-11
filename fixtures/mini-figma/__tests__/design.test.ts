@@ -21,7 +21,7 @@ describe('브랜드 없음 (FD-07)', () => {
   });
 
   it('앱 이름은 mini-figma다 (<title>)', () => {
-    expect(indexHtml).toContain('<title>mini-figma</title>');
+    expect(indexHtml).toContain('<title>Mini-Figma</title>');
   });
 });
 
@@ -46,8 +46,8 @@ describe('외부 글꼴 · 외부 요청 없음 (FD-05)', () => {
 
 describe('색 변수 (FD-01 · 03) — 문서 값이 변수로 정의돼 있다', () => {
   it.each<[string, string]>([
-    ['--bg', '#0a0b0d'],
-    ['--card', '#16181c'],
+    ['--bg', '#16181c'],
+    ['--card', '#0a0b0d'],
     ['--ink-soft', '#a8acb3'],
     ['--accent', '#0052ff'],
   ])('%s = %s', (name, value) => {

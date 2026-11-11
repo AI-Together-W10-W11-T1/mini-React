@@ -69,15 +69,20 @@ test('QA-2 배치: 도구 막대가 세 영역 위(가로 전체)에 있고, 그
   const real = await box('real-section');
 
   if (testInfo.project.name === 'desktop') {
-    // 왼쪽 레이어, 가운데 캔버스, 오른쪽 속성. 위 y가 같은 줄
+    // 왼쪽 레이어, 가운데 캔버스, 오른쪽 속성
     expect(layer.x + layer.width).toBeLessThanOrEqual(canvas.x + 1);
     expect(canvas.x + canvas.width).toBeLessThanOrEqual(prop.x + 1);
-    expect(Math.abs(layer.y - canvas.y)).toBeLessThanOrEqual(1);
-    expect(Math.abs(canvas.y - prop.y)).toBeLessThanOrEqual(1);
-    // 도구 막대는 세 영역 위, 가로 전체 (왼쪽 = 레이어 왼쪽, 오른쪽 = 속성 오른쪽)
+    // 레이어 · 속성은 사이드바: 도구 막대 바로 아래(여백 없음)에서 시작해 화면 맨 아래까지, 캔버스는 그 아래 간격을 두고 시작
+    const vh = page.viewportSize()?.height ?? 0;
+    for (const [name, b] of [['layer', layer], ['prop', prop]] as const) {
+      expect(Math.abs(b.y - (toolbar.y + toolbar.height)), `${name} 위 = 도구 막대 아래`).toBeLessThanOrEqual(1);
+      expect(Math.abs(b.y + b.height - vh), `${name} 아래 = 화면 아래`).toBeLessThanOrEqual(1);
+    }
+    expect(canvas.y).toBeGreaterThanOrEqual(layer.y);
+    // 도구 막대는 세 영역 위, 창 기준 가로 전체 (왼쪽 = 0, 너비 = 창 너비)
     expect(toolbar.y + toolbar.height).toBeLessThanOrEqual(layer.y + 1);
-    expect(Math.abs(toolbar.x - layer.x)).toBeLessThanOrEqual(1);
-    expect(Math.abs(toolbar.x + toolbar.width - (prop.x + prop.width))).toBeLessThanOrEqual(1);
+    expect(Math.abs(toolbar.x)).toBeLessThanOrEqual(1);
+    expect(Math.abs(toolbar.width - (page.viewportSize()?.width ?? 0))).toBeLessThanOrEqual(1);
   } else {
     // 도구 막대 → 레이어 → 캔버스 → 속성 순으로 쌓임
     expect(toolbar.y + toolbar.height).toBeLessThanOrEqual(layer.y + 1);

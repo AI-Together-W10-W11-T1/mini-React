@@ -439,10 +439,11 @@ describe('메인 속성 편집 (MF-14 · MF-15 · P2-10 · D-01 ~ D-04) — patc
 /** 속성 패널의 그 칸 안 ↻ 버튼 (override일 때만 있음) */
 const resetButton = (field: string): HTMLElement | null => root.querySelector<HTMLElement>(`[data-testid="prop-row"][data-field="${field}"] [data-testid="prop-reset"]`);
 const overriddenRows = (): string[] => Array.from(root.querySelectorAll('[data-testid="prop-row"].override')).map((r) => r.getAttribute('data-field') ?? '');
+/** 메인을 따르는 칸 = 인스턴스를 골랐을 때 override 표시가 없는 칸 (「메인 따름」 글자는 없앰 — 표시 없음이 곧 메인 따름) */
 const followRows = (): string[] =>
-  Array.from(root.querySelectorAll('[data-testid="prop-row"]'))
-    .filter((r) => r.querySelector('[data-testid="prop-follow"]') !== null)
-    .map((r) => r.getAttribute('data-field') ?? '');
+  root.querySelector('[data-testid="property-title"]')?.textContent?.startsWith('인스턴스')
+    ? Array.from(root.querySelectorAll('[data-testid="prop-row"]:not(.override)')).map((r) => r.getAttribute('data-field') ?? '')
+    : [];
 /** b2 버튼 안 경로 접두: 캔버스 [0, 2] → 인스턴스 줄(1번 자식) → 위치 1 */
 const B2_PATH: Path = [0, 2, 2, 1]; // 캔버스 첫 자식으로 제목 <h2>가 생겨 캔버스 안 경로가 한 칸 밀림
 
@@ -758,13 +759,13 @@ describe('팔레트 판 (Dev-3)', () => {
     expect(bgOf('b1')).toBe(rgb('#f4b000'));
   });
 
-  it('P-27 b1(메인 따름) 선택 → 칩 #05b169: 캔버스 { SET_STYLE: 2 }(b1 버튼만 배경 + 글자색, 메인 · b2 · b3 줄 0) · 속성 패널 REPLACE 1줄 이상(「메인 따름」 <span> → ↻ <button>)', async () => {
+  it('P-27 b1(메인 따름) 선택 → 칩 #05b169: 캔버스 { SET_STYLE: 2 }(b1 버튼만 배경 + 글자색, 메인 · b2 · b3 줄 0) · 속성 패널 INSERT 1줄 이상(색 칸 끝에 ↻ <button>이 붙음)', async () => {
     await click(buttonOf('b1'));
     await pick('#05b169');
     expect(toolbarCounts(instance.lastPatches), '편집은 도구 막대를 안 바꿈 (Undo 버튼 없음)').toEqual({});
     expect(canvasCounts(instance.lastPatches)).toEqual({ SET_STYLE: 2 });
     expect(layerCounts(instance.lastPatches)).toEqual({});
-    expect(instance.lastPatches.filter((p) => p.kind === 'REPLACE' && startsWith(p.path, PANEL_PREFIX)).length).toBeGreaterThanOrEqual(1);
+    expect(instance.lastPatches.filter((p) => p.kind === 'INSERT' && startsWith(p.path, PANEL_PREFIX)).length).toBeGreaterThanOrEqual(1);
     expect(bgs()).toEqual([rgb('#0052ff'), rgb('#05b169'), rgb('#0052ff'), rgb('#cf202f')]);
   });
 
@@ -791,10 +792,10 @@ describe('인스턴스 추가 · 삭제 (Dev-9)', () => {
     expect(root.querySelector('[data-testid="layer-panel"] [data-testid="add-instance"]')).toBeNull();
   });
 
-  it('도구 막대 안 자식 순서는 앱 이름 → [+ 인스턴스]이고 앱 이름 글자는 mini-figma다', () => {
+  it('도구 막대 안 자식 순서는 앱 이름 → [+ 인스턴스]이고 앱 이름 글자는 Mini-Figma다', () => {
     const toolbar = byId('toolbar');
     expect(Array.from(toolbar.children).map(testId).slice(0, 2)).toEqual(['app-name', 'add-instance']);
-    expect(byId('app-name').textContent).toBe('mini-figma');
+    expect(byId('app-name').textContent).toBe('Mini-Figma');
     expect(toolbar.localName).toBe('header');
     expect(addButton().getAttribute('type')).toBe('button');
   });
@@ -1280,7 +1281,7 @@ describe('실제 영역 (patch-preview, PP-01 ~ 10 · Dev-7)', () => {
     expect(byId('test-area-title').textContent).toBe('테스트 영역');
     const bar = byId('toolbar');
     expect(Array.from(bar.children).map(testId)).toEqual(['app-name', 'add-instance', 'back-button', 'forward-button', 'patch-button']);
-    expect(Array.from(bar.children).map((c) => c.textContent)).toEqual(['mini-figma', '+ 인스턴스', '실행 취소', '다시 실행', 'Patch']);
+    expect(Array.from(bar.children).map((c) => c.textContent)).toEqual(['Mini-Figma', '+ 인스턴스', '실행 취소', '다시 실행', 'Patch']);
     expect(patchButton().className).toBe('btn-primary');
     expect(backButton().className).toBe('btn-secondary');
     expect(forwardButton().className).toBe('btn-secondary');

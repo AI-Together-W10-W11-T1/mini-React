@@ -37,7 +37,7 @@ test('QA-31 도구 막대가 영역 최상위 첫 자식이고 안에 앱 이름
   // 도구 막대 안 자식 순서 (patch-preview PP-07 변경): 앱 이름 → [+ 인스턴스] → [실행 취소] → [다시 실행] → [Patch]
   const inside = await page.getByTestId('toolbar').evaluate((el) => Array.from(el.children).map((c) => c.getAttribute('data-testid')));
   expect(inside).toEqual(['app-name', 'add-instance', 'back-button', 'forward-button', 'patch-button']);
-  await expect(page.getByTestId('app-name')).toHaveText('mini-figma');
+  await expect(page.getByTestId('app-name')).toHaveText('Mini-Figma');
   await expect(page.getByTestId('toolbar').getByTestId('add-instance')).toBeEnabled();
   await expect(backBtn(page)).toHaveText('실행 취소');
   await expect(forwardBtn(page)).toHaveText('다시 실행');

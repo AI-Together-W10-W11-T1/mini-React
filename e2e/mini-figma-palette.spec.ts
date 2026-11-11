@@ -141,12 +141,12 @@ test('QA-38 인스턴스 색: 칩을 누르면 override(↻), 메인을 바꿔�
   expect(await bgOf(page, 'b2')).toBe(rgb('#cf202f'));
   expect(await bgOf(page, 'b1')).toBe(rgb('#05b169'));
 
-  // ③ b1을 고르고 ↻: 「메인 따름」, b1이 메인 색(빨강)을 따라감, 'undefined' 글자가 화면에 없음
+  // ③ b1을 고르고 ↻: 메인 따름(override 표시 없음), b1이 메인 색(빨강)을 따라감, 'undefined' 글자가 화면에 없음
   await selectOnCanvas(page, 'b1');
   await page.locator(inRow('color', 'prop-reset')).click();
   expect(await followingFields(page)).toContain('color');
   expect(await overriddenFields(page)).toEqual([]);
-  await expect(page.locator(inRow('color', 'prop-follow'))).toHaveText('메인 따름');
+  await expect(page.locator(inRow('color', 'prop-reset'))).toHaveCount(0);
   expect(await bgOf(page, 'b1')).toBe(rgb('#cf202f'));
   await expect(page.getByTestId('prop-color')).toHaveValue('#cf202f');
   expect(((await page.getByTestId('app-root').textContent()) ?? '').toLowerCase()).not.toContain('undefined');
