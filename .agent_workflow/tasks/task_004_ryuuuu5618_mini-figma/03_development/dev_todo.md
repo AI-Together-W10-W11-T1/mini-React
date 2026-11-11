@@ -67,7 +67,7 @@ fixtures/mini-figma/
 
 ## Dev 항목
 
-- [ ] **Dev-1** (`mini-figma`): 모델 순수 함수 ① — 시작 데이터 · override 합치기 · 칸 바꾸기 · ↻ [MF-10 · MF-11 · MF-12 · MF-13 · MF-16]
+- [x] **Dev-1** (`mini-figma`): 모델 순수 함수 ① — 시작 데이터 · override 합치기 · 칸 바꾸기 · ↻ [MF-10 · MF-11 · MF-12 · MF-13 · MF-16]
   - 의존: 없음
   - 대상 파일: `fixtures/mini-figma/model.ts` — 타입(`MainProps` · `Instance` · `Doc = { main, instances }` · `Field = 'label' | 'size' | 'hasIcon' | 'icon' | 'color'`), `INITIAL_DOC`(MF-16 그대로: main `{ label: '버튼', size: 'M', hasIcon: false, icon: 'star', color: 'blue' }`, b1 `{}` · b2 `{ label: '취소' }` · b3 `{ label: '삭제', color: 'red' }`), `mergeProps(main, instance)` (= `{ ...main, ...instance }`, 키가 있으면 override), `isOverridden(instance, field)`(`Object.hasOwn`), `setMainField(doc, field, value)`, `setInstanceField(doc, id, field, value)`, `resetInstanceField(doc, id, field)`(키 지우기, `undefined`를 넣지 않음)
   - 테스트(먼저 실패 확인): `fixtures/mini-figma/__tests__/model.test.ts`
@@ -80,8 +80,9 @@ fixtures/mini-figma/
     - 입력 객체를 `Object.freeze`한 채로 불러도 안 바뀜(불변)
   - 알고리즘: 「override 판단」(키가 있으면 override · 되돌리기 = 키 지우기)
   - 완료 근거로 남길 것: 테스트 파일 · 건수, `npx vitest run fixtures/mini-figma` 통과 수, `npx tsc --noEmit`, 커밋 해시
+  - **완료 근거 (Evidence)**: `fixtures/mini-figma/model.ts`의 `INITIAL_DOC` · `mergeProps` · `isOverridden` · `setMainField` · `setInstanceField` · `resetInstanceField`(키 지우기, `undefined` 안 넣음). 테스트 `fixtures/mini-figma/__tests__/model.test.ts`를 먼저 써서 실패 확인(`Failed to resolve import "../model"`) → 구현 → 36건 통과(`npx vitest run fixtures/mini-figma` 36 passed, Dev-2 합치기 전 시점), `npx tsc --noEmit` 오류 0건, 커밋 aa22ea9
 
-- [ ] **Dev-2** (`mini-figma`): 모델 순수 함수 ② — 추가 · 삭제 · 순서 · 선택 정리 [MF-22 · MF-23 · MF-25 · MF-26 · MF-32]
+- [x] **Dev-2** (`mini-figma`): 모델 순수 함수 ② — 추가 · 삭제 · 순서 · 선택 정리 [MF-22 · MF-23 · MF-25 · MF-26 · MF-32]
   - 의존: Dev-1
   - 대상 파일: `fixtures/mini-figma/model.ts` — `addInstance(doc, nextId)`(override 없는 `{ id: 'b' + nextId }`를 **배열 끝**에. 번호 `nextId`는 `Doc` 밖, `App`이 세어 넘김 — Q17-3), `removeInstance(doc, id)`(`filter`로 새 배열), `moveInstance(doc, id, delta: -1 | 1)`, `reconcileSelection(selectedId, doc)`(`'main'`은 항상 유효, 인스턴스 id가 `instances`에 없으면 `null`), `instanceName(main, instance)`(레이어 · 패널 머리에 쓸 이름 = `mergeProps`의 `label`, 빈 글자 `''`면 `instance.id` — ④-3)
   - 테스트(먼저 실패 확인): `fixtures/mini-figma/__tests__/model.test.ts`에 이어서
@@ -93,8 +94,9 @@ fixtures/mini-figma/
     - `instanceName`: override 글자(`취소`)면 그 글자, 따르면 메인 글자, **`''`이면 `'b1'` 같은 id**, 메인이 `''`이고 따르면 id
   - 알고리즘: 「인스턴스 목록 자료구조」(배열, 삭제 = `filter`), 「선택 · key」(id), 정책 「새 인스턴스 = override 없음」 · 「메인 삭제 = 못 함」
   - 완료 근거로 남길 것: 위와 같음
+  - **완료 근거 (Evidence)**: `fixtures/mini-figma/model.ts`에 `addInstance`(번호 `nextId`는 doc 밖) · `removeInstance` · `moveInstance` · `reconcileSelection` · `instanceName` 추가. `model.test.ts`에 이어 쓴 뒤 실패 확인(26 failed / 36 passed) → 구현 → `model.test.ts` 62건 통과(Dev-1 36 + Dev-2 26, `npx vitest run fixtures/mini-figma` 62 passed), `npx tsc --noEmit` 오류 0건, 커밋 825cb95
 
-- [ ] **Dev-3** (`mini-figma`): Undo 기록 순수 함수 — 묶음 · 50개(= Undo 49번) · Undo · Redo [MF-30 · MF-31 · MF-32]
+- [x] **Dev-3** (`mini-figma`): Undo 기록 순수 함수 — 묶음 · 50개(= Undo 49번) · Undo · Redo [MF-30 · MF-31 · MF-32]
   - 의존: Dev-1 (`Doc` 타입)
   - 대상 파일: `fixtures/mini-figma/undo.ts` — `UndoState = { past: Doc[], future: Doc[], group: { target: 'main' | id, field: Field } | null }`, `EMPTY_UNDO`, `recordEdit(state, current, next, group | null)`, `undo(state, current)`, `redo(state, current)`. **한도 상수 `UNDO_LIMIT = 50`** — 뜻 주석 필수: 「처음 상태(지금 모습)를 포함한 기록 개수. Phase 1 `HISTORY_LIMIT`과 같은 뜻이라 `past`는 최대 `UNDO_LIMIT - 1` = 49칸 = Undo 49번」. `@mini-react/shared`의 `HISTORY_LIMIT`은 import하지 않고 이 파일에 따로 둔다 (공통 주의 14, 1회차 NON-BLOCKING 9)
   - 테스트(먼저 실패 확인): `fixtures/mini-figma/__tests__/undo.test.ts`
@@ -108,8 +110,9 @@ fixtures/mini-figma/
     - 저장된 Doc을 나중에 고치지 않음(불변)
   - 알고리즘: 「Undo 묶음」(같은 대상 + 같은 칸 연달아 = 한 단계, 시간 기준 없음, 기록 50개 = Undo 49번, `main` · `instances`만 기록 — **선택 · `nextId`는 기록에 없음**)
   - 완료 근거로 남길 것: 위와 같음 (49개 / 50개 경계의 실제 `past.length` 값을 출력에 남김)
+  - **완료 근거 (Evidence)**: `fixtures/mini-figma/undo.ts`의 `UNDO_LIMIT = 50`(뜻 주석: 처음 상태 포함 기록 개수, `past` 최대 49 — `HISTORY_LIMIT` import 안 함) · `EMPTY_UNDO` · `recordEdit` · `undo` · `redo`. `undo.test.ts`를 먼저 써서 실패 확인(`Failed to resolve import "../undo"`) → 구현 → 24건 통과(`npx vitest run fixtures/mini-figma/__tests__/undo.test.ts` 24 passed). 경계 실제 출력(`--silent=false`): `[한도] 49단계: past.length = 49 / past[0] === 처음 Doc: true`, `[한도] 50단계: past.length = 49 / past[0] === 처음 Doc: false / past[0] === 첫 수정 직후 Doc: true`, 60단계 `past.length` 49 단언 통과. `npx tsc --noEmit` 오류 0건, 커밋 160f56b
 
-- [ ] **Dev-4** (`mini-figma`): 키 판정 순수 함수 [MF-33 · MF-34]
+- [x] **Dev-4** (`mini-figma`): 키 판정 순수 함수 [MF-33 · MF-34]
   - 의존: 없음
   - 대상 파일: `fixtures/mini-figma/keys.ts` — `keyAction(info) → 'delete' | 'undo' | 'redo' | null`. 입력은 DOM 이벤트가 아니라 평범한 객체 `{ key, ctrlKey, metaKey, shiftKey, altKey, targetTag }` (DOM 없는 모듈, `document` · `window` 안 씀). `App`이 `KeyboardEvent`를 이 모양으로 바꿔 넘긴다
   - 테스트(먼저 실패 확인): `fixtures/mini-figma/__tests__/keys.test.ts`
@@ -120,6 +123,7 @@ fixtures/mini-figma/
     - 표 형태(`it.each`)로 위 케이스 전부
   - 알고리즘: 「키보드 받는 방법」(입력칸 안 키 무시), 정책 「단축키」(Delete · Backspace(수정키 없을 때만, Q17-4) · Ctrl/Cmd+Z · Ctrl/Cmd+Shift+Z)
   - 완료 근거로 남길 것: 위와 같음
+  - **완료 근거 (Evidence)**: `fixtures/mini-figma/keys.ts`의 `keyAction(info)`(+ `KeyInfo` · `KeyAction` 타입, `document` · `window` 없음). `keys.test.ts`를 먼저 써서 실패 확인 → 구현 → 76건 통과(`it.each` 표: 정해진 키 · 정해진 키 밖 · Delete/Backspace + Ctrl/Meta/Alt/Shift 조합 · 입력칸 INPUT/SELECT/TEXTAREA 대소문자 · BUTTON/DIV/BODY/null). `npx vitest run fixtures/mini-figma` 162 passed(model 62 + undo 24 + keys 76), `npx tsc --noEmit` 오류 0건, 커밋 be98199
 
 - [ ] **Dev-5** (`mini-figma`): 앱 뼈대 · Button · Canvas · 시작 화면 · 세 영역 배치 [MF-01 · MF-03 · MF-04 · MF-05 · MF-10 · MF-11 · MF-16 · P2-02 · P2-07 · P2-09 · P2-10 · P2-22]
   - 의존: Dev-1 ~ 3
