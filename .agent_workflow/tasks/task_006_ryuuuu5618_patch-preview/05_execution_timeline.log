@@ -18,3 +18,8 @@
 2026-11-12T00:00 | stage=3 | agent=mr-qa | round=- | signal=UNKNOWN | - | by=hook
 2026-11-12T00:00 | stage=3 | agent=master | round=- | signal=PASS | QA PASS (preview 24 · 전체 308 · vitest 1178), 캡처 10장. 서버 남음 5199 PID 47932 — 사용자 승인 대기. 다음 = 사람 확인
 2026-11-12T00:08 | stage=3 | agent=master | round=- | signal=SCOPE | 사용자 결정: A33 · 34 · 35 · 37 e2e 추가. 5199 서버(PID 47932) 끄기 승인 대기
+2026-11-12T00:26 | stage=3 | agent=master | round=- | signal=PASS | A33·34·35·37 e2e 추가 03ba8b9 (전체 316). 미커밋 index.html · design/render 스펙 · design.test = 사용자가 다른 창에서 디자인 수정 중 → 건드리지 않음. 다음 = 사람 확인
+2026-11-12T00:32 | stage=1 | agent=master | round=- | signal=SPEC_CHANGE | PP-06 변경: 실행 취소 · 다시 실행 = 두 영역 함께(doc 사본), 세부 1~4 추천안 "응". 1단계로 돌아가 Dev-8 기획 → 테스트 케이스 확인 → 개발
+2026-11-12T00:40 | stage=1 | agent=mr-worker | round=- | signal=UNKNOWN | Dev-8 | by=hook
+2026-11-12T00:47 | stage=2 | agent=mr-worker | round=- | signal=UNKNOWN | Dev-7 | by=hook
+2026-11-12T00:47 | stage=2 | agent=master | round=- | signal=VERIFY | 사용자 디자인 커밋 5e841b2 확인(tsc 0 · vitest 1178 · playwright 316). 실제 영역 점무늬 제거 905a582(사용자 "추천대로"). FD-02 · MF-21 · PP-02에 변경 기록. 다음 = Dev-8 진행 여부 질문
