@@ -30,3 +30,4 @@
 2026-11-12T01:14 | stage=3 | agent=mr-qa | round=- | signal=UNKNOWN | - | by=hook
 2026-11-12T01:15 | stage=3 | agent=master | round=2 | signal=PASS | QA 재실행 2회차 PASS (playwright 330 · vitest 1195 · tsc 0), task_006 캡처 갱신 + task_005 v2 12장. 서버 남음 5231 PID 46960 — 승인 대기. 다음 = 사람 확인(005 · 006)
 2026-11-12T01:16 | stage=3 | agent=master | round=- | signal=HUMAN_CHECK | 사용자 "캡처 OK, 팝업 됨, 스크롤바 그대로, 서버 꺼" → 사람 확인 체크, 5231 서버 종료(승인). 다음 = 2.5 체크포인트 → 위키 → 병합
+2026-11-12T01:18 | stage=마무리 | agent=master | round=- | signal=MERGE_READY | 체크포인트 · 위키는 발표 전으로 미룸(사용자 "너가 추천하는 방식으로 진행해"), 07_pr_body 작성 → 병합 005 → 006

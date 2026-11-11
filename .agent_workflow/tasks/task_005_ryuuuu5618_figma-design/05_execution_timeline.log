@@ -14,3 +14,4 @@
 2026-11-11T21:44 | stage=3 | agent=mr-qa | round=- | signal=UNKNOWN | - | by=hook
 2026-11-11T22:41 | stage=3 | agent=master | round=- | signal=PAUSE | QA PASS(mr-qa), 사람 확인 · 서버 PID 50900 정리 대기. 사용자 "디자인 말고 새 task_006를 먼저 진행하자"
 2026-11-12T01:16 | stage=3 | agent=master | round=- | signal=HUMAN_CHECK | 사용자 "캡처 OK, 팝업 됨, 스크롤바 그대로, 서버 꺼" → 사람 확인 체크, 5231 서버 종료(승인). 다음 = 2.5 체크포인트 → 위키 → 병합
+2026-11-12T01:18 | stage=마무리 | agent=master | round=- | signal=MERGE_READY | 체크포인트 · 위키는 발표 전으로 미룸(사용자 "너가 추천하는 방식으로 진행해"), 07_pr_body 작성 → 병합 005 → 006
