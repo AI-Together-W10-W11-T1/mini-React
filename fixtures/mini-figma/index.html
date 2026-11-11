@@ -48,6 +48,10 @@
       /* 속성 칸: 이름 + 입력 부품. 긴 글자도 칸 안에서 줄어들게 min-width: 0 */
       .prop-row { display: flex; align-items: center; gap: 8px; margin: 8px 0; }
       .prop-name { flex: 0 0 6rem; color: var(--label); font-size: 0.875rem; }
+      /* override 칸: 색으로 구분 + ↻. 아닌 칸은 「메인 따름」 */
+      .prop-row.override { padding: 2px 6px; margin-left: -6px; margin-right: -6px; border-left: 4px solid var(--select); background: var(--select-bg); border-radius: 4px; }
+      .prop-follow { flex: 0 0 auto; color: #8a93a3; font-size: 0.75rem; }
+      .prop-reset { flex: 0 0 auto; padding: 2px 8px; font: inherit; cursor: pointer; }
       .prop-row input[type='text'], .prop-row select { flex: 1 1 auto; min-width: 0; padding: 6px 8px; font: inherit; }
 
       @media (max-width: 720px) {

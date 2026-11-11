@@ -3,7 +3,7 @@ import type { VNode } from '@mini-react/shared';
 import { Canvas } from './components/Canvas';
 import { LayerPanel } from './components/LayerPanel';
 import { PropertyPanel } from './components/PropertyPanel';
-import { INITIAL_DOC, setMainField } from './model';
+import { INITIAL_DOC, resetInstanceField, setInstanceField, setMainField } from './model';
 import type { Doc, Field, MainProps } from './model';
 import { EMPTY_UNDO, recordEdit } from './undo';
 import type { UndoGroup, UndoState } from './undo';
@@ -35,10 +35,18 @@ export function App(): VNode {
   // 같은 것을 다시 고르면 같은 값(Object.is)이라 다시 그리지 않는다.
   const onSelect = (id: string): void => setSelectedId(id);
 
-  // [AI Note]: 속성 패널 한 칸이 바뀌면 불린다. 고른 대상이 메인이면 setMainField → applyEdit (묶음 기준 = 메인 + 그 칸).
-  // 인스턴스 편집은 Dev-8에서 이 함수에 더한다. 같은 값이면 setMainField가 같은 Doc을 돌려줘서 렌더 · 기록이 없다.
+  // [AI Note]: 속성 패널 한 칸이 바뀌면 불린다. 고른 대상이 메인이면 setMainField, 인스턴스면 setInstanceField(그 칸에 키가 생겨 override) → applyEdit.
+  // 묶음 기준 = 고른 대상('main' 또는 인스턴스 id) + 그 칸이라 같은 대상의 같은 칸이 연달아 바뀌면 한 단계가 된다. 같은 값이면 같은 Doc이라 렌더 · 기록이 없다.
   const onEdit = (field: Field, value: MainProps[Field]): void => {
-    if (selectedId === 'main') applyEdit(setMainField(doc, field, value), { target: 'main', field });
+    if (selectedId === null) return;
+    const next = selectedId === 'main' ? setMainField(doc, field, value) : setInstanceField(doc, selectedId, field, value);
+    applyEdit(next, { target: selectedId, field });
+  };
+
+  // [AI Note]: ↻ = 그 인스턴스의 그 칸 키를 지운다 (undefined를 넣지 않음) → 메인 값을 다시 따라간다. 추가 · 삭제 · 순서와 같이 묶음을 끝내는 한 단계(group = null).
+  const onReset = (field: Field): void => {
+    if (selectedId === null || selectedId === 'main') return;
+    applyEdit(resetInstanceField(doc, selectedId, field), null);
   };
 
   return h(
@@ -46,6 +54,6 @@ export function App(): VNode {
     { class: 'app' },
     h(LayerPanel, { main: doc.main, instances: doc.instances, selectedId, onSelect }),
     h(Canvas, { main: doc.main, instances: doc.instances, selectedId, onSelect }),
-    h(PropertyPanel, { main: doc.main, instances: doc.instances, selectedId, onEdit }),
+    h(PropertyPanel, { main: doc.main, instances: doc.instances, selectedId, onEdit, onReset }),
   );
 }

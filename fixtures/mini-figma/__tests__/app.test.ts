@@ -355,3 +355,194 @@ describe('메인 속성 편집 (MF-14 · MF-15 · P2-10 · D-01 ~ D-04) — patc
     expect((slot(0) as typeof INITIAL_DOC).instances).toBe(before);
   });
 });
+
+/** 속성 패널의 그 칸 안 ↻ 버튼 (override일 때만 있음) */
+const resetButton = (field: string): HTMLElement | null => root.querySelector<HTMLElement>(`[data-testid="prop-row"][data-field="${field}"] [data-testid="prop-reset"]`);
+const overriddenRows = (): string[] => Array.from(root.querySelectorAll('[data-testid="prop-row"].override')).map((r) => r.getAttribute('data-field') ?? '');
+const followRows = (): string[] =>
+  Array.from(root.querySelectorAll('[data-testid="prop-row"]'))
+    .filter((r) => r.querySelector('[data-testid="prop-follow"]') !== null)
+    .map((r) => r.getAttribute('data-field') ?? '');
+/** b2 버튼 안 경로 접두: 캔버스 [0, 1] → 인스턴스 줄(1번 자식) → 위치 1 */
+const B2_PATH: Path = [0, 1, 1, 1];
+
+describe('인스턴스 속성 편집 · override 표시 · ↻ (MF-12 ~ 15 · MF-21) — patch 기대 표 P-9 ~ P-14 · P-21 · P-22', () => {
+  it('인스턴스를 고르면 5칸이 합쳐진 값(메인 값 위에 인스턴스 값)으로 뜨고 override 칸은 색 구분 + ↻, 아닌 칸은 「메인 따름」이다 (b2 · b3 · b1)', async () => {
+    await click(buttonOf('b2'));
+    expect(byId('property-title').textContent).toBe('인스턴스 · 취소');
+    expect((byId('prop-label') as HTMLInputElement).value).toBe('취소');
+    expect(overriddenRows()).toEqual(['label']);
+    expect(followRows()).toEqual(['size', 'hasIcon', 'icon', 'color']);
+    expect(root.querySelectorAll('[data-testid="prop-reset"]')).toHaveLength(1);
+
+    await click(buttonOf('b3'));
+    expect(overriddenRows()).toEqual(['label', 'color']);
+    expect(followRows()).toEqual(['size', 'hasIcon', 'icon']);
+    expect((byId('prop-color') as HTMLSelectElement).value).toBe('red');
+
+    await click(buttonOf('b1'));
+    expect(overriddenRows()).toEqual([]);
+    expect(followRows()).toEqual(['label', 'size', 'hasIcon', 'icon', 'color']);
+    expect(root.querySelectorAll('[data-testid="prop-reset"]')).toHaveLength(0);
+    expect((byId('prop-label') as HTMLInputElement).value).toBe('버튼');
+  });
+
+  it('P-9 b1 선택 → 라벨 `확인`: 캔버스 { SET_TEXT: 1 } · 레이어 { SET_TEXT: 1 }. 인스턴스 편집 한 번 = 렌더 한 번', async () => {
+    await click(buttonOf('b1'));
+    const before = renders;
+    await typeInto('prop-label', '확인');
+    expect(canvasCounts(instance.lastPatches)).toEqual({ SET_TEXT: 1 });
+    expect(layerCounts(instance.lastPatches)).toEqual({ SET_TEXT: 1 });
+    expect(renders - before).toBe(1);
+    expect(labels()).toEqual(['버튼', '확인', '취소', '삭제']);
+    expect(overriddenRows()).toEqual(['label']);
+    expect(byId('property-title').textContent).toBe('인스턴스 · 확인');
+  });
+
+  it('P-22 b1 선택 → 크기 `S`: 캔버스 { SET_ATTR: 1 }(b1만 btn-S, 메인 · b2 · b3는 btn-M) · 레이어 { }', async () => {
+    await click(buttonOf('b1'));
+    await choose('prop-size', 'S');
+    expect(canvasCounts(instance.lastPatches)).toEqual({ SET_ATTR: 1 });
+    expect(layerCounts(instance.lastPatches)).toEqual({});
+    expect(buttons().map((b) => (b.classList.contains('btn-S') ? 'S' : b.classList.contains('btn-M') ? 'M' : '?'))).toEqual(['M', 'S', 'M', 'M']);
+  });
+
+  it('P-10 b2 선택 → 아이콘 보이기 켜기: 캔버스 { INSERT: 1 } — 경로는 b2 버튼 경로 + [0] · 레이어 { }', async () => {
+    await click(buttonOf('b2'));
+    await toggle('prop-hasicon', true);
+    expect(canvasCounts(instance.lastPatches)).toEqual({ INSERT: 1 });
+    expect(layerCounts(instance.lastPatches)).toEqual({});
+    const insert = instance.lastPatches.find((p) => p.kind === 'INSERT' && startsWith(p.path, CANVAS_PREFIX));
+    expect(insert?.kind === 'INSERT' && insert.path).toEqual([...B2_PATH, 0]);
+    expect(buttonOf('b2').querySelector('[data-testid="btn-icon"]')?.textContent).toBe('★');
+    expect(overriddenRows()).toEqual(['label', 'hasIcon']);
+  });
+
+  it('P-11 (P-10 뒤) 아이콘 종류 `♥`: 캔버스 { SET_TEXT: 1 }(b2 아이콘 글자)', async () => {
+    await click(buttonOf('b2'));
+    await toggle('prop-hasicon', true);
+    await choose('prop-icon', 'heart');
+    expect(canvasCounts(instance.lastPatches)).toEqual({ SET_TEXT: 1 });
+    expect(layerCounts(instance.lastPatches)).toEqual({});
+    expect(buttonOf('b2').querySelector('[data-testid="btn-icon"]')?.textContent).toBe('♥');
+  });
+
+  // P-12 · P-13의 준비: b2가 아이콘 override(켜짐 + ♥)를 가진 상태에서 메인을 고른다
+  const prepareB2Icon = async (): Promise<void> => {
+    await click(buttonOf('b2'));
+    await toggle('prop-hasicon', true);
+    await choose('prop-icon', 'heart');
+    await click(buttonOf('main'));
+  };
+
+  it('P-12 b2에 아이콘 override(켜짐 + ♥)가 있는 채 메인 아이콘 켜기: 캔버스 { INSERT: 3 }(메인 · b1 · b3) — b2 경로의 줄은 0', async () => {
+    await prepareB2Icon();
+    await toggle('prop-hasicon', true);
+    expect(canvasCounts(instance.lastPatches)).toEqual({ INSERT: 3 });
+    expect(layerCounts(instance.lastPatches)).toEqual({});
+    expect(instance.lastPatches.filter((p) => p.kind !== 'SET_EVENT' && startsWith(p.kind === 'MOVE' ? p.parent : p.path, B2_PATH))).toHaveLength(0);
+    expect(buttonOf('b2').querySelector('[data-testid="btn-icon"]')?.textContent).toBe('♥');
+  });
+
+  it('P-13 (P-12 뒤) 메인 종류 `♥`, 이어서 `★`: 각각 캔버스 { SET_TEXT: 3 }(메인 · b1 · b3) — b2 줄 0, b2는 ♥ 그대로', async () => {
+    await prepareB2Icon();
+    await toggle('prop-hasicon', true);
+    for (const [kind, glyph] of [['heart', '♥'], ['star', '★']] as const) {
+      await choose('prop-icon', kind);
+      expect(canvasCounts(instance.lastPatches)).toEqual({ SET_TEXT: 3 });
+      expect(instance.lastPatches.filter((p) => p.kind !== 'SET_EVENT' && startsWith(p.kind === 'MOVE' ? p.parent : p.path, B2_PATH))).toHaveLength(0);
+      expect(['main', 'b1', 'b3'].map((id) => buttonOf(id).querySelector('[data-testid="btn-icon"]')?.textContent)).toEqual([glyph, glyph, glyph]);
+      expect(buttonOf('b2').querySelector('[data-testid="btn-icon"]')?.textContent).toBe('♥');
+    }
+  });
+
+  it('P-14 b2: 켜짐 + ♥ override, 메인 꺼짐 → ① hasIcon ↻ = { REMOVE: 1 } ② icon ↻ = 렌더는 되지만 캔버스 줄 0 ③ 메인 켜기 = { INSERT: 4 }(b2도 ★)', async () => {
+    await click(buttonOf('b2'));
+    await toggle('prop-hasicon', true);
+    await choose('prop-icon', 'heart');
+
+    // ① hasIcon ↻
+    const r1 = renders;
+    await click(resetButton('hasIcon') as HTMLElement);
+    expect(canvasCounts(instance.lastPatches)).toEqual({ REMOVE: 1 });
+    expect(layerCounts(instance.lastPatches)).toEqual({});
+    expect(renders - r1).toBe(1);
+    expect(buttonOf('b2').querySelector('[data-testid="btn-icon"]')).toBeNull();
+
+    // ② icon ↻ — 꺼진 상태라 눈에 보이는 변화 없음. doc은 바뀌었으니 렌더는 1번
+    const r2 = renders;
+    await click(resetButton('icon') as HTMLElement);
+    expect(renders - r2).toBe(1);
+    expect(canvasCounts(instance.lastPatches)).toEqual({});
+    expect(layerCounts(instance.lastPatches)).toEqual({});
+    expect(overriddenRows()).toEqual(['label']);
+
+    // ③ 메인 켜기: 4개 버튼 모두 ★ (b2도 메인을 따라)
+    await click(buttonOf('main'));
+    await toggle('prop-hasicon', true);
+    expect(canvasCounts(instance.lastPatches)).toEqual({ INSERT: 4 });
+    expect(layerCounts(instance.lastPatches)).toEqual({});
+    expect(buttons().map((b) => b.querySelector('[data-testid="btn-icon"]')?.textContent)).toEqual(['★', '★', '★', '★']);
+  });
+
+  it('P-21 b1 라벨 override(`확인`) 상태 → ↻: 캔버스 { SET_TEXT: 1 }(메인 글자로) · 레이어 { SET_TEXT: 1 }', async () => {
+    await click(buttonOf('b1'));
+    await typeInto('prop-label', '확인');
+    const before = renders;
+    await click(resetButton('label') as HTMLElement);
+    expect(canvasCounts(instance.lastPatches)).toEqual({ SET_TEXT: 1 });
+    expect(layerCounts(instance.lastPatches)).toEqual({ SET_TEXT: 1 });
+    expect(renders - before).toBe(1);
+    expect(labels()).toEqual(['버튼', '버튼', '취소', '삭제']);
+    expect(overriddenRows()).toEqual([]);
+  });
+
+  it('↻ 뒤 doc의 인스턴스에 그 키가 없고 `undefined` 값도 없다. Button 글자 · class에도 undefined가 안 나오고, 이후 메인 변경을 다시 따라간다', async () => {
+    await click(buttonOf('b3'));
+    await click(resetButton('color') as HTMLElement);
+    await click(resetButton('label') as HTMLElement);
+    const b3 = (slot(0) as typeof INITIAL_DOC).instances.find((it) => it.id === 'b3');
+    expect(b3).toEqual({ id: 'b3' });
+    expect(Object.keys(b3 ?? {})).toEqual(['id']);
+    expect(Object.values(b3 ?? {})).not.toContain(undefined);
+    expect(buttons().map((b) => b.className + '|' + b.textContent).join('\n')).not.toContain('undefined');
+    expect(labels()).toEqual(['버튼', '버튼', '취소', '버튼']);
+    // 메인을 바꾸면 b3도 따라감
+    await click(buttonOf('main'));
+    await choose('prop-color', 'green');
+    await typeInto('prop-label', '저장');
+    expect(buttonOf('b3').classList.contains('btn-green')).toBe(true);
+    expect(labels()).toEqual(['저장', '저장', '취소', '저장']);
+  });
+
+  it('빈 라벨 override: 메인 값으로 돌아가지 않고 글자 노드는 빈 글자로 남는다. 레이어 행 이름 · 패널 머리는 id', async () => {
+    await click(buttonOf('b1'));
+    await typeInto('prop-label', '');
+    expect(labels()).toEqual(['버튼', '', '취소', '삭제']);
+    expect(layerNames()).toEqual(['b1', '취소', '삭제']);
+    expect(byId('property-title').textContent).toBe('인스턴스 · b1');
+    expect(overriddenRows()).toEqual(['label']);
+  });
+
+  it('인스턴스 편집은 doc의 다른 인스턴스 · 메인을 같은 객체로 둔다 (참조 유지)', async () => {
+    const before = slot(0) as typeof INITIAL_DOC;
+    await click(buttonOf('b1'));
+    await typeInto('prop-label', '확인');
+    const after = slot(0) as typeof INITIAL_DOC;
+    expect(after.main).toBe(before.main);
+    expect(after.instances[1]).toBe(before.instances[1]);
+    expect(after.instances[2]).toBe(before.instances[2]);
+    expect(after.instances[0]).not.toBe(before.instances[0]);
+  });
+
+  it('인스턴스 편집 · ↻는 같은 대상 + 같은 칸이면 한 단계로 묶이고 ↻는 새 단계(묶음 끝)다', async () => {
+    await click(buttonOf('b1'));
+    await typeInto('prop-label', '확');
+    await typeInto('prop-label', '확인');
+    expect((slot(2) as UndoState).past).toHaveLength(1);
+    expect((slot(2) as UndoState).group).toEqual({ target: 'b1', field: 'label' });
+    await click(resetButton('label') as HTMLElement);
+    expect((slot(2) as UndoState).past).toHaveLength(2);
+    expect((slot(2) as UndoState).group).toBeNull();
+  });
+});

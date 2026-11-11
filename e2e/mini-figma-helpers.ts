@@ -117,3 +117,67 @@ export function keydownListenerCount(page: Page): Promise<number> {
     return c.add - c.remove;
   });
 }
+
+// ---------------------------------------------------------------------------
+// 속성 패널 · 한 노드 관찰
+// ---------------------------------------------------------------------------
+
+export type PropField = 'label' | 'size' | 'hasIcon' | 'icon' | 'color';
+export const PROP_FIELDS: readonly PropField[] = ['label', 'size', 'hasIcon', 'icon', 'color'];
+
+/** 속성 패널의 칸 하나 (`data-field`) */
+export function rowSel(field: PropField): string {
+  return `[data-testid="prop-row"][data-field="${field}"]`;
+}
+
+/** 칸 안의 요소 선택자. 예: `inRow('label', 'prop-reset')` */
+export function inRow(field: PropField, testId: string): string {
+  return `${rowSel(field)} [data-testid="${testId}"]`;
+}
+
+/** 지금 override 표시(`override` 클래스 + ↻ 버튼)가 있는 칸들 (칸 순서대로) */
+export function overriddenFields(page: Page): Promise<PropField[]> {
+  return page
+    .locator('[data-testid="prop-row"].override')
+    .evaluateAll((els) => els.map((el) => el.getAttribute('data-field') as PropField));
+}
+
+/** 지금 「메인 따름」 글자가 있는 칸들 (칸 순서대로) */
+export function followingFields(page: Page): Promise<PropField[]> {
+  return page
+    .locator('[data-testid="prop-row"]')
+    .evaluateAll((els) => els.filter((el) => el.querySelector('[data-testid="prop-follow"]') !== null).map((el) => el.getAttribute('data-field') as PropField));
+}
+
+export interface NodeWatcher {
+  /** 지금까지 모인 DOM 변경 기록을 종류별로 세고 비운다 (그 노드의 자손 포함) */
+  take(): Promise<{ characterData: number; attributes: number; childList: number; total: number }>;
+}
+
+/** `app-root` 안 CSS 선택자로 고른 노드 하나에 MutationObserver를 심는다 (버튼마다 따로 변경을 세고 싶을 때) */
+export async function watchSel(page: Page, name: string, selector: string): Promise<NodeWatcher> {
+  const slot = `__nodeMut_${name}`;
+  await page.evaluate(
+    ({ sel, key }) => {
+      const target = document.querySelector(`[data-testid="${'app-root'}"] ${sel}`);
+      if (target === null) throw new Error(`관찰할 노드가 없다: ${sel}`);
+      const store = { observer: null as MutationObserver | null, records: [] as MutationRecord[] };
+      store.observer = new MutationObserver((list) => store.records.push(...list));
+      store.observer.observe(target, { subtree: true, childList: true, attributes: true, characterData: true });
+      (window as unknown as Record<string, unknown>)[key] = store;
+    },
+    { sel: selector, key: slot },
+  );
+  return {
+    take() {
+      return page.evaluate((key) => {
+        const store = (window as unknown as Record<string, { observer: MutationObserver; records: MutationRecord[] }>)[key];
+        const records = [...store.records, ...store.observer.takeRecords()];
+        store.records.length = 0;
+        const out = { characterData: 0, attributes: 0, childList: 0, total: records.length };
+        for (const r of records) out[r.type] += 1;
+        return out;
+      }, slot);
+    },
+  };
+}
