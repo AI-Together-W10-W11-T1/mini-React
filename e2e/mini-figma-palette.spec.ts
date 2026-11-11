@@ -8,6 +8,8 @@ import {
   watchApp,
   watchSel,
   selectOnCanvas,
+  selectedOnCanvas,
+  canvasOrder,
   buttonSel,
   inRow,
   overriddenFields,
@@ -306,4 +308,31 @@ test('QA-A25 칩 연타: 칩 8개를 한 바퀴 → 라벨 입력 → 칩 2번 �
   await pressUndo(page); // 칩 한 바퀴가 한 번에 시작 색으로
   expect(await colorsOf(page)).toEqual(CHANGED);
   expect(await allSame(page, ALL_BUTTONS)).toBe(true);
+});
+
+test('QA-A28 색 입력칸에 포커스가 있을 때: Delete · Backspace는 아무 일 없고(고른 인스턴스가 안 지워짐), Ctrl+Z = 앱 Undo, Ctrl+Shift+Z = 앱 Redo다', async ({ page }) => {
+  await page.goto(URL);
+  await selectOnCanvas(page, 'b2');
+  await pickColor(page, '#05b169'); // Undo 한 단계 (b2만 초록)
+  expect(await bgOf(page, 'b2')).toBe(rgb('#05b169'));
+  const input = page.getByTestId('prop-color');
+  await input.focus();
+  await expect(input).toBeFocused();
+
+  // Delete · Backspace: 글자 입력이 없는 칸이라 무시 (지워지지 않음)
+  const watch = await watchApp(page);
+  await page.keyboard.press('Delete');
+  await page.keyboard.press('Backspace');
+  expect(await canvasOrder(page)).toEqual(['b1', 'b2', 'b3']);
+  expect(await selectedOnCanvas(page)).toEqual(['b2']);
+  expect((await watch.take()).body.total, 'Delete · Backspace = DOM 변경 0').toBe(0);
+  await expect(input).toBeFocused();
+
+  // Ctrl+Z = 앱 Undo (포커스를 안 빼고 누른다), Ctrl+Shift+Z = 앱 Redo
+  await page.keyboard.press('Control+KeyZ');
+  expect(await bgOf(page, 'b2')).toBe(rgb('#0052ff'));
+  expect(await selectedOnCanvas(page)).toEqual(['b2']);
+  await page.keyboard.press('Control+Shift+KeyZ');
+  expect(await bgOf(page, 'b2')).toBe(rgb('#05b169'));
+  expect(await canvasOrder(page)).toEqual(['b1', 'b2', 'b3']);
 });

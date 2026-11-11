@@ -1128,6 +1128,26 @@ describe('키보드 · Undo/Redo (Dev-11)', () => {
     expect(buttonOf('b2').classList.contains('btn-M')).toBe(true);
   });
 
+  it('색 입력칸(prop-color) 안의 Ctrl+Z · Ctrl+Shift+Z = 앱 Undo · Redo + preventDefault, Delete · Backspace는 무시하고 막지 않는다 (④-3, Q18 ② 확장)', async () => {
+    await click(buttonOf('b2'));
+    await pick('#05b169');
+    expect(bgOf('b2')).toBe(rgb('#05b169'));
+    const doc = slot(0);
+    const history = slot(2);
+    const before = renders;
+    expect(await press('Delete', {}, byId('prop-color'))).toBe(false);
+    expect(await press('Backspace', {}, byId('prop-color'))).toBe(false);
+    expect(renders - before, 'Delete · Backspace = 렌더 0번').toBe(0);
+    expect(slot(0)).toBe(doc);
+    expect(slot(2)).toBe(history);
+    expect(ids()).toEqual(['b1', 'b2', 'b3']);
+    expect(await press('z', { ctrlKey: true }, byId('prop-color'))).toBe(true);
+    expect(bgOf('b2')).toBe(rgb('#0052ff'));
+    expect(await press('Z', { ctrlKey: true, shiftKey: true }, byId('prop-color'))).toBe(true);
+    expect(bgOf('b2')).toBe(rgb('#05b169'));
+    expect(slot(1)).toBe('b2');
+  });
+
   it('체크박스 안의 Ctrl+Z · Ctrl+Shift+Z = 앱 Undo · Redo + preventDefault (Q18 ②)', async () => {
     await click(buttonOf('b2'));
     await toggle('prop-hasicon', true);
