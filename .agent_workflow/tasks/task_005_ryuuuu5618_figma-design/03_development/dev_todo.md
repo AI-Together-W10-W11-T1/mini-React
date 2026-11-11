@@ -148,6 +148,20 @@ fixtures/mini-figma/
   - 완료 근거로 남길 것: 위 네 명령의 출력(통과 수), 커밋 해시
   - **완료 근거 (Evidence)**: `e2e/mini-figma-attack.spec.ts` — QA-A27(새로고침) 추가, QA-A2 보강(인스턴스 선택 시 긴 이름 가로 스크롤). QA-A20 ~ A26 · A28 · A29는 Dev-3 · 4 · 6 · 7에서 이미 써서 desktop · mobile 모두 통과(아래 전체 실행에 포함). A27은 앱 동작이 이미 있어 처음부터 통과(`npx playwright test e2e/mini-figma-attack.spec.ts -g A27` 2 passed). 도우미 추가는 앱 코드 변경 없이 `mini-figma-helpers.ts`(`rgb` · `bgOf` · `textOf` · `colorsOf` · `classOf` · `pickColor` · `pickColorInput`). **회귀 실행**: `npx vitest run` → `Test Files 43 passed (43) · Tests 1159 passed (1159)` (시작 전 1064), `npx tsc --noEmit` exit 0 · 출력 없음, `npx playwright test` 전체 → `318 passed (36.2s)` (desktop · mobile, Phase 1 · 2 · mini-figma 포함), `git diff --stat c0699a1 -- packages/` (= `git diff --stat main -- packages/`, main = c0699a1) 출력 없음 = 비어 있음. 커밋 1361282
 
+- [x] **Dev-9** (`mini-figma`): FD-08 전체 높이 + 검수 NB 1 · 3 반영 [FD-08 · FD-03]
+  - 의존: Dev-8 (검수 APPROVE 뒤 사용자 「둘 다 해」)
+  - 바깥 루프(먼저 실패): QA-43 · 44 · 45 (`e2e/mini-figma-design.spec.ts`)
+  - 대상 파일: `index.html` `<style>`만 (TS · `packages/` · 설정 변경 없음, 새 클래스 필요 없었음), `e2e/mini-figma-design.spec.ts`, `__tests__/app.test.ts`
+  - 알고리즘: 해당 없음 (CSS만, 동작 규칙 · 앱 로직 변경 없음)
+  - **완료 근거 (Evidence)**:
+    - **NB 1**: `fixtures/mini-figma/__tests__/app.test.ts` P-25 · P-27에 `toolbarCounts` `{ SET_ATTR: 1 }`, P-26에 첫 input `{ SET_ATTR: 1 }` · 이후 `{}` + 모든 input의 `layerCounts` `{}` 추가. 이미 앱이 그렇게 동작해 처음부터 통과(`npx vitest run fixtures/mini-figma/__tests__/app.test.ts` 104 passed). 커밋 637c48b
+    - **FD-08 · NB 3 e2e 먼저 실패**: QA-43 · 44 · 45를 먼저 쓰고 CSS 없이 `npx playwright test e2e/mini-figma-design.spec.ts -g "QA-4[34]"` → desktop 2 failed · mobile 2 passed. 실패 출력: QA-43 `Expected: >= 780 Received: 355.9375` (레이어 패널 아래 끝 · 화면 높이 800), QA-44 `60개 추가 뒤에도 페이지 세로 스크롤 없음 Expected: <= 800 Received: 3012`. QA-45는 `index.html`을 되돌려 실행 → `prop-hasicon 포커스 색 Expected: "rgb(0, 82, 255)" Received: "rgb(16, 16, 16)"`. 커밋 b3686a7
+    - **구현**(커밋 68cfc3f, `index.html`): `@media (min-width: 721px)`에서 `html, body { height: 100% }` · `body { overflow: hidden }` · `[data-testid='app-root'] { height: 100% }` · `.app { height: 100%; grid-template-rows: auto minmax(0, 1fr); align-items: stretch }` · 레이어 · 캔버스 · 속성 `overflow-y: auto`(+ `overscroll-behavior: contain`) · `.canvas { min-height: 0 }`. mobile(≤720)은 이 블록이 안 걸려 지금처럼 쌓임(캔버스 최소 320px). NB 3: `.color-input:focus-visible, .prop-row input[type='checkbox']:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px }`
+    - **통과**: `npx playwright test e2e/mini-figma-design.spec.ts -g "QA-4[34]"` 4 passed, QA-45 통과. 여백 허용: 세 영역 아래 끝이 화면 아래 끝에서 20px 안(body 여백 16px + 4px 여유, `BOTTOM_GAP = 20`)이고 뷰포트를 넘지 않음. 실제 desktop 값: 캔버스 높이 686(1280x800, 아래 끝 784), `scrollHeight <= innerHeight`
+    - **QA-44 설계 메모**: 인스턴스 60개를 더해도 크기 M 버튼은 줄바꿈으로 686px 안에 다 들어가 캔버스 안 스크롤이 안 생김(처음 실패: `canvas 안쪽 높이가 보이는 높이보다 큼 Expected: > 686 Received: 686`) → 시작 전에 메인 크기를 `L`로 올려 캔버스도 넘치게 함. 맨 끝 캔버스 버튼 클릭 = 캔버스 `scrollTop > 0` · `window.scrollY` 0, 맨 끝 레이어 행 클릭 = 레이어 창 `scrollTop > 0`. Playwright 클릭이 스크롤 컨테이너 안을 자동 스크롤해 흔들림 없음
+    - **회귀**: `npx playwright test e2e/mini-figma-*.spec.ts` 152 passed, `npx playwright test` 전체 `324 passed (35.3s)` (QA-2 · 42 · A12 · A26 · A29 포함 기존 그대로), `npx vitest run` `Test Files 43 passed (43) · Tests 1159 passed (1159)`, `npx tsc --noEmit` exit 0, `git diff --stat main -- packages/` 출력 없음
+    - 육안: 1280x800 캡처 확인 (도구 막대 아래 세 영역이 화면 아래까지 참, 점무늬 캔버스가 남은 높이 사용)
+
 <!-- 완료 예시
 - [x] **Dev-3 [#12]** (`mini-figma`): 팔레트 판
   - **완료 근거 (Evidence)**: `fixtures/mini-figma/components/ColorPalette.ts` 신규, `fixtures/mini-figma/__tests__/app.test.ts` 18건 통과
