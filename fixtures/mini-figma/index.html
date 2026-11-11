@@ -66,7 +66,7 @@
       /* 영역 제목 (캔버스 안 「테스트 영역」) */
       .area-title { margin: 0 0 12px; font-size: 1.125rem; font-weight: 600; line-height: 1.33; color: var(--ink); }
 
-      /* 실제 영역 구역: 카드(.app > * 규칙 재사용) = 머리글(제목 + 버튼 3개, 좁으면 줄바꿈) + 상자. [Patch]는 .btn-primary(파랑 알약), [뒤로] · [앞으로]는 .btn-secondary.
+      /* 실제 영역 구역: 카드(.app > * 규칙 재사용) = 머리글(제목 + [뒤로] [앞으로], 좁으면 줄바꿈) + 상자. [뒤로] · [앞으로]는 .btn-secondary. [Patch]는 도구 막대로 옮겼다(.btn-primary 파랑 알약, PP-07 변경).
          상자 모양은 캔버스와 같다(어두운 점무늬 · 1px 테두리 · 24px 안쪽 여백). 깜빡임 층은 상자와 같은 크기로 겹치고 마우스를 안 받는다. */
       .real-section { display: flex; flex-direction: column; gap: 12px; }
       .real-header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; }

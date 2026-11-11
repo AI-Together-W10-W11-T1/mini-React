@@ -830,7 +830,7 @@ describe('Undo/Redo 버튼 (Dev-6)', () => {
     expect(redoButton().hasAttribute('disabled')).toBe(true);
     expect(undoButton().textContent).toBe('↶ 되돌리기');
     expect(redoButton().textContent).toBe('↷ 다시 하기');
-    expect(Array.from(byId('toolbar').children).map(testId)).toEqual(['app-name', 'add-instance', 'undo-button', 'redo-button']);
+    expect(Array.from(byId('toolbar').children).map(testId)).toEqual(['app-name', 'add-instance', 'undo-button', 'redo-button', 'patch-button']);
     // Hook 칸 순서 불변: doc · selectedId · history · nextId (+ keydown effect 1칸) + 실제 영역 3칸(보관함 useMemo · 초기화 useEffect · nav useState)
     expect(slot(0)).toBe(INITIAL_DOC);
     expect(slot(1)).toBeNull();

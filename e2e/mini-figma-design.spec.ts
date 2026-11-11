@@ -165,11 +165,11 @@ test('QA-42 배치: desktop은 도구 막대가 맨 위에서 가로 전체 + �
   expect(await noHorizontalScroll(page)).toBe(true);
 });
 
-test('QA-A26 좁은 화면 도구 막대: 앱 이름 · 버튼 3개가 화면 밖으로 안 나가고(모자라면 줄바꿈) 눌러지는 크기이며, [+ 인스턴스] 20번 뒤에도 맨 위 첫 자식 · [↶]이 켜져 있다', async ({ page }) => {
+test('QA-A26 좁은 화면 도구 막대: 앱 이름 · 버튼 4개([+ 인스턴스] · [↶] · [↷] · [Patch])가 화면 밖으로 안 나가고(모자라면 줄바꿈) 눌러지는 크기이며, [+ 인스턴스] 20번 뒤에도 맨 위 첫 자식 · [↶]이 켜져 있다', async ({ page }) => {
   await page.goto(URL);
   const width = page.viewportSize()?.width ?? 0;
   const check = async (where: string): Promise<void> => {
-    for (const id of ['app-name', 'add-instance', 'undo-button', 'redo-button']) {
+    for (const id of ['app-name', 'add-instance', 'undo-button', 'redo-button', 'patch-button']) {
       const b = await page.getByTestId(id).boundingBox();
       if (b === null) throw new Error(`${where}: ${id}가 안 보인다`);
       expect(b.x, `${where}: ${id} 왼쪽`).toBeGreaterThanOrEqual(0);

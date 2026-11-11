@@ -29,15 +29,15 @@ import {
 const undoBtn = (page: Page) => page.getByTestId('undo-button');
 const redoBtn = (page: Page) => page.getByTestId('redo-button');
 
-test('QA-31 도구 막대가 영역 최상위 첫 자식이고 안에 앱 이름 · [+ 인스턴스] · [↶ 되돌리기] · [↷ 다시 하기]가 그 순서로 있다. [↶] [↷]는 꺼져 있고 레이어 창 안에는 add-instance가 없다', async ({ page }) => {
+test('QA-31 도구 막대가 영역 최상위 첫 자식이고 안에 앱 이름 · [+ 인스턴스] · [↶ 되돌리기] · [↷ 다시 하기] · [Patch]가 그 순서로 있다. [↶] [↷]는 꺼져 있고 레이어 창 안에는 add-instance가 없다', async ({ page }) => {
   await page.goto(URL);
 
   // 최상위 <div class="app">의 첫 자식 = toolbar
   const kids = await page.locator('[data-testid="app-root"] > .app').evaluate((app) => Array.from(app.children).map((c) => c.getAttribute('data-testid')));
   expect(kids[0]).toBe('toolbar');
-  // 도구 막대 안 자식 순서: 앱 이름 → [+ 인스턴스] → [↶] → [↷]
+  // 도구 막대 안 자식 순서: 앱 이름 → [+ 인스턴스] → [↶] → [↷] → [Patch] (patch-preview PP-07 변경: [Patch]가 [↷] 바로 오른쪽)
   const inside = await page.getByTestId('toolbar').evaluate((el) => Array.from(el.children).map((c) => c.getAttribute('data-testid')));
-  expect(inside).toEqual(['app-name', 'add-instance', 'undo-button', 'redo-button']);
+  expect(inside).toEqual(['app-name', 'add-instance', 'undo-button', 'redo-button', 'patch-button']);
   await expect(page.getByTestId('app-name')).toHaveText('mini-figma');
   await expect(page.getByTestId('toolbar').getByTestId('add-instance')).toBeEnabled();
   await expect(undoBtn(page)).toHaveText('↶ 되돌리기');
