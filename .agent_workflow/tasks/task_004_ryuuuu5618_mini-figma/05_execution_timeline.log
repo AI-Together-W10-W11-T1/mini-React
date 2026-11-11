@@ -14,3 +14,9 @@
 2026-11-11T18:42 | stage=2 | agent=mr-worker | round=- | signal=UNKNOWN | Dev-5~8 | by=hook
 2026-11-11T18:46 | stage=2 | agent=mr-reviewer | round=1/3 | signal=UNKNOWN | Dev-5~8 | by=hook
 2026-11-11T18:47 | stage=2 | agent=master | round=1/3 | signal=APPROVE | 묶음 2 Dev-5~8 검수 APPROVE (NB 5)
+2026-11-11T19:07 | stage=2 | agent=mr-worker | round=- | signal=UNKNOWN | Dev-9~12 | by=hook
+2026-11-11T19:13 | stage=2 | agent=mr-reviewer | round=1/3 | signal=UNKNOWN | Dev-9~12 | by=hook
+2026-11-11T19:13 | stage=2 | agent=master | round=1/3 | signal=REJECT | 묶음 3 Dev-9~12 REJECT (BLOCKING 1: 기본 Undo 겹침), 재현 e2e 먼저
+2026-11-11T19:15 | stage=2 | agent=mr-worker | round=- | signal=UNKNOWN | Dev-11 | by=hook
+2026-11-11T19:15 | stage=2 | agent=master | round=1/3 | signal=SPEC_GAP | QA-29 재현 실패(버그 확인) → ④-8 ③ preventDefault 사용자 결정 필요
+2026-11-11T19:19 | stage=2 | agent=master | round=1/3 | signal=DECISION | Q18 "응" — Undo/Redo 키 preventDefault (입력칸 밖 · 선택 상자 · 체크박스)

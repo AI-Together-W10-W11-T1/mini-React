@@ -44,3 +44,23 @@ BLOCKING 0건. 확인한 것 (파일 직접 확인, git은 못 돌려 커밋 해
 5. `App.ts:22-23` `nextId` · `setNextId`는 Dev-9 전까지 안 쓰임 (주석 있음, 그대로)
 
 - 처리 계획 (마스터): 1 · 3 · 4는 묶음 3에서 반영, 2 · 5는 기록만
+
+## 묶음 3 · Dev-9 ~ 12 · 회차 1/3 — REJECT (2026-11-11T19:13)
+- 대상: `03_diff_dev9-12.patch` (`c5aa027..d29715c`), 마스터 실행: vitest 41 files · 1047 passed, tsc 0, playwright 전체 268 passed, `git diff --stat f224bdd -- packages/` 비어 있음, 남은 서버 없음
+
+[BLOCKING] 1건: Undo 한 번에 두 단계가 되돌아가고 Redo가 사라질 수 있음 (MF-30 · MF-31 · Q17-4)
+1. [Dev-11 · Q17-4 전제 깨짐 · 런타임 버그 의심] 작업자 편차 1의 관찰: 입력칸에서 포커스를 뺀(`pressUndo`의 `blurFocus`) 뒤 Ctrl+Z도 Chromium 기본 글자 되돌리기가 그 입력칸에 적용되고, 그 `input` 이벤트를 앱 `onInput`이 편집으로 기록 → 앱 Undo 없이도 A2의 `버튼` 복귀가 통과했음.
+   - `App.ts:88-105` `onKey`는 `preventDefault`를 안 함 (`App.ts:87` 주석, ④-8 ③). 근거 `01_worker_draft.md:142` 「입력칸 밖에서는 기본 동작이 없어 필요 없음」의 전제가 틀림
+   - 예상 재현: 메인 고름 → 라벨 `새` 입력 → 색 빨강 (라벨 칸 값은 프로그램이 다시 안 써서 브라우저 글자 되돌리기 기록이 남음) → 포커스 빼고 Ctrl+Z
+   - 예상 결과: 앱 Undo가 색을 되돌림 + 브라우저 기본 Undo가 라벨 칸을 `버튼`으로 → `onInput` → `onEdit('label','버튼')` 새 단계 기록 + `future` 비움. 키 한 번에 색 · 라벨이 함께 되돌아가고 Ctrl+Shift+Z 무동작 → MF-31 · MF-30 위반
+   - 지금 e2e는 못 덮음 (QA-21 · A2 · A14는 다른 것을 골랐다 돌아오며 기록을 비움, QA-22 · A10 끝은 Undo 전에 라벨 칸이 다시 쓰이거나 사라짐)
+   - 검수자는 브라우저를 못 돌려 실패를 직접 보지 못함, 관찰 + 코드로 가능성 높다고 판단
+   - 고칠 방법: ① e2e로 먼저 (`e2e/mini-figma-undo.spec.ts`): 메인 → `prop-label` `fill('새')` → `prop-color` 빨강 → `pressUndo` → 캔버스 글자[0] = `새` · 메인 `btn-blue` → `pressRedo` → `btn-red` + `새` → `pressUndo` → `새` → `pressUndo` → `버튼`, desktop · mobile ② 통과하면 근거에 붙이고 끝 ③ 실패하면 마스터가 사용자에게 ④-8 ③을 「앱이 처리한 Undo · Redo(`keyAction`이 undo/redo = 입력칸 밖)만 `preventDefault`, 입력칸 안 키와 Delete · Backspace는 그대로」로 바꿀지 묻는다 (작업자 혼자 바꾸지 않음) ④ 바꾸면 `onKey`에서 undo · redo일 때만 `preventDefault`, `app.test.ts`에 body의 cancelable Ctrl+Z = `defaultPrevented === true`, input 대상 Ctrl+Z · body Delete = `false`, `dev_todo.md:20` · `App.ts:87` 주석 · `CLAUDE.md` 문구 갱신 (마스터)
+
+문제없는 것: keydown deps `[doc, selectedId, history]`가 핸들러가 읽는 값을 모두 덮음(`nextId` 제외 인정) · cleanup으로 리스너 1개, `unmount()` 뒤 0개 · 입력칸 안 키 · 수정키는 `keyAction` 경유 · 한 동작 = 렌더 1번 (같은 렌더의 doc · history · selectedId에서 계산, 묶음 2 NB 4) · 선택 정리 `reconcileSelection`, 메인 삭제 불가, `nextId` Undo 밖(b5 · b6), Undo 49번 경계(A9 · A19 · 단위 60번) 맞음, 고르기 기록 안 됨(QA-24) · [↑][↓] `stopPropagation` · 경계 렌더 0번 · `disabled` 없음 · MOVE 1줄 · 건수(app +28 · rootOnlyHooks +1 = 246, e2e 48 × 2) 맞음 · 묶음 2 NB 1 · 3 반영 · 편차 1(다시 고르기는 검출력을 높이고 ④-7로 뜻 유지, 다만 위 흐름을 가림) · 편차 2(A6 전체가 구현 전 실패 15건에 있음) · 편차 3(맨 아래 행 5번 + b1 5번이 원래 뜻을 둘 다 지킴) 인정
+
+[NON-BLOCKING]
+1. `qa_todo.md` 글귀를 테스트와 맞출 것 (마스터): QA-21 · A2 · A14에 「다른 것을 골랐다 돌아온 뒤 Undo」, A12 ② 「맨 아래 행 [↓] 5번 = 무동작, `b1` 행 [↓] 5번 = 한 칸씩 6번째로」, A12 ① 「버튼 23개」 → 「메인 포함 24개」
+2. QA-A8 ② · ③(선택 상자 · 체크박스에서 Ctrl+Z)도 기본 Undo가 b2 라벨 칸에 적용될 수 있으나 단언 범위 밖 → BLOCKING 결론 뒤 함께 다시 볼 것
+3. `history`는 늘 `doc`과 같이 바뀌어 deps에서 빠져도 지금 테스트로는 못 잡음 (deps에 있으므로 그대로, 기록만)
+- 재현 (2026-11-11T19:15, 작업자 · 앱 코드 안 고침): QA-29 추가(미커밋) → desktop · mobile 실패. Ctrl+Z 1번 = 메인 글자 `버튼` + 색 blue (두 단계), Ctrl+Shift+Z = 브라우저 기본 Redo가 라벨만 `새`로 (빨강 단계 사라짐). 원인: Chromium 글자 되돌리기 기록은 포커스를 빼도 남아 Ctrl+Z · Ctrl+Shift+Z에 기본 Undo/Redo가 라벨 칸에 적용, `onKey`가 `preventDefault` 안 함 → 그 `input`을 `onInput`이 새 편집으로 기록 + `future` 비움. 선택 상자 · 체크박스 포커스에서 Ctrl+Z도 기본 Undo가 이전 라벨 칸에 적용돼 새 편집으로 기록됨 (A8은 라벨을 단언 안 해 못 잡음) → 사용자 결정 필요

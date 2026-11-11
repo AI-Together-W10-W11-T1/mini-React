@@ -79,7 +79,7 @@
 - state는 루트 `App`에만: `main` · `instances`(배열, 바꾼 값만) · `selectedId`(`'main'` / id / `null`) · Undo 기록. 그리기 = `h(Button, { key: it.id, ...main, ...it })`
 - override = 키가 있으면 override (빈 글자 · 같은 값 포함), 되돌리기 = 키 지우기. 프로퍼티 4종(Text · Variant · Boolean · Instance swap) + 색(일반 override)
 - 선택 · key = 인스턴스 id (지운 번호 재사용 안 함), 순서 = 배열 순서. 메인은 지울 수 없음, 고른 것을 지우면 선택 풀림
-- 키보드 = `useEffect`에서 `document`에 `keydown` 등록 + cleanup (엔진 이벤트는 그대로 `click` · `input`), 입력칸 안의 키는 무시
+- 키보드 = `useEffect`에서 `document`에 `keydown` 등록 + cleanup (엔진 이벤트는 그대로 `click` · `input`), 입력칸 안의 키는 무시. Undo/Redo 키는 입력칸 밖 · 선택 상자 · 체크박스에서 브라우저 기본 동작을 막음(`preventDefault`, 브라우저 글자 되돌리기가 겹치지 않게), 라벨 글자 칸 안은 그대로 (Q18)
 - Undo = `main` · `instances`만, 같은 대상 + 같은 칸 연달아 = 한 단계 (시간 기준 없음), 50개
 
 **정책 (PRD §3.3 · §4.2 · §4.3 · §5)**

@@ -55,7 +55,7 @@ ID 열의 `MF-xx`는 이 task 안에서만 쓰는 번호다 (PRD ID 아님).
 | MF-31 | 한 단계 묶음 | 같은 대상의 같은 칸이 연달아 바뀌면 한 단계 (「삭제」→「지우기」 입력 후 Undo 한 번 = 「삭제」). 시간 기준 없음. 다른 칸 · 다른 대상을 고치면 묶음이 끝남. 추가 · 삭제 · 순서 · ↻ · Undo/Redo는 각각 한 단계이자 묶음을 끝냄 |
 | MF-32 | Undo 뒤 선택 | 되돌려서 고른 인스턴스가 사라지면 선택이 풀림(`null`) |
 | MF-33 | 단축키 | Delete · Backspace(수정키 없을 때만, Q17-4) = 고른 인스턴스 지우기, Ctrl+Z · Cmd+Z = 되돌리기, Ctrl+Shift+Z · Cmd+Shift+Z = 다시 하기 |
-| MF-34 | 키 받는 방법 | `App`의 `useEffect`에서 `document.addEventListener('keydown')`, cleanup에서 `removeEventListener`. 핸들러가 쓰는 state를 의존성에 넣어 옛 값을 보지 않게 함. 입력칸(`input` · `select` · `textarea`) 안에서 누른 키는 무시(브라우저 기본 동작 그대로) |
+| MF-34 | 키 받는 방법 | `App`의 `useEffect`에서 `document.addEventListener('keydown')`, cleanup에서 `removeEventListener`. 핸들러가 쓰는 state를 의존성에 넣어 옛 값을 보지 않게 함. 입력칸(`input` · `select` · `textarea`) 안에서 누른 키는 앱 동작 없음. **Undo/Redo 키의 브라우저 기본 동작 (Q18)**: 입력칸 밖 = 앱 Undo/Redo + `preventDefault`, 선택 상자 · 체크박스 = `preventDefault`만(아무 일 없음), 라벨 글자 칸 안 = 막지 않음(브라우저 글자 되돌리기, 결과는 일반 수정). Delete · Backspace는 막지 않음 |
 
 ## 3. 구현 제외 범위
 - 끌어서 옮기기 · 크기 조절 · 확대·축소 (엔진 이벤트 = `click` · `input`만)
@@ -100,6 +100,7 @@ ID 열의 `MF-xx`는 이 task 안에서만 쓰는 번호다 (PRD ID 아님).
 | 앱 자리 · 엔진 무수정 | `fixtures/mini-figma/` | 추천안 수용 (이유 미기재) |
 | 속성 칸 5개 · 시작 데이터 | MF-14 · MF-16 | 추천안 수용 (이유 미기재) |
 | 단축키 | Delete · Backspace · Ctrl/Cmd+Z · Ctrl/Cmd+Shift+Z | 사용자가 고름 ("cmd키는 넣자", "Delete, Backspace로 수정하자") |
+| Undo 키 기본 동작 (Q18, 묶음 3 검수 뒤) | 입력칸 밖 · 선택 상자 · 체크박스에서 Ctrl/Cmd+Z · Shift+Z의 브라우저 기본 동작을 막음, 라벨 글자 칸 안은 그대로 | 추천안 수용 ("응", 이유 미기재) — 재현 QA-29로 겹침 버그 확인 |
 | 기획 검수 뒤 6개 (Q17) | 아이콘 key · Undo 49번 · `nextId` · 수정키 없을 때만 지움 · 줄바꿈 · Undo 버튼 없음 | 추천안 수용 ("응", 이유 미기재) |
 
 ## 6. 수용 기준 연결
