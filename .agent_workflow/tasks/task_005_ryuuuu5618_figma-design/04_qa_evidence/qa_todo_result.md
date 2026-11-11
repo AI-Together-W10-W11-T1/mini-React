@@ -72,6 +72,16 @@ MCP로 같은 페이지에서 재현한 값 (desktop · mobile 동일): 처음 [
 
 ## 사람 확인
 
-- [ ] 캡처를 직접 열어 확인함 (확인한 사람: , 시각: )
-- [ ] 브라우저의 색 고르기 팝업(`<input type="color">` 네이티브 창)을 직접 열어 색을 고르면 버튼이 따라 바뀌고 Ctrl+Z 한 번에 시작 색으로 돌아오는지 (Playwright `fill`로는 팝업 조작을 못 함)
-- [ ] 어두운 바탕에서 글자 · 선택 표시 · 점무늬가 읽히는지 육안 확인 (특히 `#eef0f3` · `#0a0b0d` 칠한 버튼 위 선택 파랑 테두리, QA-A29)
+- [x] 캡처를 직접 열어 확인함 (확인한 사람: ryuuuu5618, 시각: 2026-11-12T01:16, v2 재캡처 기준) — 사용자 "캡처 OK"
+- [x] 브라우저의 색 고르기 팝업(`<input type="color">` 네이티브 창)을 직접 열어 색을 고르면 버튼이 따라 바뀌고 Ctrl+Z 한 번에 시작 색으로 돌아오는지 (Playwright `fill`로는 팝업 조작을 못 함) — 사용자 "팝업 됨" (2026-11-12T01:16)
+- [x] 어두운 바탕에서 글자 · 선택 표시 · 점무늬가 읽히는지 육안 확인 (특히 `#eef0f3` · `#0a0b0d` 칠한 버튼 위 선택 파랑 테두리, QA-A29) — 점무늬는 5e841b2에서 사용자가 없앰, 스크롤바 색은 사용자 "스크롤바 그대로" (2026-11-12T01:16)
+
+## 재캡처 v2 (task_006 이후 화면)
+
+task_006 · Dev-8 · 디자인 커밋(HEAD 81e1e2d) 이후 화면으로 다시 찍음. 기존 파일은 그대로 두고 `_v2`로 추가. 같은 폴더, desktop 1280x800 · mobile 375x812 (mobile은 fullPage). 앱 Undo 버튼이 없어져 05 장면을 바꿈.
+- 01 처음 화면 (도구 막대 [실행 취소] · [다시 실행] 꺼짐 · [Patch] 켜짐, 테스트 · 실제 영역) — `screenshot_01_desktop_v2.png` · `screenshot_01_mobile_v2.png`
+- 02 메인 고른 상태 — `screenshot_02_desktop_v2.png` · `screenshot_02_mobile_v2.png`
+- 03 메인을 `#f4b000`으로 (메인 · b1 · b2 `rgb(244, 176, 0)`, b3 빨강) — `screenshot_03_desktop_v2.png` · `screenshot_03_mobile_v2.png`
+- 04 b1 고르고 `#05b169` override (b1 `rgb(5, 177, 105)`, ↻ 1개) — `screenshot_04_desktop_v2.png` · `screenshot_04_mobile_v2.png`
+- 05 메인 크기 L → [Patch] → [실행 취소] (두 영역 버튼 4개 모두 `btn-M`으로 복원, [다시 실행] 켜짐; 깜빡임 사라진 뒤 촬영) — `screenshot_05_desktop_v2.png` · `screenshot_05_mobile_v2.png`
+- 06 인스턴스 22개 추가 (기존 3 + 22 = 레이어 행 25개; desktop scrollWidth 1280 = innerWidth, scrollHeight 800 = innerHeight / mobile scrollHeight 3350, 가로 스크롤 없음, fullPage) — `screenshot_06_desktop_v2.png` · `screenshot_06_mobile_v2.png`

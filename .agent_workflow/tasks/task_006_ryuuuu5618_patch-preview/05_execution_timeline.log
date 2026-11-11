@@ -27,3 +27,6 @@
 2026-11-12T01:06 | stage=2 | agent=mr-worker | round=- | signal=UNKNOWN | Dev-8 | by=hook
 2026-11-12T01:08 | stage=2 | agent=mr-reviewer | round=1/3 | signal=UNKNOWN | Dev-8 | by=hook
 2026-11-12T01:08 | stage=2 | agent=master | round=1 | signal=APPROVE | Dev-8 검수 1/3 APPROVE (a327456), NON-BLOCKING 1 문서 수정 · 2 기록만. 다음 = 사용자 디자인 커밋 뒤 QA + 캡처(005 · 006)
+2026-11-12T01:14 | stage=3 | agent=mr-qa | round=- | signal=UNKNOWN | - | by=hook
+2026-11-12T01:15 | stage=3 | agent=master | round=2 | signal=PASS | QA 재실행 2회차 PASS (playwright 330 · vitest 1195 · tsc 0), task_006 캡처 갱신 + task_005 v2 12장. 서버 남음 5231 PID 46960 — 승인 대기. 다음 = 사람 확인(005 · 006)
+2026-11-12T01:16 | stage=3 | agent=master | round=- | signal=HUMAN_CHECK | 사용자 "캡처 OK, 팝업 됨, 스크롤바 그대로, 서버 꺼" → 사람 확인 체크, 5231 서버 종료(승인). 다음 = 2.5 체크포인트 → 위키 → 병합
