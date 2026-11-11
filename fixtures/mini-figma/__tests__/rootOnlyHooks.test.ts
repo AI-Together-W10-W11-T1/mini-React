@@ -98,7 +98,7 @@ describe('T-16 코드 확인 — 루트(App.ts)만 Hook을 쓴다', () => {
   it('preview.ts: Hook이 없다 (엔진 · DOM 연결은 허용 — Hook은 App.ts만)', () => {
     const code = stripNoise(sourceOf(topLevel, '../preview.ts'));
     for (const hook of ['useState', 'useEffect', 'useMemo']) {
-      expect(new RegExp(`\b${hook}\b`).test(code), `preview.ts의 ${hook}`).toBe(false);
+      expect(new RegExp(`\\b${hook}\\b`).test(code), `preview.ts의 ${hook}`).toBe(false);
     }
   });
 

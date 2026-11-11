@@ -36,20 +36,20 @@ export function App(): VNode {
   const onSelect = (id: string): void => setSelectedId(id);
 
   // [AI Note]: 속성 패널 한 칸이 바뀌면 불린다. 고른 대상이 메인이면 setMainField, 인스턴스면 setInstanceField(그 칸에 키가 생겨 override) → applyEdit.
-  // 묶음 기준 = 고른 대상('main' 또는 인스턴스 id) + 그 칸이라 같은 대상의 같은 칸이 연달아 바뀌면 한 단계가 된다. 같은 값이면 같은 Doc이라 렌더 · 기록이 없다.
+  // 같은 값이면 같은 Doc이라 applyEdit가 렌더 없이 돌려보낸다. (앱 편집 Undo의 묶음 규칙은 task_006에서 없앴다)
   const onEdit = (field: Field, value: MainProps[Field]): void => {
     if (selectedId === null) return;
     const next = selectedId === 'main' ? setMainField(doc, field, value) : setInstanceField(doc, selectedId, field, value);
     applyEdit(next);
   };
 
-  // [AI Note]: ↻ = 그 인스턴스의 그 칸 키를 지운다 (undefined를 넣지 않음) → 메인 값을 다시 따라간다. 추가 · 삭제 · 순서와 같이 묶음을 끝내는 한 단계(group = null).
+  // [AI Note]: ↻ = 그 인스턴스의 그 칸 키를 지운다 (undefined를 넣지 않음) → 메인 값을 다시 따라간다.
   const onReset = (field: Field): void => {
     if (selectedId === null || selectedId === 'main') return;
     applyEdit(resetInstanceField(doc, selectedId, field));
   };
 
-  // [AI Note]: [+ 인스턴스] = 번호 nextId로 끝에 붙이고(addInstance) nextId를 하나 올린다. 번호 칸은 doc 밖이라 Undo가 되돌리지 않는다 (Q17-3).
+  // [AI Note]: [+ 인스턴스] = 번호 nextId로 끝에 붙이고(addInstance) nextId를 하나 올린다. 번호 칸은 doc 밖이라 삭제해도 지운 번호를 다시 쓰지 않는다 (Q17-3).
   // 한 동작의 setter 값은 모두 이 렌더의 doc · nextId에서 계산한다 (묶음 2 검수 NON-BLOCKING 4) → 렌더는 한 번.
   const onAdd = (): void => {
     applyEdit(addInstance(doc, nextId));
@@ -57,11 +57,11 @@ export function App(): VNode {
   };
 
   // [AI Note]: [↑] [↓] = 배열에서 그 인스턴스의 자리만 바꾼다(moveInstance). 선택은 id라서 순서가 바뀌어도 그대로다 (MF-26).
-  // 경계(맨 위의 [↑] · 맨 아래의 [↓])는 같은 Doc → applyEdit가 렌더 · 기록 없이 돌려보낸다 (④-13). 새 단계 하나(묶음 끝).
+  // 경계(맨 위의 [↑] · 맨 아래의 [↓])는 같은 Doc → applyEdit가 렌더 없이 돌려보낸다 (④-13).
   const onMove = (id: string, delta: -1 | 1): void => applyEdit(moveInstance(doc, id, delta));
 
-  // [AI Note]: 고른 인스턴스 삭제 = 문서 · 선택 · 기록을 이 렌더의 doc 하나에서 계산해 한 번에 바꾼다 (setter 3개 → 렌더 1번, 결정 9 B).
-  // 메인 · 선택 없음 · 이미 없는 id는 아무것도 안 함 (removeInstance가 같은 Doc을 돌려줌 → 렌더 · 기록 없음, MF-24).
+  // [AI Note]: 고른 인스턴스 삭제 = 문서 · 선택을 이 렌더의 doc 하나에서 계산해 한 번에 바꾼다 (결정 9 B: 렌더 1번).
+  // 메인 · 선택 없음 · 이미 없는 id는 아무것도 안 함 (removeInstance가 같은 Doc을 돌려줌 → 렌더 없음, MF-24).
   // 지운 것이 고른 것이므로 reconcileSelection이 null로 정리한다 (MF-23).
   const deleteSelected = (): void => {
     if (selectedId === null || selectedId === 'main') return;

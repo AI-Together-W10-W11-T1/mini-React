@@ -89,7 +89,7 @@ function propRows(values: MainProps, onEdit: PropertyPanelProps['onEdit'], overr
       override,
     ),
     select('icon', 'prop-icon', '아이콘 종류', values.icon, ICON_OPTIONS),
-    // [AI Note]: 색 칸 = 팔레트 판(칩 8개 + 직접 고르기). 고른 색 `#rrggbb`를 그대로 onEdit('color', hex)로 올린다 — 묶음 { target, field: 'color' }은 다른 칸과 같은 규칙 (FD-21 · 22 · 25).
+    // [AI Note]: 색 칸 = 팔레트 판(칩 8개 + 직접 고르기). 고른 색 `#rrggbb`를 그대로 onEdit('color', hex)로 올린다 — 다른 칸과 같은 경로 (FD-21 · 22 · 25).
     propRow('color', '색', h(ColorPalette, { value: values.color, onPick: (hex: string) => onEdit('color', hex) }), override),
   ];
 }

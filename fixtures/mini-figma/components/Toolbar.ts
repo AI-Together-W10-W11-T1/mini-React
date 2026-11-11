@@ -15,8 +15,8 @@ interface ToolbarProps {
 
 // [AI Note]: 도구 막대 — props + 콜백 props만 받는 순수 함수 (Hook 없음, P2-09). `div.app`의 첫 자식이라 경로 접두가 [0,0]이고
 // 레이어 · 캔버스 · 속성 패널의 접두는 하나씩 밀린다 ([0,1] · [0,2] · [0,3], FD-10). 안 자식 순서 = 앱 이름 · [+ 인스턴스] · [실행 취소] · [다시 실행] · [Patch].
-// [AI Note]: 앱 편집 Undo/Redo 버튼([↶] [↷], FD-12)은 없앴다 — 기능은 그대로고 Ctrl/Cmd+Z · Ctrl/Cmd+Shift+Z 단축키로만 동작한다 (App의 keydown effect).
-// [실행 취소] [다시 실행]는 실제 영역 기록용 State History 버튼이다 (앱 Undo와 별개). 켜짐 여부는 루트가 nav에서 계산해 내려 준다(canBack · canForward, 새 Hook 아님).
+// [AI Note]: 앱 편집 Undo/Redo 버튼([↶] [↷], FD-12)과 앱 Undo 기능은 task_006(PP-12)에서 없앴다. 되돌리기는 State History가 맡는다.
+// [실행 취소] [다시 실행]는 실제 영역 기록용 State History 버튼이고, Ctrl/Cmd+Z · Ctrl/Cmd+Shift+Z 단축키(App의 keydown effect)가 같은 기록을 움직인다. 켜짐 여부는 루트가 nav에서 계산해 내려 준다(canBack · canForward, 새 Hook 아님).
 // 꺼진 버튼은 `disabled` 속성만 바뀌므로 Patch로 기록이 처음 쌓이는 때 도구 막대 patch는 SET_ATTR 1줄뿐이다.
 // 꺼진 `<button>`은 눌러도 click이 오지 않으므로(브라우저) 핸들러에 「꺼진 상태 검사」를 따로 두지 않는다 — 경계 이동은 엔진이 무시하고 nav는 같은 객체를 돌려준다.
 // 앱 이름은 「mini-figma」 — 디자인 문서의 회사 이름 · 로고는 쓰지 않는다 (FD-07).

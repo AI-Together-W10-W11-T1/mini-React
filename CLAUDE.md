@@ -76,10 +76,10 @@
 
 **시연 앱 mini-figma** (task_004, 2026-11-11 — 이유는 `task_004_ryuuuu5618_mini-figma/01_request_spec.md` 「알고리즘 결정」)
 - 엔진(`packages/`)은 고치지 않고 `@mini-react/*`로 가져다 씀. 자리 `fixtures/mini-figma/`
-- state는 루트 `App`에만: `main` · `instances`(배열, 바꾼 값만) · `selectedId`(`'main'` / id / `null`) · Undo 기록. 그리기 = `h(Button, { key: it.id, ...main, ...it })`
+- state는 루트 `App`에만: `main` · `instances`(배열, 바꾼 값만) · `selectedId`(`'main'` / id / `null`) · Undo 기록 (task_006에서 Undo 기록 제거). 그리기 = `h(Button, { key: it.id, ...main, ...it })`
 - override = 키가 있으면 override (빈 글자 · 같은 값 포함), 되돌리기 = 키 지우기. 프로퍼티 4종(Text · Variant · Boolean · Instance swap) + 색(일반 override)
 - 선택 · key = 인스턴스 id (지운 번호 재사용 안 함), 순서 = 배열 순서. 메인은 지울 수 없음, 고른 것을 지우면 선택 풀림
-- 키보드 = `useEffect`에서 `document`에 `keydown` 등록 + cleanup (엔진 이벤트는 그대로 `click` · `input`), 입력칸 · 선택 상자 · 체크박스 안의 Delete · Backspace는 무시. Undo/Redo 키는 입력칸 밖 · 선택 상자 · 체크박스에서 앱 Undo/Redo + 브라우저 기본 동작을 막음(`preventDefault`, 브라우저 글자 되돌리기가 겹치지 않게), 라벨 글자 칸 안은 앱 동작 없이 브라우저 글자 되돌리기 그대로 (Q18)
+- 키보드 = `useEffect`에서 `document`에 `keydown` 등록 + cleanup (엔진 이벤트는 그대로 `click` · `input`), 입력칸 · 선택 상자 · 체크박스 안의 Delete · Backspace는 무시. Undo/Redo 키는 입력칸 밖 · 선택 상자 · 체크박스에서 앱 Undo/Redo(task_006부터 State History 뒤로 · 앞으로) + 브라우저 기본 동작을 막음(`preventDefault`, 브라우저 글자 되돌리기가 겹치지 않게), 라벨 글자 칸 안은 앱 동작 없이 브라우저 글자 되돌리기 그대로 (Q18)
 - Undo = `main` · `instances`만, 같은 대상 + 같은 칸 연달아 = 한 단계 (시간 기준 없음), 50개 — **task_006에서 제거** (단축키는 State History로)
 - (task_006, 2026-11-11) 실제 영역 = Phase 1 흐름: [Patch] → 테스트 영역(캔버스) DOM `readAreaChildren` → 정리(고르기 표시 · testid · 제목 빼기) → `createVDomRoot(실제 영역).update` (diff + 바뀐 곳만 patch + State History, 한도 50), 바뀐 노드 깜빡임(덧칠 층). 도구 막대 = [+ 인스턴스] · [실행 취소] · [다시 실행] · [Patch] (State History 뒤로 · 앞으로), Ctrl/Cmd+Z · Shift+Z = State History 뒤로 · 앞으로 (Q18 키 규칙 유지). 실제 영역은 보기 전용(`inert`), 상자는 미니 React가 자식 없는 빈 요소로 그림
 

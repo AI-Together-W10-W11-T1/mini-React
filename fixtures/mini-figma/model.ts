@@ -1,6 +1,6 @@
 // [AI Note]: mini-figma의 "값" 쪽 순수 함수들. DOM · Hook · 엔진 import가 없다 (rootOnlyHooks.test.ts가 검사).
 // 입력을 고치지 않고 새 객체를 돌려준다. 바뀐 것이 없으면 "같은 Doc 객체"를 그대로 돌려줘서,
-// 루트의 setter가 같은 값(Object.is)으로 보고 다시 그리지 않고 Undo 기록에도 안 남게 한다 (phase2-app/todoOps.ts 방식).
+// 루트의 setter가 같은 값(Object.is)으로 보고 다시 그리지 않게 한다 (phase2-app/todoOps.ts 방식).
 
 export type Size = 'S' | 'M' | 'L';
 /** 색 값 `#rrggbb` (소문자, FD-20). 이름('blue')이 아니라 값을 저장한다 — 칩 8개 밖의 색도 색 입력칸으로 고를 수 있어서 */
@@ -22,7 +22,7 @@ export type Field = keyof MainProps;
 /** 인스턴스 = id + "바꾼 칸만" 가진 객체. 키가 있으면 override, 없으면 메인을 따른다 */
 export type Instance = { readonly id: string } & Partial<MainProps>;
 
-/** Undo가 기록하는 것: main · instances만. 선택(selectedId) · nextId는 doc 밖이라 기록에 없다 */
+/** 앱 문서: main · instances만. 선택(selectedId) · nextId는 doc 밖의 App 칸이다 */
 export interface Doc {
   readonly main: MainProps;
   readonly instances: readonly Instance[];
@@ -85,8 +85,7 @@ export function resetInstanceField(doc: Doc, id: string, field: Field): Doc {
 
 /**
  * 끝에 새 인스턴스를 붙인다. 번호 `nextId`는 doc 밖(App의 칸)에서 받는다.
- * [AI Note]: 번호가 doc 안에 있으면 Undo가 번호까지 되돌려서 추가 → Undo → 추가가 같은 id(b4)를 다시 만든다.
- * 번호를 App이 따로 세고 Undo가 건드리지 않으므로 지운 번호를 다시 쓰지 않는다 (key가 겹치지 않음, Q17-3).
+ * [AI Note]: 번호를 App이 따로 세므로(doc 밖) 삭제한 뒤 다시 추가해도 지운 번호를 다시 쓰지 않는다 (추가 → 삭제 → 추가 = b4 · b5, key가 겹치지 않음, Q17-3).
  * 새 인스턴스는 override 없이 `{ id }`만 가진다 → 메인을 따른다.
  */
 export function addInstance(doc: Doc, nextId: number): Doc {
@@ -114,7 +113,7 @@ export function moveInstance(doc: Doc, id: string, delta: -1 | 1): Doc {
 }
 
 /**
- * 삭제 · Undo · Redo로 doc이 바뀐 뒤 선택을 정리한다. 'main'은 항상 유효, 없는 인스턴스 id는 null (MF-32).
+ * 삭제로 doc이 바뀐 뒤 선택을 정리한다. 'main'은 항상 유효, 없는 인스턴스 id는 null (MF-32).
  * [AI Note]: 선택은 인덱스가 아니라 id라서, 앞에 다른 인스턴스가 끼어들거나 빠져도 같은 인스턴스를 계속 가리킨다 (MF-26).
  */
 export function reconcileSelection(selectedId: string | null, doc: Doc): string | null {

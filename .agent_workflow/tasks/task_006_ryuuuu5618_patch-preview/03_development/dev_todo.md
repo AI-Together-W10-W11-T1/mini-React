@@ -1,6 +1,6 @@
 # dev_todo: patch-preview
 
-- 명세: `../01_request_spec.md` (PP-01 ~ 10) · 브랜치: `feature/patch-preview` · 테스트 케이스: `../04_qa_evidence/qa_todo.md`
+- 명세: `../01_request_spec.md` (PP-01 ~ 12) · 브랜치: `feature/patch-preview` · 테스트 케이스: `../04_qa_evidence/qa_todo.md`
 - 규칙: 항목 하나 = 커밋 하나. 체크할 때 완료 근거 필수 (근거 없는 체크는 무효). 커밋 메시지 `<type>(mini-figma): <요약> (Dev-N)`, push 안 함
 - 범위: `fixtures/mini-figma/` · `e2e/mini-figma-*.spec.ts` · `e2e/mini-figma-helpers.ts`뿐. **`packages/`는 한 줄도 바꾸지 않는다.** `types.ts` 변경 없음. 완료 때 `git diff --stat main -- packages/`가 비어 있음을 근거에 붙인다
 - 바깥 루프(ATDD): 인수 시나리오가 있는 Dev(4 ~ 7)는 `qa_todo.md`의 해당 QA를 **먼저 e2e로 써서 desktop에서 실패하는 것을 확인**한 뒤 구현한다. 안쪽 루프는 Vitest (`fixtures/mini-figma/__tests__/`)
@@ -140,6 +140,7 @@ e2e/mini-figma-helpers.ts        실제 영역 도우미 추가 / 기존 render 
       - 단위 `keys.test.ts`: `'undo'` → `'back'`, `'redo'` → `'forward'` (규칙 표 100건 그대로 통과) / `rootOnlyHooks.test.ts`: 순수 모듈 목록에서 `undo.ts` 제거 / `undo.test.ts` 파일 삭제(Undo 모델 자체가 사라짐)
       - e2e: `mini-figma-undo.spec.ts` 통째 삭제(QA-19 ~ 25 · 29 · 30) / `mini-figma-toolbar.spec.ts`: QA-32 · 33 · A20(2건) · A21 삭제(Undo 버튼 전용), QA-31 → 도구 막대 순서 · [실행 취소] [다시 실행] 꺼짐 · [Patch] 켜짐 · [↶] [↷] 없음, QA-34 끝의 `[↶] 켜짐` 단언 제거 / `mini-figma-attack.spec.ts`: A9 · A19 · A15 · A17 · A27 삭제(Undo 한도 · 묶음 · 선택 · 새로고침 Undo), A6 → Delete로 선택이 풀림만, A8 → 선택 상자 · 체크박스 Ctrl+Z가 실제 영역 [실행 취소](+ 라벨 칸 안은 안 움직임), A10 → 키 핸들러가 옛 state를 안 읽음 · 리스너 1개(Ctrl+Z가 실제 영역 가장 최근 [Patch] 단계), A18 → 「삭제 후 추가 = b5 · b6」, A13 · A14 → Undo 단언만 제거 / `mini-figma-palette.spec.ts`: QA-37 · A22 · A24의 Undo 단언 제거, A25 삭제, A28 → 색 입력칸에서 Ctrl+Z · Shift+Z = 실제 영역 [실행 취소] · [다시 실행] / `mini-figma-render.spec.ts`(QA-1) · `mini-figma-design.spec.ts`(QA-40 · A26): [↶] [↷] → [실행 취소] [다시 실행] · [Patch] 기준
     - **회귀 명령 (최종)**: `npx vitest run` 45 files · **1178 passed** (이 전 1231 − 삭제 Undo 테스트 + 새 테스트), `npx tsc --noEmit` 오류 0, `npx playwright test` **308 passed** (desktop · mobile, Phase 1 · 2 · mini-figma 전체 포함), `git diff --stat main -- packages/` 출력 없음(0줄)
+    - **검수 1회차 반영 (REJECT → 수정)**: `04_qa_evidence/qa_todo.md`를 PP-07 · 11 · 12 최신본과 실제 e2e에 맞춤(QA-52 · 54 · 화면 약속 표 · 바뀌는 기존 단언 표(Hook 7칸 · `slot(5)` · `undo` 모듈 삭제 · 삭제 · 변경 QA/A 번호를 e2e `git diff 969edc4..HEAD`의 test 이름과 대조) · PP → QA 연결). `rootOnlyHooks.test.ts:101` 정규식 템플릿 안 `\b`(백스페이스) → `\\b`(고친 뒤 통과, preview.ts에 `useState` · `useEffect`를 일부러 넣으면 3건 실패 확인 후 되돌림). 옛 앱 Undo 설명 주석만 정리(`Toolbar.ts` · `App.ts` · `model.ts` · `ColorPalette.ts` · `PropertyPanel.ts`, 동작 변경 없음). 확인: `npx vitest run` 45 files · 1178 passed, `npx tsc --noEmit` 오류 0, `git diff --stat main -- packages/` 출력 없음
     - **mobile 375px 도구 막대**: QA-47 · QA-A26 이 mobile에서 통과 — 도구 막대 버튼 5개가 화면 밖으로 안 나가고(줄바꿈) 가로 스크롤 없음
     - 포트 5199: Playwright가 `reuseExistingServer: false`로 띄우고 끝에 내리므로 남은 LISTEN 서버 없음 (확인: `netstat`에 LISTEN 행 없음)
     - 커밋: 60f0fb3 · 8110e51 · 6d44b13 (feat) · c369905 (test 단위) · 0a6bd0e (test e2e)
