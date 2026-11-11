@@ -28,6 +28,13 @@ import {
   clickAdd,
   moveInLayer,
   canvasOrder,
+  areaSnapshot,
+  watchFlash,
+  boxSame,
+  boxOverlap,
+  navState,
+  realBgOf,
+  variableRowSel,
 } from './mini-figma-helpers';
 
 // [AI Note]: 색 변수 Variables (task_007). QA-63 · 76 · A46 (Dev-3: 변수 구역) · QA-64 ~ 71 · A43 · A44 · A47 ~ A51 · A54 · A58 (Dev-4: 연결 UI, 같은 준비를 쓰는 것은 한 test로 묶고 이름에 번호를 모두 적음) — 이 스펙의 테스트는 desktop · mobile 두 프로젝트에서 모두 돈다.
@@ -324,7 +331,18 @@ test('QA-71 · A49 b3 Danger 연결(override) + 메인 Primary: 순서 · 추가
   expect(await bgOf(page, 'b3')).toBe(rgb('#f4b000'));
 });
 
-test('A43 · A44 메인 Primary 연결 중 입력칸에 input 6번 연타 → 마지막 값만 남고 입력칸 노드 같은 참조, 같은 값을 다시 넣으면 DOM 변경 0', async ({ page }) => {
+test('A43 · A44 메인 Primary 연결 중 입력칸에 input 6번 연타 → 마지막 값만 남고 입력칸 노드 같은 참조, 같은 값을 다시 넣으면 렌더 0번(DOM 변경 0 · 렌더 예약 0)', async ({ page }) => {
+  // 렌더는 setter가 queueMicrotask로 예약한다(Batching) → 그 호출 수로 「렌더 0번」을 센다 (같은 모습으로 다시 그려도 DOM 변경은 0이라 DOM만으로는 못 가른다)
+  await page.addInitScript(() => {
+    const w = window as unknown as { __mc: number };
+    w.__mc = 0;
+    const q = window.queueMicrotask.bind(window);
+    window.queueMicrotask = (cb: VoidFunction) => {
+      w.__mc += 1;
+      q(cb);
+    };
+  });
+  const scheduled = (): Promise<number> => page.evaluate(() => (window as unknown as { __mc: number }).__mc);
   await page.goto(URL);
   await linkMain(page, 'Primary');
   const varInput = '[data-testid="variable-row"][data-id="primary"] [data-testid="variable-color"]';
@@ -339,8 +357,13 @@ test('A43 · A44 메인 Primary 연결 중 입력칸에 input 6번 연타 → �
 
   // A44: 같은 값을 다시 input → 렌더 0번 = DOM 변경 0
   const mut = await watchApp(page);
+  const before = await scheduled();
   await setVariable(page, 'Primary', '#f4b000');
   expect((await mut.take()).body.total).toBe(0);
+  expect(await scheduled() - before, '렌더 예약 0번').toBe(0);
+  // 대조: 다른 값이면 렌더가 예약된다 (센 방법이 맞는지)
+  await setVariable(page, 'Primary', '#112233');
+  expect(await scheduled() - before, '다른 값은 렌더 예약').toBeGreaterThan(0);
 });
 
 test('A47 · A48 변수 상자를 Primary ↔ 없음으로 20번 번갈아 고르면 끝 상태가 마지막 선택과 같고 상자 노드가 그대로이며, 같은 Primary를 다시 고르면 DOM 변경 0', async ({ page }) => {
@@ -405,4 +428,187 @@ test('A58 연결 상태에서 속성 패널 · 레이어 창 · 변수 구역이
   expect(m.selHeight).toBeGreaterThanOrEqual(32);
   expect(m.inputH).toBeGreaterThanOrEqual(32);
   expect(m.varInputH).toBeGreaterThanOrEqual(32);
+});
+
+// ---------------------------------------------------------------------------
+// Dev-5: Patch · 되돌리기 · 새로고침 · 키보드 · 회귀 (VR-07 · 08)
+// ---------------------------------------------------------------------------
+
+const patchNow = (page: Page) => page.getByTestId('patch-button').click();
+const backNow = (page: Page) => page.getByTestId('back-button').click();
+const forwardNow = (page: Page) => page.getByTestId('forward-button').click();
+
+async function expectAreasSame(page: Page, where: string): Promise<void> {
+  expect(await areaSnapshot(page, 'real'), `${where}: 두 영역 모습`).toEqual(await areaSnapshot(page, 'test'));
+}
+
+test('QA-72 · QA-73 메인 Primary 연결 + #f4b000 → [Patch]: 실제 영역은 푼 색(var: 글자 없음) + 바뀐 세 버튼 위에만 박스, [실행 취소] = 두 영역 · 연결 · 변수 값 되돌림, [다시 실행] = 다시 적용', async ({ page }) => {
+  await page.goto(URL);
+  await linkMain(page, 'Primary');
+  await setVariable(page, 'Primary', '#f4b000');
+  const flash = await watchFlash(page);
+
+  await patchNow(page);
+
+  const real = await areaSnapshot(page, 'real');
+  expect(real.map((b) => b.bg)).toEqual([rgb('#f4b000'), rgb('#f4b000'), rgb('#f4b000'), rgb('#cf202f')]);
+  expect(real.map((b) => b.fg)).toEqual([INK, INK, INK, WHITE]);
+  await expectAreasSame(page, 'Patch 뒤');
+  expect(await page.getByTestId('real-area').innerHTML(), 'real-area에 var: 없음').not.toContain('var:');
+  const { boxes, buttons } = await flash.take();
+  for (const id of ['main', 'b1', 'b2']) expect(boxes.some((b) => boxSame(b, buttons[id], 2)), `${id} 위 박스`).toBe(true);
+  for (const b of boxes) expect(boxOverlap(b, buttons.b3), 'b3 위에는 박스 없음').toBe(false);
+
+  // QA-73 ① [실행 취소]
+  await backNow(page);
+  expect(await colorsOf(page)).toEqual([rgb(BLUE), rgb(BLUE), rgb(BLUE), rgb('#cf202f')]);
+  expect((await areaSnapshot(page, 'real')).map((b) => b.bg)).toEqual([rgb(BLUE), rgb(BLUE), rgb(BLUE), rgb('#cf202f')]);
+  await expectAreasSame(page, '실행 취소');
+  expect((await variableRows(page)).map((r) => r.value)).toEqual([BLUE, '#cf202f', '#05b169']);
+  expect((await variableRows(page))[0].hex).toBe(BLUE);
+  await expect(linkSelect(page)).toHaveValue('');
+  expect(await colorHex(page)).toBe(BLUE);
+  expect(await navState(page)).toEqual({ patch: true, back: false, forward: true });
+  // ② [다시 실행]
+  await forwardNow(page);
+  expect(await colorsOf(page)).toEqual([rgb('#f4b000'), rgb('#f4b000'), rgb('#f4b000'), rgb('#cf202f')]);
+  expect(await realBgOf(page, 'main')).toBe(rgb('#f4b000'));
+  await expectAreasSame(page, '다시 실행');
+  await expect(linkSelect(page)).toHaveValue('primary');
+  expect(await colorHex(page)).toBe('Primary');
+  expect((await variableRows(page))[0].value).toBe('#f4b000');
+  expect(await navState(page)).toEqual({ patch: true, back: true, forward: false });
+});
+
+test('QA-74 Patch 안 한 변수 · 연결 편집은 [실행 취소] 때 버려지고 [다시 실행]해도 안 돌아온다', async ({ page }) => {
+  await page.goto(URL);
+  await linkMain(page, 'Primary');
+  await setVariable(page, 'Primary', '#f4b000');
+  await patchNow(page);
+  await setVariable(page, 'Primary', '#05b169');
+  await linkTo(page, '없음');
+
+  await backNow(page);
+  expect(await colorsOf(page)).toEqual([rgb(BLUE), rgb(BLUE), rgb(BLUE), rgb('#cf202f')]);
+  await expectAreasSame(page, '실행 취소');
+  expect((await variableRows(page))[0].value).toBe(BLUE);
+  await expect(linkSelect(page)).toHaveValue('');
+  await forwardNow(page);
+  expect((await variableRows(page))[0].value).toBe('#f4b000');
+  expect(await colorsOf(page)).toEqual([rgb('#f4b000'), rgb('#f4b000'), rgb('#f4b000'), rgb('#cf202f')]);
+  await expect(linkSelect(page)).toHaveValue('primary');
+});
+
+test('QA-75 변수를 안 쓰는 대표 흐름은 그대로다: b3 override 표시 · 칩 · Patch · 실행 취소 · 인스턴스 추가 · 처음 화면 자식 5개 (기존 mini-figma 스펙 전부가 회귀로 증명)', async ({ page }) => {
+  await page.goto(URL);
+  expect(await page.locator('[data-testid="app-root"] > .app > *').count()).toBe(5);
+  await selectOnCanvas(page, 'b3');
+  expect(await overriddenFields(page)).toEqual(['label', 'color']);
+  expect(await pressedChips(page)).toEqual(['#cf202f']);
+  await pickColor(page, '#05b169');
+  await patchNow(page);
+  await expectAreasSame(page, 'Patch');
+  expect(await realBgOf(page, 'b3')).toBe(rgb('#05b169'));
+  await backNow(page);
+  expect(await bgOf(page, 'b3')).toBe(rgb('#cf202f'));
+  await clickAdd(page);
+  expect(await canvasOrder(page)).toEqual(['b1', 'b2', 'b3', 'b4']);
+});
+
+test('A45 값을 바꿨다 원래대로 되돌리고 [Patch]하면 무변경 Patch (기록 안 쌓임, [실행 취소] 꺼짐)', async ({ page }) => {
+  await page.goto(URL);
+  await linkMain(page, 'Primary');
+  await setVariable(page, 'Primary', '#f4b000');
+  await setVariable(page, 'Primary', BLUE);
+  await patchNow(page);
+  expect(await colorsOf(page)).toEqual([rgb(BLUE), rgb(BLUE), rgb(BLUE), rgb('#cf202f')]);
+  await expectAreasSame(page, '무변경 Patch');
+  expect(await navState(page)).toEqual({ patch: true, back: false, forward: false });
+});
+
+test('A52 변수 · 연결을 바꾸고 새로고침하면 처음 doc이다 (저장 안 됨)', async ({ page }) => {
+  await page.goto(URL);
+  await linkMain(page, 'Primary');
+  await setVariable(page, 'Primary', '#f4b000');
+  await patchNow(page);
+  await page.reload();
+  expect((await variableRows(page)).map((r) => r.value)).toEqual([BLUE, '#cf202f', '#05b169']);
+  expect(await colorsOf(page)).toEqual([rgb(BLUE), rgb(BLUE), rgb(BLUE), rgb('#cf202f')]);
+  await selectOnCanvas(page, 'main');
+  await expect(linkSelect(page)).toHaveValue('');
+  expect((await areaSnapshot(page, 'real')).map((b) => b.bg)).toEqual([rgb(BLUE), rgb(BLUE), rgb(BLUE), rgb('#cf202f')]);
+});
+
+test('A53 Patch 3번 뒤 [실행 취소] ×3 · [다시 실행] ×3: 칸마다 두 영역 · 변수 줄 · 연결이 그 칸의 사본과 같다', async ({ page }) => {
+  await page.goto(URL);
+  // ① 메인 Primary 연결 + #f4b000 ② b3 Danger 연결 + #05b169 ③ 메인 「없음」 + 칩 #cf202f
+  await linkMain(page, 'Primary');
+  await setVariable(page, 'Primary', '#f4b000');
+  await patchNow(page);
+  await selectOnCanvas(page, 'b3');
+  await linkTo(page, 'Danger');
+  await setVariable(page, 'Danger', '#05b169');
+  await patchNow(page);
+  await selectOnCanvas(page, 'main');
+  await linkTo(page, '없음');
+  await pickColor(page, '#cf202f');
+  await patchNow(page);
+
+  const R = rgb('#cf202f');
+  const G = rgb('#05b169');
+  const Y = rgb('#f4b000');
+  const B = rgb(BLUE);
+  const states = [
+    { bgs: [B, B, B, R], vars: [BLUE, '#cf202f', '#05b169'], main: '', b3: '' },
+    { bgs: [Y, Y, Y, R], vars: ['#f4b000', '#cf202f', '#05b169'], main: 'primary', b3: '' },
+    { bgs: [Y, Y, Y, G], vars: ['#f4b000', '#05b169', '#05b169'], main: 'primary', b3: 'danger' },
+    { bgs: [R, R, R, G], vars: ['#f4b000', '#05b169', '#05b169'], main: '', b3: 'danger' },
+  ];
+  const check = async (index: number): Promise<void> => {
+    const s = states[index];
+    expect(await colorsOf(page), `칸 ${index} 테스트 영역`).toEqual(s.bgs);
+    expect((await areaSnapshot(page, 'real')).map((b) => b.bg), `칸 ${index} 실제 영역`).toEqual(s.bgs);
+    await expectAreasSame(page, `칸 ${index}`);
+    expect((await variableRows(page)).map((r) => r.value), `칸 ${index} 변수 줄`).toEqual(s.vars);
+    await selectOnCanvas(page, 'main');
+    await expect(linkSelect(page), `칸 ${index} 메인 상자`).toHaveValue(s.main);
+    await selectOnCanvas(page, 'b3');
+    await expect(linkSelect(page), `칸 ${index} b3 상자`).toHaveValue(s.b3);
+  };
+  await check(3);
+  await backNow(page);
+  await check(2);
+  await backNow(page);
+  await check(1);
+  await backNow(page);
+  await check(0);
+  expect((await navState(page)).back, '끝에서 꺼짐').toBe(false);
+  await forwardNow(page);
+  await check(1);
+  await forwardNow(page);
+  await check(2);
+  await forwardNow(page);
+  await check(3);
+  expect((await navState(page)).forward, '끝에서 꺼짐').toBe(false);
+});
+
+test('A55 변수 색 입력칸에 포커스한 채 Ctrl+Z · Ctrl+Shift+Z는 [실행 취소] · [다시 실행]처럼 움직인다', async ({ page }) => {
+  await page.goto(URL);
+  await linkMain(page, 'Primary');
+  await setVariable(page, 'Primary', '#f4b000');
+  await patchNow(page);
+  await setVariable(page, 'Primary', '#112233');
+  await patchNow(page);
+
+  const input = page.locator(`${variableRowSel('primary')} [data-testid="variable-color"]`);
+  await input.focus();
+  await page.keyboard.press('Control+KeyZ');
+  expect(await bgOf(page, 'main')).toBe(rgb('#f4b000'));
+  expect((await variableRows(page))[0].value).toBe('#f4b000');
+  await expectAreasSame(page, 'Ctrl+Z');
+  await input.focus();
+  await page.keyboard.press('Control+Shift+KeyZ');
+  expect(await bgOf(page, 'main')).toBe(rgb('#112233'));
+  expect((await variableRows(page))[0].value).toBe('#112233');
+  await expectAreasSame(page, 'Ctrl+Shift+Z');
 });

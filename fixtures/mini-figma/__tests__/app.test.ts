@@ -2076,3 +2076,71 @@ describe('연결 UI — 변수 상자 (VR-02 · 05)', () => {
     expect(pressedChips()).toEqual([]);
   });
 });
+
+// ---------------------------------------------------------------------------
+// task_007 색 변수 — [Patch] · [실행 취소] · [다시 실행] (Dev-5: VR-07, U-8)
+// ---------------------------------------------------------------------------
+describe('변수 · State History (VR-07, U-8)', () => {
+  const doc = (): typeof INITIAL_DOC => slot(0) as typeof INITIAL_DOC;
+  const setVar = async (id: string, value: string): Promise<void> => {
+    const el = root.querySelector<HTMLInputElement>(`[data-testid="variable-row"][data-id="${id}"] [data-testid="variable-color"]`) as HTMLInputElement;
+    el.value = value;
+    el.dispatchEvent(new Event('input'));
+    await Promise.resolve();
+  };
+  const varValues = (): string[] => Array.from(root.querySelectorAll<HTMLInputElement>('[data-testid="variable-color"]')).map((el) => el.value);
+  const realBgsNow = (): string[] => Array.from(root.querySelectorAll<HTMLElement>('[data-testid="real-figma-button"]')).map((b) => b.style.getPropertyValue('background-color'));
+  const linkValue = (): string => (byId('prop-variable') as HTMLSelectElement).value;
+  const hexNow = (): string => byId('color-hex').textContent ?? '';
+
+  it('U-8 연결 + Primary #f4b000 → [Patch]: 실제 영역은 푼 hex(var: 없음). [실행 취소] = slot(0) 처음 doc 같은 참조 · 연결 · 변수 값 복원 · 렌더 1번, [다시 실행] = Patch 때 doc 같은 참조', async () => {
+    await click(buttonOf('main'));
+    await choose('prop-variable', 'primary');
+    await setVar('primary', '#f4b000');
+    const docA = doc();
+    await click(byId('patch-button'));
+    expect(realBgsNow()).toEqual([rgb('#f4b000'), rgb('#f4b000'), rgb('#f4b000'), rgb('#cf202f')]);
+    expect(byId('real-area').innerHTML).not.toContain('var:');
+
+    let before = renders;
+    await click(byId('back-button'));
+    expect(renders - before).toBe(1);
+    expect(doc()).toBe(INITIAL_DOC);
+    expect(bgs()).toEqual([rgb('#0052ff'), rgb('#0052ff'), rgb('#0052ff'), rgb('#cf202f')]);
+    expect(realBgsNow()).toEqual(bgs());
+    expect(varValues()).toEqual(['#0052ff', '#cf202f', '#05b169']);
+    expect(linkValue()).toBe('');
+    expect(hexNow()).toBe('#0052ff');
+
+    before = renders;
+    await click(byId('forward-button'));
+    expect(renders - before).toBe(1);
+    expect(doc()).toBe(docA);
+    expect(bgs()).toEqual([rgb('#f4b000'), rgb('#f4b000'), rgb('#f4b000'), rgb('#cf202f')]);
+    expect(realBgsNow()).toEqual(bgs());
+    expect(varValues()[0]).toBe('#f4b000');
+    expect(linkValue()).toBe('primary');
+    expect(hexNow()).toBe('Primary');
+  });
+
+  it('Patch 안 한 변수 · 연결 편집은 [실행 취소] 때 버려지고 [다시 실행]해도 안 돌아온다', async () => {
+    await click(buttonOf('main'));
+    await choose('prop-variable', 'primary');
+    await setVar('primary', '#f4b000');
+    await click(byId('patch-button'));
+    await setVar('primary', '#05b169');
+    await choose('prop-variable', '');
+    await click(byId('back-button'));
+    expect(doc()).toBe(INITIAL_DOC);
+    await click(byId('forward-button'));
+    expect(doc().variables[0].value).toBe('#f4b000');
+    expect(doc().main.color).toBe('var:primary');
+    expect(bgs()[0]).toBe(rgb('#f4b000'));
+  });
+
+  it('변수만 바꾸고(연결 없음) [Patch]는 무변경이라 기록이 안 쌓인다 (되돌리기 꺼짐)', async () => {
+    await setVar('primary', '#f4b000');
+    await click(byId('patch-button'));
+    expect((byId('back-button') as HTMLButtonElement).hasAttribute('disabled')).toBe(true);
+  });
+});

@@ -392,3 +392,65 @@ describe('테스트 영역 불변', () => {
     expect(records).toHaveLength(0);
   });
 });
+
+// ---------------------------------------------------------------------------
+// task_007 색 변수 — 실제 영역 patch (RV-1 ~ 4, VR-07). 푼 hex만 실제 영역으로 간다 (var: 글자 없음)
+// ---------------------------------------------------------------------------
+describe('변수 · 실제 영역 (RV-1 ~ 4)', () => {
+  const setVar = async (id: string, value: string): Promise<void> => {
+    const el = root.querySelector<HTMLInputElement>(`[data-testid="variable-row"][data-id="${id}"] [data-testid="variable-color"]`) as HTMLInputElement;
+    el.value = value;
+    el.dispatchEvent(new Event('input'));
+    await tick();
+  };
+  const linkMain = async (): Promise<void> => {
+    await selectMain();
+    await choose('prop-variable', 'primary');
+  };
+
+  it('RV-1 연결만 하고 [Patch] → 무변경 (patch 없음, false)', async () => {
+    await linkMain();
+    seen = [];
+    expect(preview.patch()).toBe(false);
+    expect(take()).toEqual({});
+    expect(real.innerHTML).not.toContain('var:');
+  });
+
+  it('RV-2 연결 + Primary #f4b000 → [Patch]: 메인 · b1 · b2 SET_STYLE 6줄, 경로 [0,0] [1,0] [1,1], DOM에 var: 없음, 두 영역 같은 모습', async () => {
+    await linkMain();
+    await setVar('primary', '#f4b000');
+    seen = [];
+    expect(preview.patch()).toBe(true);
+    const lines = seen.filter((p) => p.kind === 'SET_STYLE');
+    expect(take()).toEqual({ SET_STYLE: 6 });
+    const paths = new Set(lines.map((p) => ('path' in p ? p.path.join(',') : '')));
+    expect([...paths].sort()).toEqual(['0,0', '1,0', '1,1']);
+    expect(real.innerHTML).not.toContain('var:');
+    expect(realLook()).toEqual(testLook());
+    expect(realLook().map((b) => b.style)).toEqual([
+      'background-color: #f4b000; color: #0a0b0d',
+      'background-color: #f4b000; color: #0a0b0d',
+      'background-color: #f4b000; color: #0a0b0d',
+      'background-color: #cf202f; color: #ffffff',
+    ]);
+  });
+
+  it('RV-3 b3 Danger 연결 + Danger #05b169 → [Patch]: b3([1,2])만 SET_STYLE 2줄', async () => {
+    await click(testButton('b3'));
+    await choose('prop-variable', 'danger');
+    await setVar('danger', '#05b169');
+    seen = [];
+    expect(preview.patch()).toBe(true);
+    const lines = seen.filter((p) => p.kind === 'SET_STYLE');
+    expect(take()).toEqual({ SET_STYLE: 2 });
+    expect(lines.every((p) => 'path' in p && p.path.join(',') === '1,2')).toBe(true);
+    expect(real.innerHTML).not.toContain('var:');
+  });
+
+  it('RV-4 연결 없이 Primary 값만 바꾸고 [Patch] → 무변경', async () => {
+    await setVar('primary', '#f4b000');
+    seen = [];
+    expect(preview.patch()).toBe(false);
+    expect(take()).toEqual({});
+  });
+});

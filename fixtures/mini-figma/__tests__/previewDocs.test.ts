@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { History } from '@mini-react/react-dom';
 import { HISTORY_LIMIT } from '@mini-react/shared';
 import type { HistoryEntry } from '@mini-react/shared';
-import { INITIAL_DOC } from '../model';
+import { INITIAL_DOC, setVariableValue } from '../model';
 import type { Doc } from '../model';
 import { initialTrack, trackBack, trackDoc, trackForward, trackPush } from '../previewDocs';
 import type { DocTrack } from '../previewDocs';
@@ -167,5 +167,24 @@ describe('PD-5 무작위 불변식', () => {
       expect(t.nav.index).toBe(e.index);
       expect(tag(trackDoc(t))).toBe(e.tag);
     }
+  });
+});
+
+describe('PD-6 변수가 든 doc 사본 (task_007 VR-07)', () => {
+  it('variables · main · instances가 칸마다 같은 참조로 돌아오고, 값을 바꾼 doc과 안 바꾼 doc이 구별된다', () => {
+    const linked: Doc = { ...INITIAL_DOC, main: { ...INITIAL_DOC.main, color: 'var:primary' } };
+    const changed: Doc = setVariableValue(linked, 'primary', '#f4b000');
+    let track = initialTrack(INITIAL_DOC);
+    track = trackPush(track, changed);
+    expect(trackDoc(track)).toBe(changed);
+    expect(trackDoc(track).variables).toBe(changed.variables);
+    expect(trackDoc(track).main.color).toBe('var:primary');
+    track = trackBack(track);
+    expect(trackDoc(track)).toBe(INITIAL_DOC);
+    expect(trackDoc(track).variables).toBe(INITIAL_DOC.variables);
+    expect(trackDoc(track).main.color).toBe('#0052ff');
+    track = trackForward(track);
+    expect(trackDoc(track)).toBe(changed);
+    expect(trackDoc(track).variables[0].value).toBe('#f4b000');
   });
 });
