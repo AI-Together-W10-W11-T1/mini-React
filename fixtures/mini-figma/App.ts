@@ -1,14 +1,15 @@
-import { h, useState } from '@mini-react/react';
+import { h, useEffect, useState } from '@mini-react/react';
 import type { VNode } from '@mini-react/shared';
 import { Canvas } from './components/Canvas';
 import { LayerPanel } from './components/LayerPanel';
 import { PropertyPanel } from './components/PropertyPanel';
 import { INITIAL_DOC, addInstance, moveInstance, reconcileSelection, removeInstance, resetInstanceField, setInstanceField, setMainField } from './model';
 import type { Doc, Field, MainProps } from './model';
-import { EMPTY_UNDO, recordEdit } from './undo';
-import type { UndoGroup, UndoState } from './undo';
+import { keyAction } from './keys';
+import { EMPTY_UNDO, recordEdit, redo, undo } from './undo';
+import type { UndoGroup, UndoResult, UndoState } from './undo';
 
-// [AI Note]: 루트 컴포넌트. 모든 useState(와 Dev-11의 useEffect)는 이 파일에서만 부른다 (MF-04 · P2-07 · P2-08).
+// [AI Note]: 루트 컴포넌트. 모든 useState · useEffect는 이 파일에서만 부른다 (MF-04 · P2-07 · P2-08).
 // 자식(LayerPanel · Canvas · PropertyPanel)은 props만 받는 순수 함수이고, 바꾸고 싶은 것은 루트가 내려 주는 콜백 props로 알린다 (Lifting State Up).
 // 상태 칸은 4개고 렌더마다 같은 순서로 부른다 (Hook 개수가 달라지면 엔진이 오류, dev_todo 공통 주의 9):
 //   doc        = { main, instances } 한 칸 — Undo가 기록하는 것은 이것뿐
@@ -69,6 +70,39 @@ export function App(): VNode {
     applyEdit(next, null);
     setSelectedId(reconcileSelection(selectedId, next));
   };
+
+  // [AI Note]: Undo · Redo = undo.ts가 돌려준 { state, doc }를 이 렌더의 값에서 한 번에 반영한다 (doc · history · selectedId 세 setter → 렌더 1번).
+  // 되돌릴 것이 없으면 undo()가 같은 state를 돌려주므로 아무 setter도 안 부른다 (렌더 · 기록 없음). 선택은 새 doc 기준으로 정리: 없는 인스턴스면 null (MF-32).
+  // nextId는 일부러 안 건드린다 — Undo가 번호까지 되돌리면 b4 추가 → Undo → 추가가 b4를 다시 만든다 (Q17-3).
+  const moveThroughHistory = (result: UndoResult): void => {
+    if (result.state === history) return;
+    setHistory(result.state);
+    setDoc(result.doc);
+    setSelectedId(reconcileSelection(selectedId, result.doc));
+  };
+
+  // [AI Note]: 키보드 = 마운트 때 한 번이 아니라 "핸들러가 읽는 state가 바뀔 때마다" document에 다시 등록한다 (엔진 이벤트는 click · input뿐이라 keydown은 직접 등록, MF-34).
+  // deps에 doc · selectedId · history를 넣어서 핸들러가 늘 이번 렌더의 값을 본다 — 빠지면 "b1을 고르고 b2를 고른 뒤 Delete"가 옛 선택 b1을 지운다.
+  // 다시 등록하기 전 cleanup이 먼저 removeEventListener를 불러서 리스너는 항상 1개다 (등록 − 해제 = 1). unmount() 때도 cleanup이 돈다.
+  // 한 동작(삭제 · Undo · Redo)은 모두 이번 렌더의 doc 하나에서 계산한다. 입력칸 안의 키 · 수정키 규칙은 keys.ts의 keyAction이 정한다 (preventDefault 안 함).
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent): void => {
+      const target = event.target as Element | null;
+      const action = keyAction({
+        key: event.key,
+        ctrlKey: event.ctrlKey,
+        metaKey: event.metaKey,
+        shiftKey: event.shiftKey,
+        altKey: event.altKey,
+        targetTag: target?.tagName ?? null,
+      });
+      if (action === 'delete') deleteSelected();
+      else if (action === 'undo') moveThroughHistory(undo(history, doc));
+      else if (action === 'redo') moveThroughHistory(redo(history, doc));
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [doc, selectedId, history]);
 
   return h(
     'div',

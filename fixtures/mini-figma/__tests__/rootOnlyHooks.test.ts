@@ -71,9 +71,21 @@ describe('T-16 코드 확인 — 루트(App.ts)만 Hook을 쓴다', () => {
     });
   }
 
-  it('App.ts가 useState를 부른다 (루트가 상태를 가진다. useEffect 호출 확인은 Dev-11에서 더한다)', () => {
+  it('App.ts가 useState와 useEffect를 부른다 (루트가 상태 · keydown 등록을 가진다)', () => {
     const app = stripNoise(sourceOf(topLevel, '../App.ts'));
     expect(/\buseState\s*(<[^>(]*>)?\(/.test(app), 'useState 호출').toBe(true);
+    expect(/\buseEffect\s*\(/.test(app), 'useEffect 호출').toBe(true);
+  });
+
+  it('components/*.ts · model · undo · keys는 useEffect도 부르지 않는다 (keydown 등록은 App.ts 한 곳)', () => {
+    const files = [
+      ...Object.entries(components).map(([path, source]) => [path, source] as const),
+      ...['model.ts', 'undo.ts', 'keys.ts', 'main.ts'].map((file) => [file, sourceOf(topLevel, `../${file}`)] as const),
+    ];
+    for (const [path, source] of files) {
+      expect(/\buseEffect\b/.test(stripNoise(source)), `${path}의 useEffect`).toBe(false);
+      expect(/\baddEventListener\b/.test(stripNoise(source)), `${path}의 addEventListener`).toBe(false);
+    }
   });
 
   for (const file of ['model.ts', 'undo.ts', 'keys.ts']) {
