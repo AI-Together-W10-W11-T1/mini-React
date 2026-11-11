@@ -32,6 +32,8 @@
 - 사용자 (원문, 2026-11-11T23:25): "State History 다루는 버튼들을 undo-button와 redo-button의 위치로 옮기고 undo-button와 redo-button는 제거하자" → PP-07 다시 변경: 도구 막대 = 앱 이름 · [+ 인스턴스] · [뒤로] · [앞으로] · [Patch], `undo-button` · `redo-button` 제거, 실제 영역 머리글은 제목만. 앱 편집 Undo/Redo는 단축키로만 남음 → task_005 FD-12(Undo 버튼 · 터치 기기 Undo) 되돌림. B 작업자에게 전달
 - 사용자 (원문): "스테이트 히스토리 관련 기능들에 Ctrl/Cmd+Z · Ctrl/Cmd+Shift+Z 단축키로 할당하자" → 마스터: 그러면 앱 편집 Undo를 부를 방법이 없어짐 → A 완전히 없앰(추천) / B 다른 키(Ctrl+Alt+Z)
 - A (원문, 2026-11-11T23:27): "추천으로 가자" → A: Ctrl/Cmd+Z = State History 뒤로, Ctrl/Cmd+Shift+Z = 앞으로 (Q18 키 규칙 유지), 앱 편집 Undo 기록 · `undo.ts` 제거, 관련 테스트 정리(뜻이 남는 것은 State History로). task_004 Q14 · Q17-2 · MF-30 ~ 32 · task_005 FD-12는 「task_006에서 제거」
+- 사용자 (원문, 2026-11-11T23:43): "그 사이에 back-button과 forward-button를 뒤로 -> 실행 취소, 앞으로 -> 다시 실행 이렇게 수정하자" → 버튼 글자만 바꿈 (testid · 동작 그대로, 커밋 0654f66). B 단계 확인: vitest 1178 · tsc 0 · playwright 308 · packages diff 0
+- 사용자 (원문): "테스트 케이스 끝나면 compact 한 번 하고 가자." · 다음 기능 후보(마스터 제안): Dev Mode 코드 보기 · 레이어 숨기기 · Variables (task_007 후보, 미정)
 
 ## 알고리즘 결정 문답
 

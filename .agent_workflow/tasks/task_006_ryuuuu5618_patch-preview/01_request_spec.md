@@ -22,7 +22,7 @@ mini-figma 캔버스를 **테스트 영역**(편집하면 바로 바뀜)으로 �
 | PP-04 | Patch 흐름 | [Patch]를 누르면: 테스트 영역 DOM을 `readAreaChildren`으로 VNode로 읽음 → 정리(아래 PP-05) → `createVDomRoot(실제 영역).update(next)` = 이전 VNode와 diff → 바뀐 곳만 patch → 기록 저장. 바뀐 게 없으면 기록 안 함 (엔진 동작 그대로) |
 | PP-05 | 읽은 VNode 정리 | 실제 영역에 넣기 전 순수 함수로: 고르기 표시(`selected` 클래스) 빼기, `data-testid` 빼기(테스트 영역과 겹치지 않게, 실제 영역용 testid는 따로). 이벤트는 DOM에서 읽히지 않으므로 실제 영역은 **보기 전용** |
 | PP-06 | 뒤로 · 앞으로 | 실제 영역 기록만 움직임 (`back()` · `forward()`), 테스트 영역 · 앱 상태 · 앱 Undo는 그대로. 처음 · 끝에서는 버튼 꺼짐 (`disabled`). 뒤로 간 뒤 Patch하면 앞쪽 기록은 버림 (엔진 History 정책 그대로, 한도 50) |
-| PP-07 | 버튼 자리 | **(변경 2026-11-11T23:25, 사용자 요청)** 도구 막대 = 앱 이름 · [+ 인스턴스] · [뒤로] · [앞으로] · [Patch]. 도구 막대의 앱 Undo/Redo 버튼(`undo-button` · `redo-button`)은 **제거** — 앱 편집 Undo/Redo는 단축키로만 (task_005 FD-12 되돌림). 실제 영역 머리글은 제목만 |
+| PP-07 | 버튼 자리 | **(변경 2026-11-11T23:25, 사용자 요청)** 도구 막대 = 앱 이름 · [+ 인스턴스] · [실행 취소](`back-button`) · [다시 실행](`forward-button`) · [Patch] (글자는 2026-11-11T23:43 사용자 요청으로 뒤로 → 실행 취소, 앞으로 → 다시 실행). 도구 막대의 앱 Undo/Redo 버튼(`undo-button` · `redo-button`)은 **제거** — 앱 편집 Undo/Redo는 단축키로만 (task_005 FD-12 되돌림). 실제 영역 머리글은 제목만 |
 | PP-08 | 실시간 깜빡임 | Patch · 뒤로 · 앞으로 때 실제 영역에서 **바뀐 노드만** 잠깐 강조 (엔진 `onPatch` 관찰 콜백). 강조는 실제 영역 DOM을 고치지 않는 덧칠 층으로 (Phase 1 Diff 시각화와 같은 방식, 실제 영역 DOM에 클래스를 붙이면 VNode와 어긋남) |
 | PP-09 | Hook 규칙 | Hook은 `App`에만. 실제 영역 상자는 미니 React가 **자식 없는 빈 요소**로 그리고 내용은 `createVDomRoot`가 채움 (Phase 2 기록판 직접 쓰기 칸과 같은 방식) — 미니 React diff와 부딪히지 않게. 버튼 꺼짐 상태(뒤로 · 앞으로 가능 여부)는 App state |
 | PP-10 | 기존 동작 유지 | 편집 · 고르기 · 팔레트 · override 규칙 그대로 (Undo/Redo · 단축키는 PP-11 · 12로 바뀜). 실제 영역은 키 · 클릭에 반응하지 않음 |

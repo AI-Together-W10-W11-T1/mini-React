@@ -8,3 +8,5 @@
 2026-11-11T23:27 | stage=2 | agent=master | round=- | signal=DECISION | PP-11 단축키 = State History · PP-12 앱 편집 Undo 제거 (사용자 "추천으로 가자")
 2026-11-11T23:40 | stage=2 | agent=mr-worker | round=- | signal=UNKNOWN | Dev-7 | by=hook
 2026-11-11T23:41 | stage=2 | agent=master | round=- | signal=VERIFY | B 단계 끝: vitest 1178 · tsc 0 · playwright 308 · packages diff 0. 다음 = 개발 검수(diff 969edc4..HEAD) → QA → 사람 확인
+2026-11-11T23:43 | stage=2 | agent=mr-worker | round=- | signal=UNKNOWN | Dev-7 | by=hook
+2026-11-11T23:43 | stage=2 | agent=master | round=- | signal=PAUSE | 버튼 글자 변경 0654f66, compact 전 멈춤. 다음 = 개발 검수(diff 969edc4..HEAD, 가벼운 1회) → QA → 사람 확인 → task_005 사람 확인 → 위키 · 병합(005 → 006)
