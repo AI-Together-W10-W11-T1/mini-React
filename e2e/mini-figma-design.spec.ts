@@ -59,11 +59,14 @@ test('QA-40 어두운 바탕 · 한 단계 밝은 카드 24px(desktop 사이드�
   expect(cv['background-image']).toBe('none');
   expect(cv['background-color']).toBe('rgba(0, 0, 0, 0)');
   expect(cv['border-top-width']).toBe('0px');
-  // 실제 영역 상자: 점무늬 · 테두리 없음, 배경색은 바탕색(--bg)
+  // 실제 영역 상자: 모양 없음(점무늬 · 테두리 · 자체 배경 없음) — 카드 바탕 위에 바로 놓인다
   const ra = await styleOf(page, tid('real-area'), ['background-image', 'background-color', 'border-top-width']);
   expect(ra['background-image'], '실제 영역 점무늬 없음').toBe('none');
-  expect(ra['background-color'], '실제 영역 배경 = 바탕색').toBe(CARD);
+  expect(ra['background-color'], '실제 영역 자체 배경 없음').toBe('rgba(0, 0, 0, 0)');
   expect(ra['border-top-width'], '실제 영역 테두리 없음').toBe('0px');
+  // 위아래 정렬: 실제 영역 메인 버튼의 왼쪽 = 테스트 영역 메인 버튼의 왼쪽 (±1px)
+  const leftOf = async (sel: string): Promise<number> => (await page.locator(sel).boundingBox())?.x ?? -1;
+  expect(Math.abs((await leftOf('[data-testid="real-area"] [data-id="main"]')) - (await leftOf('[data-testid="canvas"] [data-id="main"]'))), '두 영역 버튼 시작 x').toBeLessThanOrEqual(1);
 
   // 알약 버튼: [+ 인스턴스](메인을 골랐을 때 속성 패널 오른쪽 아래) 파랑 배경 · 흰 글자 · 100px · 그림자 없음, [실행 취소] [다시 실행]도 100px
   await selectOnCanvas(page, 'main');
