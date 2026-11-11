@@ -64,3 +64,23 @@ BLOCKING 0건. 확인한 것 (파일 직접 확인, git은 못 돌려 커밋 해
 2. QA-A8 ② · ③(선택 상자 · 체크박스에서 Ctrl+Z)도 기본 Undo가 b2 라벨 칸에 적용될 수 있으나 단언 범위 밖 → BLOCKING 결론 뒤 함께 다시 볼 것
 3. `history`는 늘 `doc`과 같이 바뀌어 deps에서 빠져도 지금 테스트로는 못 잡음 (deps에 있으므로 그대로, 기록만)
 - 재현 (2026-11-11T19:15, 작업자 · 앱 코드 안 고침): QA-29 추가(미커밋) → desktop · mobile 실패. Ctrl+Z 1번 = 메인 글자 `버튼` + 색 blue (두 단계), Ctrl+Shift+Z = 브라우저 기본 Redo가 라벨만 `새`로 (빨강 단계 사라짐). 원인: Chromium 글자 되돌리기 기록은 포커스를 빼도 남아 Ctrl+Z · Ctrl+Shift+Z에 기본 Undo/Redo가 라벨 칸에 적용, `onKey`가 `preventDefault` 안 함 → 그 `input`을 `onInput`이 새 편집으로 기록 + `future` 비움. 선택 상자 · 체크박스 포커스에서 Ctrl+Z도 기본 Undo가 이전 라벨 칸에 적용돼 새 편집으로 기록됨 (A8은 라벨을 단언 안 해 못 잡음) → 사용자 결정 필요
+
+## 묶음 3 · Dev-9 ~ 12 · 회차 2/3 — APPROVE (2026-11-11T19:33)
+- 대상: `04_diff_dev11-fix.patch` (`d29715c..32f73bc`: 23d84ab test · e57484e fix · 32f73bc docs + 마스터 문서 커밋), 마스터 실행: vitest 41 files · 1064 passed, tsc 0, playwright 전체 272 passed, `packages/` diff 비어 있음, 남은 서버 없음
+
+1회차 BLOCKING 1 해소, 새 BLOCKING 없음. 확인한 것 (파일 직접, git · 테스트는 못 돌려 마스터 결과와 diff로 건수 대조):
+- Q18 판정 `keys.ts:21-49`: `isTextField`(TEXTAREA 또는 checkbox 아닌 INPUT) = 전부 null(③), `isChoiceControl`(SELECT · checkbox) = Delete · Backspace만 null, Undo/Redo 통과(②), 그 밖 = 원래 판정(①)
+- `App.ts:100-110`: `targetType` = `HTMLInputElement`의 type, `preventDefault`는 undo · redo일 때만(되돌릴 것이 없어도 막음), Delete · null은 안 막음. `00_master_dialogue.md:86` Q18 ② 변경과 맞음
+- 그 밖 input을 글자 칸으로: 앱 input은 text · checkbox뿐(`PropertyPanel.ts:70,83`) → 동작 영향 없음
+- QA-29 (`undo.spec.ts:236-291`): 다시 고르지 않아 브라우저 기록이 남은 채 Undo → Redo → Undo → Undo 한 단계씩. QA-30: 포커스가 선택 상자 · 체크박스에 남은 채 앱 Undo · Redo + 라벨 글자 · 칸 값 `새` 그대로 → 체크박스 단계에서도 겹침을 잡음. 구현 전 실패(`Expected "새" Received "버튼"`) = 1회차 재현과 같은 증상
+- QA-A8 (`attack.spec.ts:232-275`): ② · ③ Delete · Backspace 무시, Ctrl+Z = 파랑, Ctrl+Shift+Z = 빨강, ① 라벨 칸은 앱 Undo 없음(빨강)
+- 문서: qa_todo A8 · 1회차 NB 1(QA-21 · A2 · A14, A12 ① 「메인 포함 24개」 · ②) 반영, MF-34 · `dev_todo.md:20` · CLAUDE.md 키보드 줄 · `App.ts:87-89` 주석이 Q18과 일치
+- Q18 밖 동작 그대로: `anyModifier` · Alt 무시, 입력칸 안 Delete · Backspace null, `undo.ts` · `applyEdit` · `moveThroughHistory`는 diff에 없음
+- 건수: 단위 246 → 263 (+17: keys 4 × 3 = 12, app 1 → 2 나눔 + 4 = 5), 구현 전 실패 8 = keys 4 + app 4, e2e 268 → 272
+
+[NON-BLOCKING]
+1. 주석 두 곳이 Q18 이전 표현: `e2e/mini-figma-helpers.ts:85` 「입력칸 안의 키는 앱이 무시하므로」, `e2e/mini-figma-undo.spec.ts:23` 「입력칸 안의 키는 앱이 무시하기 때문이다」 → 「라벨 글자 칸 안의 키는 앱이 무시」로 (동작 영향 없음)
+2. Ctrl+Y는 앱 키가 아니라 안 막음 — Windows Chromium에서 Ctrl+Y는 브라우저 기본 Redo → 라벨 칸 글자 되돌리기(③) 뒤 포커스를 빼고 Ctrl+Y면 브라우저 Redo가 라벨 칸에 적용돼 일반 수정 한 단계로 기록될 수 있음. Q18 ③ 「결과는 일반 수정」 범위 안, 앱 Undo 기록은 안 깨짐 → 기록만
+3. QA-A8 ② · ③의 `b2 글자 취소` 단언은 겹침을 못 잡음 (그 전에 글자 입력이 없어 브라우저 기록이 비어 있음). 겹침은 QA-29 · 30이 맡음 → 그대로
+
+- 처리 계획 (마스터): 1은 3단계 QA 전에 작업자에게 주석만 고치게 함(테스트 코드라 마스터가 안 고침), 2 · 3은 기록만 (2는 README 「알려진 한계」 후보)

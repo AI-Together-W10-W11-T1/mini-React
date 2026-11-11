@@ -21,3 +21,6 @@
 2026-11-11T19:15 | stage=2 | agent=master | round=1/3 | signal=SPEC_GAP | QA-29 재현 실패(버그 확인) → ④-8 ③ preventDefault 사용자 결정 필요
 2026-11-11T19:19 | stage=2 | agent=master | round=1/3 | signal=DECISION | Q18 "응" — Undo/Redo 키 preventDefault (입력칸 밖 · 선택 상자 · 체크박스)
 2026-11-11T19:23 | stage=2 | agent=master | round=1/3 | signal=DECISION | Q18 ② 변경 — 선택 상자 · 체크박스 Ctrl+Z = 앱 Undo + preventDefault
+2026-11-11T19:30 | stage=2 | agent=mr-worker | round=- | signal=UNKNOWN | Dev-11 | by=hook
+2026-11-11T19:33 | stage=2 | agent=mr-reviewer | round=2/3 | signal=UNKNOWN | Dev-9~12 | by=hook
+2026-11-11T19:33 | stage=2 | agent=master | round=2/3 | signal=APPROVE | 묶음 3 Dev-9~12 재검수 APPROVE (NB 3) — 2단계 끝

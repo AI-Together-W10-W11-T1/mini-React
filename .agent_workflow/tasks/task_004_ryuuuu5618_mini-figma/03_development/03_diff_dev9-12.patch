@@ -1,0 +1,1646 @@
+diff --git a/.agent_workflow/tasks/task_004_ryuuuu5618_mini-figma/03_development/dev_todo.md b/.agent_workflow/tasks/task_004_ryuuuu5618_mini-figma/03_development/dev_todo.md
+index 2f75db1..17902d1 100644
+--- a/.agent_workflow/tasks/task_004_ryuuuu5618_mini-figma/03_development/dev_todo.md
++++ b/.agent_workflow/tasks/task_004_ryuuuu5618_mini-figma/03_development/dev_todo.md
+@@ -172,23 +172,28 @@ fixtures/mini-figma/
+   - **완료 근거 (Evidence)**: `PropertyPanel.ts`(인스턴스를 골랐을 때 같은 5칸, 값 = `mergeProps(main, 인스턴스)`, override 칸 = 클래스 `override` + `prop-reset` ↻ 버튼, 아닌 칸 = `prop-follow` 「메인 따름」, 판단은 `isOverridden`), `App.ts`(`onEdit`가 고른 대상에 따라 `setMainField` / `setInstanceField` → `applyEdit(next, { target: 선택 id, field })`, `onReset` → `resetInstanceField` + `applyEdit(next, null)`). 바깥 루프: `e2e/mini-figma-instance.spec.ts`(QA-10 ~ QA-13 · QA-26 ~ QA-28) + `e2e/mini-figma-attack.spec.ts`(QA-A3 ~ A5)를 먼저 써서 실패 확인(`--project=desktop` 10 failed) → 구현 뒤 `npx playwright test e2e/mini-figma-instance.spec.ts e2e/mini-figma-attack.spec.ts e2e/mini-figma-main.spec.ts` 34 passed(desktop · mobile). **qa_todo QA-13 불일치 1건**: QA-13 문장은 b3의 「라벨 메인 따름 · 색만 override」인데 MF-16 시작 데이터는 b3 = `{ label: '삭제', color: 'red' }`(QA-1도 b3 글자 `삭제`)라 라벨도 override다. MF-16대로 구현하고 e2e는 b3의 override 칸을 `['label', 'color']`로 단언(QA-13 표의 글귀는 마스터가 고칠 것)
+   - 안쪽 루프: `app.test.ts` 「인스턴스 속성 편집」 13건을 먼저 써서 실패 확인 → 구현 → `npx vitest run fixtures/mini-figma` 5 files 217 passed. 실제 값: P-9 b1 라벨 캔버스 `{ SET_TEXT: 1 }` · 레이어 `{ SET_TEXT: 1 }`(렌더 +1) / P-22 b1 크기 S 캔버스 `{ SET_ATTR: 1 }` · 레이어 `{}`(클래스 `M S M M`) / P-10 b2 아이콘 켜기 캔버스 `{ INSERT: 1 }`, 경로 = `[0, 1, 1, 1, 0]`(b2 버튼 `[0, 1, 1, 1]` + `[0]`) / P-11 ♥ `{ SET_TEXT: 1 }` / P-12 b2에 아이콘 override가 있는 채 메인 켜기 `{ INSERT: 3 }`(b2 경로 줄 0) / P-13 메인 ♥ · ★ 각각 `{ SET_TEXT: 3 }`(b2 줄 0, b2는 ♥ 그대로) / P-14 ① hasIcon ↻ `{ REMOVE: 1 }` ② icon ↻ 렌더 1번이지만 캔버스 줄 `{}` ③ 메인 켜기 `{ INSERT: 4 }`(전부 ★) / P-21 라벨 ↻ 캔버스 `{ SET_TEXT: 1 }` · 레이어 `{ SET_TEXT: 1 }`. ↻ 뒤 `b3` = `{ id: 'b3' }`(`Object.keys` = `['id']`, `undefined` 값 없음) · 메인 변경을 다시 따라감, 빈 라벨 override는 메인으로 안 돌아가고 레이어 이름은 id, ↻는 `group = null`(새 단계). `npx tsc --noEmit` 오류 0건, 커밋 8b45c32
+ 
+-- [ ] **Dev-9** (`mini-figma`): 인스턴스 추가 · 삭제 · 메인 삭제 불가 [MF-22 · MF-23 · MF-24 · MF-26 · D-03 · D-04 · D-05]
++- [x] **Dev-9** (`mini-figma`): 인스턴스 추가 · 삭제 · 메인 삭제 불가 [MF-22 · MF-23 · MF-24 · MF-26 · D-03 · D-04 · D-05]
+   - 의존: Dev-8
+   - 바깥 루프: `e2e/mini-figma-layers.spec.ts`(QA-14 · QA-15 · QA-16) + 공격 A6 앞부분(고른 것 삭제)
+   - 대상 파일: `LayerPanel.ts`([+ 인스턴스] 버튼), `PropertyPanel.ts`(인스턴스를 골랐을 때만 [삭제], 메인에는 없음), `App.ts`(추가 = `addInstance(doc, nextId)` + `setNextId(nextId + 1)` + `applyEdit(next, null)`, 삭제 = `removeInstance` + `setSelectedId(null)` + 기록, 한 동작 = setter 여럿 → 렌더 한 번)
+   - 테스트(먼저 실패 확인): e2e QA-14 ~ QA-16, `app.test.ts`: [+ 인스턴스] 한 번 = 캔버스 `{ INSERT: 1 }` · 레이어 `{ INSERT: 1 }`, 삭제(`b2` 선택) 한 번 = 캔버스 `{ REMOVE: 1 }` · 레이어 `{ REMOVE: 1 }` + 속성 패널 `REPLACE` 1줄 이상(머리 `<h2>` → 빈 `<p>`, D-05), **삭제 동작의 렌더 횟수 +1**(wrapper로 `App` 실행 횟수 확인), 지운 번호 재사용 안 함(b3 지움 → 추가 → b4), `doc`에 `nextId`가 없음
+   - 알고리즘: 「인스턴스 목록 자료구조」, 정책 「고른 것 삭제 = 선택 풀림」 · 「메인 삭제 = 못 함」 · 「새 인스턴스 = override 없음」, 결정 9 B, Q17-3
+   - 완료 근거로 남길 것: 위와 같음
++  - **완료 근거 (Evidence)**: `LayerPanel.ts`(`[+ 인스턴스]` 버튼 `add-instance`, `<ul>` 밖 맨 끝 — 형제 전부 key 규칙 유지), `PropertyPanel.ts`(`delete-instance`는 인스턴스를 골랐을 때만, 메인에는 버튼 없음), `App.ts`(`onAdd` = `applyEdit(addInstance(doc, nextId), null)` + `setNextId(nextId + 1)`, `deleteSelected` = `removeInstance` + `applyEdit` + `setSelectedId(reconcileSelection(...))` — 한 동작의 setter 값을 모두 같은 렌더의 `doc` 하나에서 계산, 묶음 2 검수 NON-BLOCKING 4). `index.html`에 버튼 CSS 한 줄.
++  - 바깥 루프: `e2e/mini-figma-layers.spec.ts`(QA-14 · QA-15 · QA-16)를 먼저 써서 실패 확인(`npx playwright test e2e/mini-figma-layers.spec.ts --project=desktop` 2 failed · 1 passed, `waiting for getByTestId('add-instance')` / `waiting for getByTestId('delete-instance')` 타임아웃. QA-16은 키 연결 전이라도 「아무 일 없음」이 참이라 처음부터 통과 — 이후 Dev-11에서도 계속 통과) → 구현 뒤 `npx playwright test e2e/mini-figma-layers.spec.ts e2e/mini-figma-attack.spec.ts` 18 passed(desktop · mobile). **A6 앞부분**(`[삭제]` 버튼으로 지우면 선택 풀림)은 구현 직후에 썼다(실패 확인 없이 통과) — Dev-11에서 Delete · Undo · Redo 전체 시나리오로 대체. 같은 커밋에서 묶음 2 NON-BLOCKING 1(`attack.spec.ts`의 `waitForTimeout(100)`) 제거
++  - 안쪽 루프: `app.test.ts` 「인스턴스 추가 · 삭제」 6건을 먼저 써서 실패 확인(6 failed, `data-testid="delete-instance"가 없다` 등) → 구현 → `npx vitest run fixtures/mini-figma` 5 files 223 passed. 실제 값: P-16 [+ 인스턴스] 캔버스 `{ INSERT: 1 }` · 레이어 `{ INSERT: 1 }`, 렌더 +1 / P-17 b2 선택 → [삭제] 캔버스 `{ REMOVE: 1 }` · 레이어 `{ REMOVE: 1 }` · 속성 패널 `REPLACE` ≥ 1(머리 `<h2>` 노드가 DOM에서 분리, 빈 `<p>`로), 렌더 +1, 선택 null / b3 지움 → 추가 → `b4`, 또 추가 → `b5`, `nextId` 칸 6 / `doc`의 키 = `['main', 'instances']`(`nextId` 없음), 새 인스턴스 `{ id: 'b4' }`(`Object.keys` = `['id']`). `npx tsc --noEmit` 오류 0건, 커밋 f2b929f
+ 
+-- [ ] **Dev-10** (`mini-figma`): 순서 바꾸기 [↑] [↓] [MF-25 · MF-26 · 결정 2 B MOVE]
++- [x] **Dev-10** (`mini-figma`): 순서 바꾸기 [↑] [↓] [MF-25 · MF-26 · 결정 2 B MOVE]
+   - 의존: Dev-9
+   - 바깥 루프: `e2e/mini-figma-layers.spec.ts`(QA-17 · QA-18) + 공격 A16(순서 버튼이 고르기를 안 바꿈)
+   - 대상 파일: `LayerPanel.ts`(인스턴스 행마다 [↑] [↓], `stopPropagation`. 메인 행에는 없음), `App.ts`(`moveInstance` + `applyEdit(next, null)`)
+   - 테스트(먼저 실패 확인): e2e QA-17 · QA-18 · A16 (순서를 바꿔도 캔버스 버튼 · 레이어 행 DOM 노드가 **같은 참조**), `app.test.ts`: 순서 바꾸기 한 번 = 캔버스 `{ MOVE: 1 }` · 레이어 `{ MOVE: 1 }`(`INSERT` · `REMOVE` · `REPLACE` · `SET_TEXT` 0), 경계 [↑] · [↓] = 렌더 0번(같은 Doc)
+   - 알고리즘: 결정 2 B(key 표 매칭 + MOVE), 「선택 · key」(id), 공통 주의 1 · 3 · 13
+   - 완료 근거로 남길 것: 위와 같음
++  - **완료 근거 (Evidence)**: `LayerPanel.ts`(인스턴스 행마다 `layer-up` · `layer-down` 버튼, 메인 행에는 없음. 핸들러는 `event.stopPropagation()` 뒤 `onMove(id, ∓1)` — 행의 고르기 `onClick`이 같이 불리지 않게, ④-4. `disabled` 안 씀, ④-13), `App.ts`(`onMove` = `applyEdit(moveInstance(doc, id, delta), null)` — 경계는 같은 Doc이라 렌더 · 기록 없음). `index.html`에 `.layer-move` CSS. 바깥 루프: `e2e/mini-figma-layers.spec.ts`(QA-17 · QA-18) + `e2e/mini-figma-attack.spec.ts`(QA-A16 두 건: 선택 있음 · 없음)를 먼저 써서 실패 확인(`npx playwright test e2e/mini-figma-layers.spec.ts e2e/mini-figma-attack.spec.ts --project=desktop -g "QA-17|QA-18|QA-A16"` 4 failed, `waiting for locator('[data-testid="layer-item"][data-id="b1"] [data-testid="layer-down"]')` 타임아웃) → 구현 뒤 `npx playwright test e2e/mini-figma-layers.spec.ts e2e/mini-figma-attack.spec.ts` 26 passed(desktop · mobile). 도우미 `moveInLayer(page, id, 'up' | 'down')` 추가
++  - 안쪽 루프: `app.test.ts` 「순서 바꾸기」 7건을 먼저 써서 실패 확인(7 failed) → 구현 → `npx vitest run fixtures/mini-figma` 5 files 230 passed. 실제 값: P-15 b1 행 [↓] 캔버스 `{ MOVE: 1 }` · 레이어 `{ MOVE: 1 }`(`INSERT` · `REMOVE` · `REPLACE` · `SET_TEXT` 0), 렌더 +1, 두 번 옮겨도 버튼 · 행 6개 노드 모두 같은 참조 / P-20 경계(맨 위 [↑] · 맨 아래 [↓]) 렌더 0번 · `lastPatches` · `doc` · `history` 같은 객체, 버튼에 `disabled` 없음 / `stopPropagation`: b2를 고른 채 [↓] · [↑] 뒤에도 `selectedId` = `b2`, 선택이 없을 때 [↓]를 눌러도 `null`. **검출력 확인**: `stopPropagation` 호출을 일부러 빼면 `app.test.ts` 5 failed + A16 2 failed → 원복. `npx tsc --noEmit` 오류 0건, 커밋 da8f58d
+ 
+-- [ ] **Dev-11** (`mini-figma`): 키보드 · Undo/Redo 연결 [MF-30 · MF-31 · MF-32 · MF-33 · MF-34]
++- [x] **Dev-11** (`mini-figma`): 키보드 · Undo/Redo 연결 [MF-30 · MF-31 · MF-32 · MF-33 · MF-34]
+   - 의존: Dev-3 · 4 · 10
+   - 바깥 루프: `e2e/mini-figma-undo.spec.ts`(QA-19 ~ QA-25) + 공격 A6(뒷부분) · A7 · A8 · A9 · A10 · A11 · A15 · A17 · **A18 · A19**
+   - 대상 파일: `App.ts`(`useEffect`에서 `document.addEventListener('keydown', onKey)`, cleanup에서 `removeEventListener`, deps = 핸들러가 읽는 state 전부. `onKey`는 `KeyboardEvent` → `keyAction` → `'delete'`(고른 인스턴스 삭제, 메인 · 선택 없음은 무시) · `'undo'` · `'redo'`(`undo.ts` 적용 → `doc` · `history` 갱신 + `reconcileSelection`으로 사라진 선택은 `null`. **`nextId`는 건드리지 않음**). 편집에서 쓰는 `applyEdit`은 Dev-5부터 이미 `history`를 거친다
+@@ -197,13 +202,27 @@ fixtures/mini-figma/
+     - `app.test.ts`(jsdom, `render()` **전에** spy를 걸고 `afterEach`에서 `unmount()` — Dev-5 공통 규칙): `document.addEventListener`/`removeEventListener` 호출 횟수를 세어 **상태가 여러 번 바뀐 뒤에도 등록된 keydown 리스너는 1개**(`add` 횟수 − `remove` 횟수 = 1), `unmount()` 뒤 keydown을 보내도 아무 일 없음(cleanup, 남은 리스너 0개), 한 키 입력 = 한 단계(Undo 한 번에 한 묶음만), 삭제 · Undo · Redo 한 동작 = 렌더 한 번, 입력칸에서 keydown(`target`이 `input`)이면 doc · history 변화 없음, Undo/Redo 때 선택이 사라지면 `null`, **`b4` 추가 → Undo → 다시 추가 = `b5`** (`nextId`가 안 되돌아감, Q17-3), Undo = 삭제 취소 시 캔버스 `{ INSERT: 1 }` · 레이어 `{ INSERT: 1 }`, Shift+Delete · Ctrl+Backspace 등 수정키 조합은 아무 일 없음
+   - 알고리즘: 「키보드 받는 방법」(`useEffect` + `document` 등록 + cleanup — **2.5단계 「왜 이걸 골랐나」 대상**), 「Undo 묶음」, Q17-2 · 3 · 4, 공통 주의 6 · 8 · 14
+   - 완료 근거로 남길 것: e2e 실패 로그 · 통과, `app.test.ts`의 리스너 횟수 출력, vitest, 커밋 해시
++  - **완료 근거 (Evidence)**: `App.ts`에 `useEffect(() => { const onKey = …; document.addEventListener('keydown', onKey); return () => document.removeEventListener('keydown', onKey); }, [doc, selectedId, history])` — 핸들러가 읽는 state 전부가 deps(`nextId`는 안 읽음). `onKey`는 `KeyboardEvent` → `keyAction({ key, ctrlKey, metaKey, shiftKey, altKey, targetTag })` → `'delete'`는 `deleteSelected()`(버튼과 같은 함수), `'undo'` · `'redo'`는 `moveThroughHistory(undo(history, doc))` · `moveThroughHistory(redo(history, doc))` — `result.state === history`면(되돌릴 것 없음) 아무 setter도 안 부르고, 아니면 `setHistory` · `setDoc` · `setSelectedId(reconcileSelection(selectedId, result.doc))`를 모두 이번 렌더 값에서 계산(렌더 1번). `nextId`는 안 건드림(Q17-3). `preventDefault` 없음. `rootOnlyHooks.test.ts`에 `App.ts`의 `useEffect` 호출 단언 추가 + `components/*.ts` · `model` · `undo` · `keys` · `main`에 `useEffect` · `addEventListener`가 없음 단언
++  - 바깥 루프: `e2e/mini-figma-undo.spec.ts`(QA-19 ~ QA-25) + `e2e/mini-figma-attack.spec.ts`(A6 전체 · A7 · A8 · A9 · A10 · A11 · A15 · A17 · A18 · A19 + A2의 Ctrl+Z 줄)를 먼저 써서 실패 확인(`npx playwright test e2e/mini-figma-undo.spec.ts e2e/mini-figma-attack.spec.ts --project=desktop` **15 failed** · 9 passed — 실패: QA-19 · 20 · 21 · 22 · 23 · 24 · 25, A6 · A9 · A19 · A10 · A11 · A15 · A17 · A18. 예: A9 `Ctrl+Z 1번째 뒤 행 수 … unexpected value "53"`. A7 · A8 · A12 이전 것들은 「아무 일 없음」이 참이라 처음부터 통과) → 구현 뒤 `npx playwright test e2e/mini-figma-undo.spec.ts e2e/mini-figma-attack.spec.ts e2e/mini-figma-layers.spec.ts` **58 passed**(desktop · mobile). A9 · A19는 49 · 50번 경계를 모두 눌러 확인
++  - **e2e 보정 1건(발견)**: 입력칸에 입력한 직후 `Ctrl+Z`는 Chromium의 네이티브 글자 되돌리기도 같이 움직인다(앱 Undo 없이도 A2의 `버튼` 복귀 단언이 통과해 버림). 그래서 글자 입력 뒤 Undo를 확인하는 A2 · A14 · QA-21은 다른 것을 골랐다 돌아와(입력칸 값이 프로그램으로 다시 쓰여 네이티브 기록이 비워짐) 앱 Undo의 결과임이 분명하게 했다. A8의 `Ctrl+Z` 두 번 · 체크박스 · 선택 상자도 같은 이유로 앱 Undo가 잘못 돌면 메인 색이 파랑으로 돌아가 걸리게 짰다
++  - 안쪽 루프: `app.test.ts` 「키보드 · Undo/Redo」 15건 + `rootOnlyHooks` 1건을 먼저 써서 실패 확인(12 failed) → 구현 → `npx vitest run fixtures/mini-figma` 5 files **246 passed**. `app.test.ts`는 `document.addEventListener` · `removeEventListener` spy를 매 테스트 `render()` **전에** 걸고 `afterEach`에서 `unmount()` + `vi.restoreAllMocks()`. **리스너 횟수 출력**(`--reporter=verbose`): `[keydown 리스너] add=14 remove=13 남음=1 (렌더 14번)` — 선택 · 수정 · 추가 · 순서 · 삭제 · Undo · Redo 14번 렌더 뒤에도 남은 keydown 리스너 1개, `unmount()` 뒤 0개 · 그 뒤 Delete · Ctrl+Z 무시. 실제 값: P-17 키(Delete) 캔버스 `{"REMOVE":1}` · 레이어 `{"REMOVE":1}` · 속성 패널 `REPLACE` 1줄 · 렌더 +1 / P-18 삭제 취소 캔버스 `{ INSERT: 1 }` · 레이어 `{ INSERT: 1 }` · 렌더 +1 · 선택 null / P-19 메인 색 빨강 → Undo 캔버스 `{ SET_ATTR: 3 }` · 레이어 `{}` · 렌더 +1(Redo도 `{ SET_ATTR: 3 }`) / P-20 되돌릴 것 · 다시 할 것 없음 렌더 0번 · `lastPatches` 같은 객체 · `history` = `EMPTY_UNDO` / `b4` 추가 → Undo → 추가 = `b5`(`nextId` 칸 5 그대로), 또 Undo → `b6` / 입력칸 · 선택 상자 · 체크박스 `target`의 Delete · Backspace · Ctrl+Z · Meta+Z · Ctrl+Shift+Z = 렌더 0번 · `doc` · `history` 같은 객체 / 수정키 조합 9종 렌더 0번, 대조 `Delete`(`repeat: true`)는 지움 / `[+ 인스턴스]` 60번 = `past` 49칸, Undo 49번 뒤 `b1`~`b14`, 한 번 더는 그대로
++  - **검출력 확인**: ① deps를 `[]`로 바꾸면(옛 state 핸들러) `app.test.ts` 11 failed · e2e(undo · attack, desktop) 15 failed, ② cleanup을 빼면 `app.test.ts` 2 failed(리스너 수 · unmount 뒤) · A10 1 failed(`Expected: 1 Received: 43`) → 둘 다 원복. `npx tsc --noEmit` 오류 0건, 커밋 7bd1eab
+ 
+-- [ ] **Dev-12** (`e2e`): 공격 · 경계 시나리오 마무리 + 회귀 확인 [MF-02 · MF-03 · 전체]
++- [x] **Dev-12** (`e2e`): 공격 · 경계 시나리오 마무리 + 회귀 확인 [MF-02 · MF-03 · 전체]
+   - 의존: Dev-11
+   - 대상 파일: `e2e/mini-figma-attack.spec.ts`(A1 ~ A19 중 앞 Dev에서 못 채운 것 — A12 연타(**mobile에서 `noHorizontalScroll` 포함**, Q17-5) · A13 새로고침 · A14 입력 100자), `e2e/mini-figma-helpers.ts` 정리
+   - 테스트: `qa_todo.md` 공격 시나리오 전부가 desktop · mobile에서 통과
+   - 알고리즘: 해당 없음
+   - 완료 근거로 남길 것: `npx vitest run` 전체 통과 수, `npx tsc --noEmit` 오류 0건, `npx playwright test` 전체(기존 Phase 1 · 2 + mini-figma) 통과 수(desktop · mobile), `git diff --stat f224bdd -- packages/` **비어 있음**(MF-02), 콘솔 error 0건, 커밋 해시
++  - **완료 근거 (Evidence)**: `e2e/mini-figma-attack.spec.ts`에 A12 · A13 · A14 추가, `e2e/mini-figma-helpers.ts` 주석 정리(Dev-11 이후 stale 문구 수정). QA-A1 ~ A19 전부 이 파일에 있고 desktop · mobile 모두 통과(Dev-7 ~ 12에서 나눠 채움). A12: `[+ 인스턴스]` 20번 연타 → `b4`~`b23` 순서대로, `b1` ~ `b3` · `b1` 행 같은 참조, `noHorizontalScroll` 통과 · 버튼 24개 오른쪽 끝이 캔버스 오른쪽 끝(+0.5px) 이내(mobile 포함) / 맨 아래 `b23` 행 [↓] 5번 = 순서 그대로, `b1` 행 [↓] 5번 = 한 칸씩 6번째로 / `b2` 고르고 Delete 3번 = `b2` 하나만 지워짐. A13: 고치고 추가 · 순서 · 삭제 뒤 `reload()` → 시작 데이터 · 선택 없음 · Ctrl+Z · Ctrl+Shift+Z 아무 일 없음 · 추가는 `b4`. A14: 100자를 `pressSequentially` → 입력칸 같은 노드 · 포커스 유지 · 값 · 캔버스 글자가 100자 그대로, Ctrl+Z 한 번에 `버튼`. 아래는 실행 결과
++  - 검출력 확인: A12의 `flex-wrap: wrap`을 `nowrap`으로 바꾸면 mobile A12 1 failed → 원복
++  - 전체 실행(마지막 코드 변경 `ac39d89` 뒤, 같은 작업 트리):
++    - `npx vitest run` → **41 files · 1047 passed**(기존 + mini-figma 5 files 246 — model 62 · undo 24 · keys 78 · rootOnlyHooks 14 · app 68)
++    - `npx tsc --noEmit` → 출력 없음, 종료 코드 0 (오류 0건)
++    - `npx playwright test` 전체(desktop · mobile) → **268 passed** (기존 Phase 1 · 2 · perf-bench 포함 + `e2e/mini-figma-*.spec.ts` 96건 = 48 × 2). 콘솔 `error` · 선언 안 한 dialog가 있으면 실패하는 확장 `test`를 모든 스펙이 씀 → 0건
++    - `git diff --stat f224bdd -- packages/` → **비어 있음**(0줄, MF-02 · QA-R1)
++    - 포트 5199: Playwright가 끝나며 서버를 내림 (`netstat`에 LISTEN 없음, TIME_WAIT만)
++    - 커밋: Dev-9 f2b929f · Dev-10 da8f58d · Dev-11 7bd1eab · Dev-12 ac39d89
+ 
+ ## e2e 도우미 (`e2e/mini-figma-helpers.ts`, Dev-5에서 만들고 이후 Dev가 보탬)
+ 
+diff --git a/e2e/mini-figma-attack.spec.ts b/e2e/mini-figma-attack.spec.ts
+index 70e780e..fb1cb4b 100644
+--- a/e2e/mini-figma-attack.spec.ts
++++ b/e2e/mini-figma-attack.spec.ts
+@@ -1,6 +1,32 @@
+-import { test, expect, URL, selectOnCanvas, noHorizontalScroll, canvasLabels, buttonSel, layerSel, inRow } from './mini-figma-helpers';
++import type { Page } from '@playwright/test';
++import {
++  test,
++  expect,
++  URL,
++  holdNodes,
++  sameNode,
++  watchApp,
++  selectOnCanvas,
++  noHorizontalScroll,
++  canvasLabels,
++  canvasOrder,
++  layerOrder,
++  buttonSel,
++  layerSel,
++  inRow,
++  moveInLayer,
++  selectedOnCanvas,
++  selectedInLayer,
++  blurFocus,
++  pressUndo,
++  pressRedo,
++  installKeydownCounter,
++  keydownListenerCount,
++} from './mini-figma-helpers';
+ 
+-// [AI Note]: 공격적 시나리오 모음. 앞 Dev에서 채울 수 있는 것은 그 Dev에서 쓴다 (qa_todo 「Dev」 열): A1 · A2 = Dev-7, A3 ~ A5 = Dev-8.
++// [AI Note]: 공격적 시나리오 모음 (QA-A1 ~ A19). 앞 Dev에서 채울 수 있는 것은 그 Dev에서 썼다 (qa_todo 「Dev」 열): A1 · A2 = Dev-7, A3 ~ A5 = Dev-8, A16 = Dev-10,
++// A6 · A7 · A8 · A9 · A10 · A11 · A15 · A17 · A18 · A19 = Dev-11, A12 ~ A14 = Dev-12.
++// 입력칸 글자를 입력한 뒤 Ctrl+Z로 확인하는 시나리오(A2 · A14)는 다른 것을 골랐다 돌아와 브라우저의 글자 되돌리기 기록을 비운 뒤 누른다 — 앱 Undo의 결과임을 분명히 하려고.
+ // 이 스펙의 테스트는 desktop · mobile 두 프로젝트에서 모두 돈다.
+ 
+ test('QA-A1 특수문자 라벨: 마크업이 아니라 글자 그대로 그려지고 onerror가 실행되지 않는다', async ({ page }) => {
+@@ -23,7 +49,6 @@ test('QA-A1 특수문자 라벨: 마크업이 아니라 글자 그대로 그려
+ 
+   // <b> · <img> 요소가 생기지 않았고 onerror도 실행되지 않았다
+   await expect(page.locator('[data-testid="app-root"] b, [data-testid="app-root"] img')).toHaveCount(0);
+-  await page.waitForTimeout(100);
+   expect(await page.evaluate(() => (window as unknown as { __pwned?: number }).__pwned)).toBeUndefined();
+ });
+ 
+@@ -41,7 +66,14 @@ test('QA-A2 아주 긴 글자: 공백 없는 200자를 넣어도 가로 스크
+   if (canvas === null) throw new Error('캔버스가 안 보인다');
+   const rights = await page.getByTestId('figma-button').evaluateAll((els) => els.map((el) => el.getBoundingClientRect().right));
+   for (const right of rights) expect(right).toBeLessThanOrEqual(canvas.x + canvas.width + 0.5);
+-  // [Dev-11에서 더함] 입력 한 번이 한 단계로 묶여 Ctrl+Z 한 번에 `버튼`으로 돌아오는지
++  // 입력 한 번이 한 단계라 Ctrl+Z 한 번에 `버튼`으로 돌아온다 (포커스는 pressUndo가 입력칸 밖으로 뺌)
++  // [AI Note]: 다른 것을 골랐다 돌아오면 입력칸 값이 프로그램으로 다시 쓰여 브라우저의 글자 되돌리기(네이티브 Undo) 기록이 비워진다 —
++  // 그래야 아래 되돌리기가 브라우저가 아니라 앱 Undo의 결과라는 것이 분명하다.
++  await selectOnCanvas(page, 'b1');
++  await selectOnCanvas(page, 'main');
++  await pressUndo(page);
++  expect((await canvasLabels(page))[0]).toBe('버튼');
++  expect(await noHorizontalScroll(page)).toBe(true);
+ });
+ 
+ // ---------------------------------------------------------------------------
+@@ -112,3 +144,390 @@ test('QA-A5 ↻ 뒤 메인 변경: b3가 메인을 다시 따라가고 `undefine
+   const texts = await page.getByTestId('figma-button').evaluateAll((els) => els.map((el) => el.className + '|' + el.textContent));
+   for (const t of texts) expect(t).not.toContain('undefined');
+ });
++
++// ---------------------------------------------------------------------------
++// Dev-10: [↑] [↓]가 행의 고르기를 같이 부르지 않는다 (A16, 이벤트 버블링 ④-4)
++// ---------------------------------------------------------------------------
++
++test('QA-A16 [↑] · [↓] 버튼이 고르기를 안 바꾼다: b2를 고른 채 b1 행 [↓], b3 행 [↑]를 눌러도 b2가 계속 골라져 있고 b1 · b3에 selected가 안 붙는다', async ({ page }) => {
++  await page.goto(URL);
++  await selectOnCanvas(page, 'b2');
++
++  await moveInLayer(page, 'b1', 'down');
++  await moveInLayer(page, 'b3', 'up');
++
++  await expect(page.getByTestId('property-title')).toHaveText('인스턴스 · 취소');
++  expect(await selectedOnCanvas(page)).toEqual(['b2']);
++  expect(await selectedInLayer(page)).toEqual(['b2']);
++  await expect(page.locator(`${buttonSel('b1')}.selected, ${buttonSel('b3')}.selected, ${layerSel('b1')}.selected, ${layerSel('b3')}.selected`)).toHaveCount(0);
++  // 순서만 바뀜
++  expect(await page.locator('[data-testid="layer-item"]').evaluateAll((els) => els.map((el) => el.getAttribute('data-id')))).toEqual(['b2', 'b3', 'b1']);
++});
++
++test('QA-A16 (선택 없음) 아무것도 안 고른 채 [↓]를 눌러도 선택은 계속 없다 (버블링으로 행이 골라지지 않음)', async ({ page }) => {
++  await page.goto(URL);
++
++  await moveInLayer(page, 'b1', 'down');
++
++  await expect(page.getByTestId('property-empty')).toHaveCount(1);
++  expect(await selectedOnCanvas(page)).toEqual([]);
++  expect(await selectedInLayer(page)).toEqual([]);
++});
++
++// ---------------------------------------------------------------------------
++// Dev-11: 키보드 · Undo/Redo 공격 (A6 · A7 · A8 · A9 · A10 · A11 · A15 · A17 · A18 · A19)
++// ---------------------------------------------------------------------------
++
++const instanceCount = (page: Page) => page.getByTestId('layer-item');
++const mainColorClass = async (page: Page): Promise<string> => (await page.locator(buttonSel('main')).getAttribute('class')) ?? '';
++
++test('QA-A6 고른 것이 Delete · Undo · Redo로 사라지면 선택이 풀린다: Delete 뒤 풀림, Ctrl+Z로 b2가 돌아와도 풀린 채, 다시 b2를 골라 Ctrl+Shift+Z로 지워지면 또 풀린다', async ({ page }) => {
++  await page.goto(URL);
++  await selectOnCanvas(page, 'b2');
++  await page.keyboard.press('Delete');
++  expect(await canvasOrder(page)).toEqual(['b1', 'b3']);
++  await expect(page.getByTestId('property-empty')).toHaveCount(1);
++  expect(await selectedOnCanvas(page)).toEqual([]);
++
++  await pressUndo(page);
++  // b2가 돌아와도 자동으로 다시 고르지 않는다
++  expect(await canvasOrder(page)).toEqual(['b1', 'b2', 'b3']);
++  await expect(page.getByTestId('property-empty')).toHaveCount(1);
++  expect(await selectedOnCanvas(page)).toEqual([]);
++  expect(await selectedInLayer(page)).toEqual([]);
++
++  await selectOnCanvas(page, 'b2');
++  await expect(page.getByTestId('property-title')).toHaveText('인스턴스 · 취소');
++  await pressRedo(page);
++  // Redo로 b2가 다시 지워지면 선택도 다시 풀리고 존재하지 않는 id가 골라진 채 남지 않는다
++  expect(await canvasOrder(page)).toEqual(['b1', 'b3']);
++  await expect(page.getByTestId('property-empty')).toHaveCount(1);
++  await expect(page.getByTestId('property-title')).toHaveCount(0);
++  expect(await selectedOnCanvas(page)).toEqual([]);
++  expect(await selectedInLayer(page)).toEqual([]);
++});
++
++test('QA-A7 메인에서 Delete · Backspace를 각각 5번 연달아 눌러도 아무 일 없다 (DOM 변경 0, 메인이 계속 골라짐)', async ({ page }) => {
++  await page.goto(URL);
++  await selectOnCanvas(page, 'main');
++  const watch = await watchApp(page);
++
++  for (let i = 0; i < 5; i += 1) await page.keyboard.press('Delete');
++  for (let i = 0; i < 5; i += 1) await page.keyboard.press('Backspace');
++
++  await expect(page.getByTestId('figma-button')).toHaveCount(4);
++  await expect(page.getByTestId('layer-item')).toHaveCount(3);
++  expect(await selectedOnCanvas(page)).toEqual(['main']);
++  expect(await selectedInLayer(page)).toEqual(['main']);
++  expect((await watch.take()).body.total, 'DOM 변경').toBe(0);
++});
++
++test('QA-A8 입력칸 · 선택 상자 · 체크박스 안의 키는 앱 동작을 안 일으킨다 (Delete · Backspace로 안 지워지고 Ctrl+Z · Meta+Z로 앱 Undo가 안 일어남)', async ({ page }) => {
++  await page.goto(URL);
++  // Undo 한 단계: 메인 색 빨강 (앱 Undo가 잘못 돌면 이 색이 파랑으로 돌아간다)
++  await selectOnCanvas(page, 'main');
++  await page.getByTestId('prop-color').selectOption({ label: '빨강' });
++  await selectOnCanvas(page, 'b2');
++
++  const appUntouched = async (where: string): Promise<void> => {
++    expect(await mainColorClass(page), `${where}: 메인 색`).toContain('btn-red');
++    await expect(page.getByTestId('figma-button'), `${where}: 버튼`).toHaveCount(4);
++    await expect(instanceCount(page), `${where}: 레이어 행`).toHaveCount(3);
++    expect(await selectedOnCanvas(page), `${where}: 선택`).toEqual(['b2']);
++  };
++
++  // ① 라벨 칸(글자 `취소`)
++  const label = page.getByTestId('prop-label');
++  await label.click();
++  await page.keyboard.press('End');
++  await page.keyboard.press('Backspace');
++  // 브라우저 기본: 입력칸 글자만 한 글자 지워지고 그 결과가 b2 라벨로 반영됨
++  await expect(label).toHaveValue('취');
++  expect((await canvasLabels(page))[2]).toBe('취');
++  await page.keyboard.press('Delete');
++  await page.keyboard.press('Control+KeyZ');
++  await page.keyboard.press('Meta+KeyZ');
++  await appUntouched('라벨 칸');
++
++  // ② 크기 선택 상자
++  await page.getByTestId('prop-size').focus();
++  for (const key of ['Delete', 'Backspace', 'Control+KeyZ', 'Control+KeyZ']) await page.keyboard.press(key);
++  await appUntouched('선택 상자');
++
++  // ③ 체크박스 (눌러서 바꾸지 않고 포커스만)
++  await page.getByTestId('prop-hasicon').focus();
++  for (const key of ['Delete', 'Backspace', 'Control+KeyZ', 'Control+KeyZ']) await page.keyboard.press(key);
++  await appUntouched('체크박스');
++});
++
++test('QA-A9 Undo 한도: [+ 인스턴스]를 50번 누르면 처음 모습이 빠져 Ctrl+Z 49번에 b1 b2 b3 b4에서 멈추고 50번째는 아무 일 없다. Ctrl+Shift+Z 49번이면 b1~b53', async ({ page }) => {
++  test.setTimeout(120_000);
++  await page.goto(URL);
++  const add = page.getByTestId('add-instance');
++  for (let i = 0; i < 50; i += 1) await add.click();
++  await expect(instanceCount(page)).toHaveCount(53);
++
++  for (let k = 1; k <= 49; k += 1) {
++    await pressUndo(page);
++    await expect(instanceCount(page), `Ctrl+Z ${k}번째 뒤 행 수`).toHaveCount(53 - k);
++  }
++  expect(await layerOrder(page)).toEqual(['b1', 'b2', 'b3', 'b4']);
++  // 50번째: 처음 모습 b1 b2 b3로는 못 돌아간다
++  await pressUndo(page);
++  expect(await layerOrder(page)).toEqual(['b1', 'b2', 'b3', 'b4']);
++  expect(await canvasOrder(page)).toEqual(['b1', 'b2', 'b3', 'b4']);
++
++  for (let k = 1; k <= 49; k += 1) await pressRedo(page);
++  const expected = Array.from({ length: 53 }, (_, i) => `b${i + 1}`);
++  expect(await layerOrder(page)).toEqual(expected);
++  expect(await canvasOrder(page)).toEqual(expected);
++});
++
++test('QA-A19 Undo 한도 경계: [+ 인스턴스] 49번 뒤 Ctrl+Z 49번이면 처음 모습 b1 b2 b3로 돌아오고 50번째는 아무 일 없다. Ctrl+Shift+Z 49번이면 b1~b52', async ({ page }) => {
++  test.setTimeout(120_000);
++  await page.goto(URL);
++  const add = page.getByTestId('add-instance');
++  for (let i = 0; i < 49; i += 1) await add.click();
++  await expect(instanceCount(page)).toHaveCount(52);
++
++  for (let k = 1; k <= 49; k += 1) await pressUndo(page);
++  expect(await layerOrder(page)).toEqual(['b1', 'b2', 'b3']);
++  await pressUndo(page);
++  expect(await layerOrder(page)).toEqual(['b1', 'b2', 'b3']);
++  expect(await canvasOrder(page)).toEqual(['b1', 'b2', 'b3']);
++
++  for (let k = 1; k <= 49; k += 1) await pressRedo(page);
++  const expected = Array.from({ length: 52 }, (_, i) => `b${i + 1}`);
++  expect(await layerOrder(page)).toEqual(expected);
++  expect(await canvasOrder(page)).toEqual(expected);
++});
++
++test('QA-A10 옛 state를 보는 키 핸들러 · 리스너 정리: Delete는 지금 고른 것, Ctrl+Z는 가장 최근 단계, 상태가 20번 넘게 바뀌어도 keydown 리스너는 1개로 유지된다', async ({ page }) => {
++  await installKeydownCounter(page);
++  await page.goto(URL);
++  const baseline = await keydownListenerCount(page);
++  expect(baseline, '로드 직후 등록된 keydown 리스너').toBe(1);
++
++  // ① b1을 고르고 b2를 고른 뒤 Delete: 지워지는 것은 지금 고른 b2
++  await selectOnCanvas(page, 'b1');
++  await selectOnCanvas(page, 'b2');
++  await page.keyboard.press('Delete');
++  expect(await canvasOrder(page)).toEqual(['b1', 'b3']);
++
++  // ② 메인 색 빨강 → 크기 L → Ctrl+Z(한 번): 되돌아가는 것은 가장 최근 단계(크기), 색은 남음
++  await selectOnCanvas(page, 'main');
++  await page.getByTestId('prop-color').selectOption({ label: '빨강' });
++  await page.getByTestId('prop-size').selectOption('L');
++  await pressUndo(page);
++  const main = (await mainColorClass(page)).split(' ');
++  expect(main).toContain('btn-M');
++  expect(main).toContain('btn-red');
++
++  // ③ 상태를 20번 넘게 바꾼다 (고르기 · 수정 섞어서): 등록 − 해제는 그대로
++  for (let i = 0; i < 6; i += 1) {
++    await selectOnCanvas(page, 'b1');
++    await page.getByTestId('prop-label').fill(`값${i}`);
++    await selectOnCanvas(page, 'main');
++    await page.getByTestId('prop-size').selectOption(i % 2 === 0 ? 'S' : 'L');
++    await selectOnCanvas(page, 'b3');
++  }
++  expect(await keydownListenerCount(page), '상태가 20번 넘게 바뀐 뒤 keydown 리스너').toBe(baseline);
++
++  // 보조 확인: Ctrl+Z 한 번 = 한 단계만
++  await selectOnCanvas(page, 'b3');
++  await page.getByTestId('prop-label').fill('마지막');
++  await pressUndo(page);
++  expect((await canvasLabels(page))[2]).toBe('삭제');
++  expect((await canvasLabels(page))[1]).toBe('값5');
++  expect(await keydownListenerCount(page)).toBe(baseline);
++});
++
++test('QA-A11 정해진 키 밖 · 수정키 조합은 아무 일도 안 한다 (Ctrl+Y · Escape · z · Alt+Z · Shift+Delete · Ctrl+Backspace · Alt+Backspace · Meta+Backspace), 수정키 없는 Delete는 b2를 지운다', async ({ page }) => {
++  await page.goto(URL);
++  await selectOnCanvas(page, 'main');
++  await page.getByTestId('prop-color').selectOption({ label: '빨강' });
++  await blurFocus(page);
++
++  const unchanged = async (where: string, selected: string): Promise<void> => {
++    expect(await mainColorClass(page), `${where}: 색`).toContain('btn-red');
++    await expect(page.getByTestId('figma-button'), `${where}: 버튼`).toHaveCount(4);
++    await expect(instanceCount(page), `${where}: 행`).toHaveCount(3);
++    expect(await selectedOnCanvas(page), `${where}: 선택`).toEqual([selected]);
++  };
++
++  for (const key of ['Control+KeyY', 'Escape', 'KeyZ', 'Alt+KeyZ']) await page.keyboard.press(key);
++  await unchanged('메인 선택', 'main');
++
++  await selectOnCanvas(page, 'b2');
++  for (const key of ['Control+KeyY', 'Escape', 'KeyZ', 'Alt+KeyZ', 'Shift+Delete', 'Control+Backspace', 'Alt+Backspace', 'Meta+Backspace']) {
++    await page.keyboard.press(key);
++  }
++  await unchanged('b2 선택', 'b2');
++
++  // 대조: 수정키 없는 Delete는 지운다
++  await page.keyboard.press('Delete');
++  expect(await canvasOrder(page)).toEqual(['b1', 'b3']);
++});
++
++test('QA-A15 고르기만 바꿔도 묶음은 안 끝난다: b2 라벨에 `A`, 다른 것을 고르고 다시 b2에 `B`를 입력한 뒤 Ctrl+Z 한 번에 둘 다 `취소`로 돌아간다', async ({ page }) => {
++  await page.goto(URL);
++  await selectOnCanvas(page, 'b2');
++  const label = page.getByTestId('prop-label');
++  await label.click();
++  await page.keyboard.press('End');
++  await page.keyboard.type('A');
++  expect((await canvasLabels(page))[2]).toBe('취소A');
++
++  await selectOnCanvas(page, 'b3');
++  await selectOnCanvas(page, 'b2');
++  await label.click();
++  await page.keyboard.press('End');
++  await page.keyboard.type('B');
++  expect((await canvasLabels(page))[2]).toBe('취소AB');
++
++  await pressUndo(page);
++
++  expect((await canvasLabels(page))[2]).toBe('취소');
++  await expect(label).toHaveValue('취소');
++});
++
++test('QA-A17 다른 것이 사라지거나 끼어들어도 고른 것은 id로 유지된다: b1 삭제 → b3 고름 → Ctrl+Z(b1이 앞에 끼어듦) → Ctrl+Shift+Z(b1 다시 삭제) 모두 b3가 계속 골라져 있다', async ({ page }) => {
++  await page.goto(URL);
++  await holdNodes(page, { btn3: buttonSel('b3') });
++  await selectOnCanvas(page, 'b1');
++  await page.keyboard.press('Delete');
++  expect(await canvasOrder(page)).toEqual(['b2', 'b3']);
++  await selectOnCanvas(page, 'b3');
++
++  await pressUndo(page);
++  expect(await canvasOrder(page)).toEqual(['b1', 'b2', 'b3']);
++  await expect(page.getByTestId('property-title')).toHaveText('인스턴스 · 삭제');
++  expect(await selectedOnCanvas(page)).toEqual(['b3']);
++  expect(await sameNode(page, 'btn3', `${buttonSel('b3')}.selected`)).toBe(true);
++
++  await pressRedo(page);
++  expect(await canvasOrder(page)).toEqual(['b2', 'b3']);
++  await expect(page.getByTestId('property-title')).toHaveText('인스턴스 · 삭제');
++  expect(await selectedOnCanvas(page)).toEqual(['b3']);
++  expect(await sameNode(page, 'btn3', `${buttonSel('b3')}.selected`)).toBe(true);
++});
++
++test('QA-A18 추가를 Undo한 뒤 다시 추가하면 번호가 이어진다: b4 → Ctrl+Z → 추가는 b5, 이어서 Ctrl+Z → 추가는 b6 (지운 번호를 다시 쓰지 않음)', async ({ page }) => {
++  await page.goto(URL);
++  const add = page.getByTestId('add-instance');
++
++  await add.click();
++  expect(await layerOrder(page)).toEqual(['b1', 'b2', 'b3', 'b4']);
++  await pressUndo(page);
++  expect(await layerOrder(page)).toEqual(['b1', 'b2', 'b3']);
++
++  await add.click();
++  expect(await layerOrder(page)).toEqual(['b1', 'b2', 'b3', 'b5']);
++  expect(await canvasOrder(page)).toEqual(['b1', 'b2', 'b3', 'b5']);
++  await expect(page.locator(`${buttonSel('b4')}, ${layerSel('b4')}`)).toHaveCount(0);
++
++  await pressUndo(page);
++  await add.click();
++  expect(await layerOrder(page)).toEqual(['b1', 'b2', 'b3', 'b6']);
++  expect(await canvasOrder(page)).toEqual(['b1', 'b2', 'b3', 'b6']);
++});
++
++// ---------------------------------------------------------------------------
++// Dev-12: 연타 · 새로고침 · 입력 100자 (A12 · A13 · A14)
++// ---------------------------------------------------------------------------
++
++test('QA-A12 연타: [+ 인스턴스] 20번 연달아 → b4~b23이 순서대로 줄바꿈되어 가로 스크롤 없이 생기고, [↓] 5번 연타는 맨 아래에서 멈추며, Delete 3번 연타는 b2 하나만 지운다', async ({ page }) => {
++  await page.goto(URL);
++  await holdNodes(page, { btn1: buttonSel('b1'), btn2: buttonSel('b2'), btn3: buttonSel('b3'), row1: layerSel('b1') });
++  const add = page.getByTestId('add-instance');
++
++  // ① [+ 인스턴스] 20번
++  for (let i = 0; i < 20; i += 1) await add.click();
++  const expected = Array.from({ length: 23 }, (_, i) => `b${i + 1}`);
++  expect(await canvasOrder(page)).toEqual(expected);
++  expect(await layerOrder(page)).toEqual(expected);
++  for (const [name, sel] of [['btn1', buttonSel('b1')], ['btn2', buttonSel('b2')], ['btn3', buttonSel('b3')], ['row1', layerSel('b1')]] as const) {
++    expect(await sameNode(page, name, sel), `${name}은 같은 참조`).toBe(true);
++  }
++  // 캔버스 버튼 줄이 줄바꿈되어(flex-wrap) 가로 스크롤이 없고, 버튼 24개(메인 + 23) 모두 캔버스 오른쪽 끝을 넘지 않는다 (mobile 375 포함, Q17-5)
++  expect(await noHorizontalScroll(page)).toBe(true);
++  const canvas = await page.getByTestId('canvas').boundingBox();
++  if (canvas === null) throw new Error('캔버스가 안 보인다');
++  const rights = await page.getByTestId('figma-button').evaluateAll((els) => els.map((el) => el.getBoundingClientRect().right));
++  expect(rights).toHaveLength(24);
++  for (const right of rights) expect(right).toBeLessThanOrEqual(canvas.x + canvas.width + 0.5);
++
++  // ② 맨 아래 행(b23)의 [↓] 5번: 맨 아래에서 멈춘다 (아무 일 없음). b1 행 [↓] 5번: 한 칸씩 내려가 b1이 6번째로
++  for (let i = 0; i < 5; i += 1) await moveInLayer(page, 'b23', 'down');
++  expect(await canvasOrder(page)).toEqual(expected);
++  for (let i = 0; i < 5; i += 1) await moveInLayer(page, 'b1', 'down');
++  const moved = ['b2', 'b3', 'b4', 'b5', 'b6', 'b1', ...expected.slice(6)];
++  expect(await canvasOrder(page)).toEqual(moved);
++  expect(await layerOrder(page)).toEqual(moved);
++  expect(await sameNode(page, 'btn1', buttonSel('b1'))).toBe(true);
++  expect(await sameNode(page, 'row1', layerSel('b1'))).toBe(true);
++
++  // ③ b2를 고르고 Delete 3번: b2는 한 번만 지워지고 나머지 Delete는 무시된다 (다른 인스턴스가 지워지지 않음)
++  await selectOnCanvas(page, 'b2');
++  for (let i = 0; i < 3; i += 1) await page.keyboard.press('Delete');
++  expect(await canvasOrder(page)).toEqual(moved.slice(1));
++  expect(await layerOrder(page)).toEqual(moved.slice(1));
++  await expect(page.getByTestId('property-empty')).toHaveCount(1);
++  expect(await sameNode(page, 'btn3', buttonSel('b3'))).toBe(true);
++});
++
++test('QA-A13 새로고침: 고치고 추가 · 삭제 · 순서까지 한 뒤 reload하면 시작 데이터로 돌아오고 선택 · Undo 기록이 비어 있다', async ({ page }) => {
++  await page.goto(URL);
++  await selectOnCanvas(page, 'main');
++  await page.getByTestId('prop-label').fill('고침');
++  await page.getByTestId('prop-color').selectOption({ label: '초록' });
++  await page.getByTestId('add-instance').click();
++  await moveInLayer(page, 'b1', 'down');
++  await selectOnCanvas(page, 'b2');
++  await page.getByTestId('delete-instance').click();
++  expect(await canvasOrder(page)).toEqual(['b1', 'b3', 'b4']);
++
++  await page.reload();
++
++  // 시작 데이터(MF-16) 그대로, 선택 없음
++  expect(await canvasOrder(page)).toEqual(['b1', 'b2', 'b3']);
++  expect(await layerOrder(page)).toEqual(['b1', 'b2', 'b3']);
++  expect(await canvasLabels(page)).toEqual(['버튼', '버튼', '취소', '삭제']);
++  await expect(page.getByTestId('property-empty')).toHaveCount(1);
++  expect(await selectedOnCanvas(page)).toEqual([]);
++  // Undo 기록도 비어 있어 Ctrl+Z를 눌러도 아무 일 없다
++  await pressUndo(page);
++  expect(await canvasOrder(page)).toEqual(['b1', 'b2', 'b3']);
++  expect(await canvasLabels(page)).toEqual(['버튼', '버튼', '취소', '삭제']);
++  await pressRedo(page);
++  expect(await canvasOrder(page)).toEqual(['b1', 'b2', 'b3']);
++  // 번호도 처음부터 (저장 안 함): 추가하면 b4
++  await page.getByTestId('add-instance').click();
++  expect(await canvasOrder(page)).toEqual(['b1', 'b2', 'b3', 'b4']);
++});
++
++test('QA-A14 입력 100자: 한 글자씩 입력해도 입력칸 노드 · 포커스 · 커서가 유지되고 최종 글자가 그대로이며, Ctrl+Z 한 번에 `버튼`으로 돌아간다', async ({ page }) => {
++  await page.goto(URL);
++  await selectOnCanvas(page, 'main');
++  await holdNodes(page, { input: '[data-testid="prop-label"]' });
++  const input = page.getByTestId('prop-label');
++  const text = '가나다라마바사아자차'.repeat(10);
++  expect(text).toHaveLength(100);
++
++  await input.fill('');
++  await input.pressSequentially(text);
++
++  // 입력칸은 같은 노드이고 포커스를 유지하며, 커서가 끝에 계속 있었으므로 글자가 순서대로 쌓였다
++  expect(await sameNode(page, 'input', '[data-testid="prop-label"]')).toBe(true);
++  await expect(input).toBeFocused();
++  await expect(input).toHaveValue(text);
++  expect((await canvasLabels(page))[0]).toBe(text);
++  expect(await noHorizontalScroll(page)).toBe(true);
++
++  // 한 단계로 묶여 Ctrl+Z 한 번에 `버튼`. (다른 것을 골랐다 돌아와 브라우저의 글자 되돌리기 기록을 비운 뒤라 앱 Undo의 결과다)
++  await selectOnCanvas(page, 'b1');
++  await selectOnCanvas(page, 'main');
++  await pressUndo(page);
++  expect((await canvasLabels(page))[0]).toBe('버튼');
++  await expect(input).toHaveValue('버튼');
++});
+diff --git a/e2e/mini-figma-helpers.ts b/e2e/mini-figma-helpers.ts
+index c07df90..499d36b 100644
+--- a/e2e/mini-figma-helpers.ts
++++ b/e2e/mini-figma-helpers.ts
+@@ -72,12 +72,17 @@ export async function selectInLayer(page: Page, id: string): Promise<void> {
+   await page.locator(`${layerSel(id)} [data-testid="layer-name"]`).click();
+ }
+ 
++/** 레이어 행의 [↑] 또는 [↓]를 누른다 (행 고르기와는 별개 — 고르기가 안 바뀌어야 한다, ④-4) */
++export async function moveInLayer(page: Page, id: string, direction: 'up' | 'down'): Promise<void> {
++  await page.locator(`${layerSel(id)} [data-testid="layer-${direction}"]`).click();
++}
++
+ /** 포커스를 입력칸 밖으로 뺀다. 늘 있는 요소를 쓰는 `activeElement.blur()` (선택이 없을 때 사라지는 property-title을 누르지 않는다) */
+ export async function blurFocus(page: Page): Promise<void> {
+   await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+ }
+ 
+-/** Ctrl+Z (포커스를 먼저 뺀다). 키 연결은 Dev-11에서 들어온다 */
++/** Ctrl+Z (포커스를 먼저 뺀다 — 입력칸 안의 키는 앱이 무시하므로) */
+ export async function pressUndo(page: Page): Promise<void> {
+   await blurFocus(page);
+   await page.keyboard.press('Control+KeyZ');
+diff --git a/e2e/mini-figma-layers.spec.ts b/e2e/mini-figma-layers.spec.ts
+new file mode 100644
+index 0000000..fa7507a
+--- /dev/null
++++ b/e2e/mini-figma-layers.spec.ts
+@@ -0,0 +1,188 @@
++import {
++  test,
++  expect,
++  URL,
++  holdNodes,
++  sameNode,
++  isStillConnected,
++  watchApp,
++  selectOnCanvas,
++  canvasOrder,
++  layerOrder,
++  selectedOnCanvas,
++  selectedInLayer,
++  buttonSel,
++  layerSel,
++  canvasLabels,
++  followingFields,
++  overriddenFields,
++  moveInLayer,
++} from './mini-figma-helpers';
++
++// [AI Note]: QA-14 ~ QA-16 (인스턴스 추가 · 삭제 · 메인 삭제 불가, Dev-9) · QA-17 · QA-18 (순서 바꾸기, Dev-10).
++// 이 스펙의 테스트는 desktop · mobile 두 프로젝트에서 모두 돈다. 「바뀐 곳만 고침」은 같은 DOM 노드(holdNodes · sameNode) +
++// MutationObserver(watchApp)로 확인한다 (화면에 patch를 안 그리므로, patch 종류 · 개수는 app.test.ts가 센다).
++
++test('QA-14 [+ 인스턴스]를 누르면 캔버스 · 레이어 끝에 b4가 override 없이 생기고, 기존 노드는 같은 참조이며 선택은 안 바뀐다', async ({ page }) => {
++  await page.goto(URL);
++  // 메인을 `확인` / 크기 L로 바꿔 둔다 (새 인스턴스가 이 메인 값을 따르는지 보려고)
++  await selectOnCanvas(page, 'main');
++  await page.getByTestId('prop-label').fill('확인');
++  await page.getByTestId('prop-size').selectOption('L');
++  await holdNodes(page, {
++    ...Object.fromEntries(['main', 'b1', 'b2', 'b3'].map((id) => [`btn-${id}`, buttonSel(id)])),
++    ...Object.fromEntries(['b1', 'b2', 'b3'].map((id) => [`row-${id}`, layerSel(id)])),
++  });
++  const canvasWatch = await watchApp(page, 'canvas');
++  const layerWatch = await watchApp(page, 'layer-panel');
++
++  await page.getByTestId('add-instance').click();
++
++  // 캔버스 · 레이어 모두 끝에 b4
++  expect(await canvasOrder(page)).toEqual(['b1', 'b2', 'b3', 'b4']);
++  expect(await layerOrder(page)).toEqual(['b1', 'b2', 'b3', 'b4']);
++  // b4는 override 없음: 글자 `확인` · 크기 L (메인 따름)
++  expect(await page.locator(`${buttonSel('b4')} [data-testid="btn-label"]`).textContent()).toBe('확인');
++  expect(((await page.locator(buttonSel('b4')).getAttribute('class')) ?? '').split(' ')).toContain('btn-L');
++  // 기존 노드는 모두 같은 참조
++  for (const id of ['main', 'b1', 'b2', 'b3']) expect(await sameNode(page, `btn-${id}`, buttonSel(id)), `${id} 버튼`).toBe(true);
++  for (const id of ['b1', 'b2', 'b3']) expect(await sameNode(page, `row-${id}`, layerSel(id)), `${id} 행`).toBe(true);
++  // 캔버스 · 레이어 DOM 변경은 각각 childList 1건(추가)뿐
++  const canvasMut = (await canvasWatch.take()).body;
++  const layerMut = (await layerWatch.take()).body;
++  expect(canvasMut.childList, '캔버스 childList').toBe(1);
++  expect(canvasMut.total, '캔버스 전체 변경').toBe(1);
++  expect(layerMut.childList, '레이어 childList').toBe(1);
++  expect(layerMut.total, '레이어 전체 변경').toBe(1);
++  // 선택은 안 바뀜 (메인이 계속 골라져 있음)
++  expect(await selectedOnCanvas(page)).toEqual(['main']);
++  expect(await selectedInLayer(page)).toEqual(['main']);
++  // b4를 고르면 속성 패널 5칸이 모두 「메인 따름」
++  await selectOnCanvas(page, 'b4');
++  expect(await followingFields(page)).toEqual(['label', 'size', 'hasIcon', 'icon', 'color']);
++  expect(await overriddenFields(page)).toEqual([]);
++});
++
++test('QA-15 b2를 고르고 [삭제]하면 캔버스 · 레이어에서 사라지고 선택이 풀리며, 이어서 추가하면 b4다 (지운 b2를 다시 쓰지 않음)', async ({ page }) => {
++  await page.goto(URL);
++  await holdNodes(page, {
++    btn1: buttonSel('b1'),
++    btn3: buttonSel('b3'),
++    row1: layerSel('b1'),
++    row3: layerSel('b3'),
++    btn2: buttonSel('b2'),
++    row2: layerSel('b2'),
++  });
++  await selectOnCanvas(page, 'b2');
++  const canvasWatch = await watchApp(page, 'canvas');
++  const layerWatch = await watchApp(page, 'layer-panel');
++
++  await page.getByTestId('delete-instance').click();
++
++  // b2가 두 곳 모두에서 사라짐, b1 · b3는 같은 참조
++  expect(await canvasOrder(page)).toEqual(['b1', 'b3']);
++  expect(await layerOrder(page)).toEqual(['b1', 'b3']);
++  expect(await isStillConnected(page, 'btn2')).toBe(false);
++  expect(await isStillConnected(page, 'row2')).toBe(false);
++  for (const [name, sel] of [['btn1', buttonSel('b1')], ['btn3', buttonSel('b3')], ['row1', layerSel('b1')], ['row3', layerSel('b3')]] as const) {
++    expect(await sameNode(page, name, sel), name).toBe(true);
++  }
++  expect((await canvasWatch.take()).body.childList, '캔버스 childList').toBe(1);
++  expect((await layerWatch.take()).body.childList, '레이어 childList').toBe(1);
++  // 선택이 풀리고 속성 패널은 빈 상태
++  await expect(page.getByTestId('property-empty')).toHaveCount(1);
++  await expect(page.getByTestId('property-title')).toHaveCount(0);
++  await expect(page.getByTestId('delete-instance')).toHaveCount(0);
++  expect(await selectedOnCanvas(page)).toEqual([]);
++  expect(await selectedInLayer(page)).toEqual([]);
++
++  // 이어서 추가: 번호를 다시 쓰지 않고 b4
++  await page.getByTestId('add-instance').click();
++  expect(await canvasOrder(page)).toEqual(['b1', 'b3', 'b4']);
++  expect(await layerOrder(page)).toEqual(['b1', 'b3', 'b4']);
++});
++
++test('QA-16 메인에는 [삭제] 버튼이 없고 Delete · Backspace를 눌러도 아무 일 없다', async ({ page }) => {
++  await page.goto(URL);
++  await selectOnCanvas(page, 'main');
++  await expect(page.getByTestId('delete-instance')).toHaveCount(0);
++  await expect(page.getByTestId('property-title')).toHaveText('메인 Button');
++  const watch = await watchApp(page);
++
++  await page.keyboard.press('Delete');
++  await page.keyboard.press('Backspace');
++
++  await expect(page.getByTestId('figma-button')).toHaveCount(4);
++  await expect(page.getByTestId('layer-item')).toHaveCount(3);
++  expect(await selectedOnCanvas(page)).toEqual(['main']);
++  expect(await selectedInLayer(page)).toEqual(['main']);
++  await expect(page.getByTestId('delete-instance')).toHaveCount(0);
++  expect((await watch.take()).body.total, 'DOM 변경').toBe(0);
++});
++
++// ---------------------------------------------------------------------------
++// Dev-10: 순서 바꾸기 [↑] [↓]
++// ---------------------------------------------------------------------------
++
++const MOVE_NODES = {
++  ...Object.fromEntries(['b1', 'b2', 'b3'].map((id) => [`btn-${id}`, buttonSel(id)])),
++  ...Object.fromEntries(['b1', 'b2', 'b3'].map((id) => [`row-${id}`, layerSel(id)])),
++};
++
++async function allMovedNodesSame(page: Parameters<typeof sameNode>[0]): Promise<boolean> {
++  for (const id of ['b1', 'b2', 'b3']) {
++    if (!(await sameNode(page, `btn-${id}`, buttonSel(id)))) return false;
++    if (!(await sameNode(page, `row-${id}`, layerSel(id)))) return false;
++  }
++  return true;
++}
++
++test('QA-17 b1 행 [↓] → b3 행 [↑]로 순서가 b2 b1 b3 → b2 b3 b1이 되고 캔버스 · 레이어가 함께 바뀌며 노드는 전부 같은 참조다. 맨 위 [↑] · 맨 아래 [↓]는 아무 일 없다', async ({ page }) => {
++  await page.goto(URL);
++  await holdNodes(page, MOVE_NODES);
++  const canvasWatch = await watchApp(page, 'canvas');
++  const layerWatch = await watchApp(page, 'layer-panel');
++
++  await moveInLayer(page, 'b1', 'down');
++  expect(await canvasOrder(page)).toEqual(['b2', 'b1', 'b3']);
++  expect(await layerOrder(page)).toEqual(['b2', 'b1', 'b3']);
++  await moveInLayer(page, 'b3', 'up');
++  expect(await canvasOrder(page)).toEqual(['b2', 'b3', 'b1']);
++  expect(await layerOrder(page)).toEqual(['b2', 'b3', 'b1']);
++
++  // 버튼 · 행 노드는 전부 같은 참조 (다시 만들지 않고 옮겨짐), 글자 변경 0건
++  expect(await allMovedNodesSame(page)).toBe(true);
++  expect((await canvasWatch.take()).body.characterData, '캔버스 characterData').toBe(0);
++  expect((await layerWatch.take()).body.characterData, '레이어 characterData').toBe(0);
++  // 글자도 그대로 (순서만 바뀜)
++  expect(await canvasLabels(page)).toEqual(['버튼', '취소', '삭제', '버튼']);
++
++  // 경계: 맨 위(b2)의 [↑] · 맨 아래(b1)의 [↓]는 눌러도 아무 일 없다 (순서 · DOM 변경 0)
++  await moveInLayer(page, 'b2', 'up');
++  await moveInLayer(page, 'b1', 'down');
++  expect(await canvasOrder(page)).toEqual(['b2', 'b3', 'b1']);
++  expect(await layerOrder(page)).toEqual(['b2', 'b3', 'b1']);
++  expect((await canvasWatch.take()).body.total, '캔버스 DOM 변경').toBe(0);
++  expect((await layerWatch.take()).body.total, '레이어 DOM 변경').toBe(0);
++  expect(await allMovedNodesSame(page)).toBe(true);
++});
++
++test('QA-18 b2를 고른 채 순서를 두 번 바꿔도 b2가 계속 골라져 있다 (id로 고름, 위치로 고르지 않음)', async ({ page }) => {
++  await page.goto(URL);
++  await selectOnCanvas(page, 'b2');
++  await holdNodes(page, MOVE_NODES);
++
++  await moveInLayer(page, 'b1', 'down');
++  expect(await layerOrder(page)).toEqual(['b2', 'b1', 'b3']);
++  await moveInLayer(page, 'b3', 'up');
++  expect(await layerOrder(page)).toEqual(['b2', 'b3', 'b1']);
++  expect(await canvasOrder(page)).toEqual(['b2', 'b3', 'b1']);
++
++  await expect(page.getByTestId('property-title')).toHaveText('인스턴스 · 취소');
++  expect(await selectedOnCanvas(page)).toEqual(['b2']);
++  expect(await selectedInLayer(page)).toEqual(['b2']);
++  expect(await sameNode(page, 'btn-b2', `${buttonSel('b2')}.selected`)).toBe(true);
++  expect(await sameNode(page, 'row-b2', `${layerSel('b2')}.selected`)).toBe(true);
++  await expect(page.getByTestId('prop-label')).toHaveValue('취소');
++  expect(await allMovedNodesSame(page)).toBe(true);
++});
+diff --git a/e2e/mini-figma-undo.spec.ts b/e2e/mini-figma-undo.spec.ts
+new file mode 100644
+index 0000000..60e225c
+--- /dev/null
++++ b/e2e/mini-figma-undo.spec.ts
+@@ -0,0 +1,234 @@
++import type { Page } from '@playwright/test';
++import {
++  test,
++  expect,
++  URL,
++  holdNodes,
++  sameNode,
++  selectOnCanvas,
++  canvasOrder,
++  layerOrder,
++  canvasLabels,
++  selectedOnCanvas,
++  selectedInLayer,
++  buttonSel,
++  inRow,
++  moveInLayer,
++  blurFocus,
++  pressUndo,
++  pressRedo,
++} from './mini-figma-helpers';
++
++// [AI Note]: QA-19 ~ QA-25 (키보드 Undo · Redo · Delete, Dev-11). 이 스펙의 테스트는 desktop · mobile 두 프로젝트에서 모두 돈다.
++// Undo · Redo를 누르기 전에는 도우미(pressUndo · pressRedo)가 포커스를 입력칸 밖으로 뺀다 — 입력칸 안의 키는 앱이 무시하기 때문이다.
++
++/** 캔버스 버튼 하나의 class 글 */
++async function classOf(page: Page, id: string): Promise<string[]> {
++  return ((await page.locator(buttonSel(id)).getAttribute('class')) ?? '').split(' ');
++}
++
++/** 메인 · b1 · b2 · b3 버튼의 색 클래스 (btn-blue · btn-red · btn-green) */
++async function colorsOf(page: Page): Promise<string[]> {
++  const out: string[] = [];
++  for (const id of ['main', 'b1', 'b2', 'b3']) out.push((await classOf(page, id)).find((c) => c.startsWith('btn-') && ['btn-blue', 'btn-red', 'btn-green'].includes(c)) ?? '');
++  return out;
++}
++
++async function pressMetaUndo(page: Page): Promise<void> {
++  await blurFocus(page);
++  await page.keyboard.press('Meta+KeyZ');
++}
++
++async function pressMetaRedo(page: Page): Promise<void> {
++  await blurFocus(page);
++  await page.keyboard.press('Meta+Shift+KeyZ');
++}
++
++/** 메인을 고르고 색을 빨강으로 바꾼 상태를 만든다 (Undo 한 단계) */
++async function makeMainRed(page: Page): Promise<void> {
++  await page.goto(URL);
++  await selectOnCanvas(page, 'main');
++  await page.getByTestId('prop-color').selectOption({ label: '빨강' });
++  expect(await colorsOf(page)).toEqual(['btn-red', 'btn-red', 'btn-red', 'btn-red']);
++}
++
++test('QA-19 메인 색을 빨강으로 바꾼 뒤 Ctrl+Z는 파랑으로, Ctrl+Shift+Z는 다시 빨강으로 되돌리고 고르기는 그대로다', async ({ page }) => {
++  await makeMainRed(page);
++  // b3는 처음부터 빨강(override)이라 메인 색을 바꿔도 그대로, 비교는 메인 · b1 · b2
++  await pressUndo(page);
++
++  expect((await colorsOf(page)).slice(0, 3)).toEqual(['btn-blue', 'btn-blue', 'btn-blue']);
++  await expect(page.getByTestId('prop-color')).toHaveValue('blue');
++  expect(await selectedOnCanvas(page)).toEqual(['main']);
++
++  await pressRedo(page);
++
++  expect((await colorsOf(page)).slice(0, 3)).toEqual(['btn-red', 'btn-red', 'btn-red']);
++  await expect(page.getByTestId('prop-color')).toHaveValue('red');
++  expect(await selectedOnCanvas(page)).toEqual(['main']);
++});
++
++test('QA-20 Meta+Z · Meta+Shift+Z(맥의 Cmd)도 QA-19와 같다', async ({ page }) => {
++  await makeMainRed(page);
++
++  await pressMetaUndo(page);
++  expect((await colorsOf(page)).slice(0, 3)).toEqual(['btn-blue', 'btn-blue', 'btn-blue']);
++  await expect(page.getByTestId('prop-color')).toHaveValue('blue');
++
++  await pressMetaRedo(page);
++  expect((await colorsOf(page)).slice(0, 3)).toEqual(['btn-red', 'btn-red', 'btn-red']);
++  await expect(page.getByTestId('prop-color')).toHaveValue('red');
++  expect(await selectedOnCanvas(page)).toEqual(['main']);
++});
++
++test('QA-21 b3 라벨을 한 글자씩 입력해도 Ctrl+Z 한 번에 `삭제`로 돌아가고(묶음 시작 직전), 한 번 더는 아무 일 없고, Ctrl+Shift+Z는 `지우기`로 간다', async ({ page }) => {
++  await page.goto(URL);
++  await selectOnCanvas(page, 'b3');
++  const input = page.getByTestId('prop-label');
++  await input.fill('');
++  await input.pressSequentially('지우기');
++  expect((await canvasLabels(page))[3]).toBe('지우기');
++  // [AI Note]: 다른 것을 골랐다 돌아오면 입력칸 값이 프로그램으로 다시 쓰여 브라우저의 글자 되돌리기(네이티브 Undo) 기록이 비워진다.
++  // (고르기는 Undo 묶음을 끝내지 않으므로 앱 입장에서는 같은 묶음이다.) 그래야 아래 되돌리기가 앱 Undo의 결과라는 것이 분명하다.
++  await selectOnCanvas(page, 'b2');
++  await selectOnCanvas(page, 'b3');
++
++  await pressUndo(page);
++  expect((await canvasLabels(page))[3], '중간 글자가 아니라 묶음 시작 직전').toBe('삭제');
++  await expect(input).toHaveValue('삭제');
++
++  await pressUndo(page);
++  expect(await canvasLabels(page)).toEqual(['버튼', '버튼', '취소', '삭제']);
++
++  await pressRedo(page);
++  expect((await canvasLabels(page))[3]).toBe('지우기');
++  await expect(input).toHaveValue('지우기');
++});
++
++test('QA-22 서로 다른 묶음 8개를 쌓고 Ctrl+Z를 8번 누르면 매번 정확히 한 단계씩만 되돌아가고 9번째는 아무 일 없다', async ({ page }) => {
++  await page.goto(URL);
++  const labelInput = page.getByTestId('prop-label');
++  /** 화면 상태 한 줄: 캔버스 순서 · 글자 · b1이 크기 S인가 */
++  const snap = async (): Promise<string> => {
++    const order = await canvasOrder(page);
++    const labels = await canvasLabels(page);
++    const b1Small = order.includes('b1') ? (await classOf(page, 'b1')).includes('btn-S') : false;
++    return `${order.join(',')} | ${labels.join(',')} | b1S=${b1Small}`;
++  };
++  const states: string[] = [await snap()];
++
++  // 1) b1 라벨 가  2) b1 크기 S  3) b1 라벨 나  4) b2 라벨 다  5) [+ 인스턴스]  6) b4 [↑]  7) b1 라벨 ↻  8) b4 삭제
++  await selectOnCanvas(page, 'b1');
++  await labelInput.fill('가');
++  states.push(await snap());
++  await page.getByTestId('prop-size').selectOption('S');
++  states.push(await snap());
++  await labelInput.fill('나');
++  states.push(await snap());
++  await selectOnCanvas(page, 'b2');
++  await labelInput.fill('다');
++  states.push(await snap());
++  await page.getByTestId('add-instance').click();
++  states.push(await snap());
++  await moveInLayer(page, 'b4', 'up');
++  states.push(await snap());
++  await selectOnCanvas(page, 'b1');
++  await page.locator(inRow('label', 'prop-reset')).click();
++  states.push(await snap());
++  await selectOnCanvas(page, 'b4');
++  await page.getByTestId('delete-instance').click();
++  states.push(await snap());
++
++  expect(states).toHaveLength(9);
++  expect(new Set(states).size, '각 단계가 서로 다른 모습').toBe(9);
++  expect(states[8]).toBe('b1,b2,b3 | 버튼,버튼,다,삭제 | b1S=true');
++
++  // Ctrl+Z 8번: 삭제 → ↻ → 순서 → 추가 → b2 라벨 → b1 라벨 나 → 크기 → 라벨 가 (매번 states[7 - i]와 같음)
++  for (let i = 1; i <= 8; i += 1) {
++    await pressUndo(page);
++    expect(await snap(), `Ctrl+Z ${i}번째`).toBe(states[8 - i]);
++  }
++  expect(await snap()).toBe(states[0]);
++  // 9번째는 아무 일 없음
++  await pressUndo(page);
++  expect(await snap(), 'Ctrl+Z 9번째').toBe(states[0]);
++});
++
++test('QA-23 새 수정을 하면 다시 하기가 버려진다 (Undo 두 번 → 라벨 `새` → Ctrl+Shift+Z는 아무 일 없음, Ctrl+Z는 `새`만 되돌림)', async ({ page }) => {
++  await page.goto(URL);
++  await selectOnCanvas(page, 'main');
++  await page.getByTestId('prop-color').selectOption({ label: '빨강' });
++  await page.getByTestId('prop-size').selectOption('L');
++
++  await pressUndo(page);
++  await pressUndo(page);
++  const afterUndo = await classOf(page, 'main');
++  expect(afterUndo).toContain('btn-M');
++  expect(afterUndo).toContain('btn-blue');
++
++  await page.getByTestId('prop-label').fill('새');
++  await pressRedo(page);
++
++  // 다시 하기가 버려져서 색 파랑 · 크기 M 그대로, 라벨 `새`
++  const main = await classOf(page, 'main');
++  expect(main).toContain('btn-blue');
++  expect(main).toContain('btn-M');
++  expect((await canvasLabels(page))[0]).toBe('새');
++
++  await pressUndo(page);
++  expect((await canvasLabels(page))[0]).toBe('버튼');
++  expect(await classOf(page, 'main')).toContain('btn-blue');
++});
++
++test('QA-24 추가를 Undo하면 b4가 사라지고 선택이 풀리며, 고르기는 기록에 없어서 다음 Undo는 색 수정 한 단계만 되돌린다', async ({ page }) => {
++  await page.goto(URL);
++  await page.getByTestId('add-instance').click();
++  await selectOnCanvas(page, 'b4');
++  expect(await selectedOnCanvas(page)).toEqual(['b4']);
++
++  await pressUndo(page);
++
++  expect(await canvasOrder(page)).toEqual(['b1', 'b2', 'b3']);
++  expect(await layerOrder(page)).toEqual(['b1', 'b2', 'b3']);
++  await expect(page.getByTestId('property-empty')).toHaveCount(1);
++  expect(await selectedOnCanvas(page)).toEqual([]);
++
++  // b2 색을 바꾼 뒤 b1 · b3를 차례로 고르고(고르기만) Undo
++  await selectOnCanvas(page, 'b2');
++  await page.getByTestId('prop-color').selectOption({ label: '초록' });
++  expect(await classOf(page, 'b2')).toContain('btn-green');
++  await selectOnCanvas(page, 'b1');
++  await selectOnCanvas(page, 'b3');
++
++  await pressUndo(page);
++
++  expect(await classOf(page, 'b2')).toContain('btn-blue');
++  // 고르기는 기록에 없으므로 고른 것은 b3 그대로 (b1으로 돌아가지 않음)
++  expect(await selectedOnCanvas(page)).toEqual(['b3']);
++  expect(await selectedInLayer(page)).toEqual(['b3']);
++});
++
++test('QA-25 b2를 고르고 Delete, b3를 고르고 Backspace로 지우고 Ctrl+Z하면 b3가 원래 자리(b1 뒤)로 돌아오고 선택은 풀린 채다', async ({ page }) => {
++  await page.goto(URL);
++  await holdNodes(page, { btn1: buttonSel('b1') });
++
++  await selectOnCanvas(page, 'b2');
++  await page.keyboard.press('Delete');
++  expect(await canvasOrder(page)).toEqual(['b1', 'b3']);
++  expect(await layerOrder(page)).toEqual(['b1', 'b3']);
++  await expect(page.getByTestId('property-empty')).toHaveCount(1);
++
++  await selectOnCanvas(page, 'b3');
++  await page.keyboard.press('Backspace');
++  expect(await canvasOrder(page)).toEqual(['b1']);
++  expect(await layerOrder(page)).toEqual(['b1']);
++  await expect(page.getByTestId('property-empty')).toHaveCount(1);
++
++  await pressUndo(page);
++
++  expect(await canvasOrder(page)).toEqual(['b1', 'b3']);
++  expect(await layerOrder(page)).toEqual(['b1', 'b3']);
++  await expect(page.getByTestId('property-empty')).toHaveCount(1);
++  expect(await selectedOnCanvas(page)).toEqual([]);
++  expect(await sameNode(page, 'btn1', buttonSel('b1'))).toBe(true);
++});
+diff --git a/fixtures/mini-figma/App.ts b/fixtures/mini-figma/App.ts
+index c7c58aa..ad9232a 100644
+--- a/fixtures/mini-figma/App.ts
++++ b/fixtures/mini-figma/App.ts
+@@ -1,14 +1,15 @@
+-import { h, useState } from '@mini-react/react';
++import { h, useEffect, useState } from '@mini-react/react';
+ import type { VNode } from '@mini-react/shared';
+ import { Canvas } from './components/Canvas';
+ import { LayerPanel } from './components/LayerPanel';
+ import { PropertyPanel } from './components/PropertyPanel';
+-import { INITIAL_DOC, resetInstanceField, setInstanceField, setMainField } from './model';
++import { INITIAL_DOC, addInstance, moveInstance, reconcileSelection, removeInstance, resetInstanceField, setInstanceField, setMainField } from './model';
+ import type { Doc, Field, MainProps } from './model';
+-import { EMPTY_UNDO, recordEdit } from './undo';
+-import type { UndoGroup, UndoState } from './undo';
++import { keyAction } from './keys';
++import { EMPTY_UNDO, recordEdit, redo, undo } from './undo';
++import type { UndoGroup, UndoResult, UndoState } from './undo';
+ 
+-// [AI Note]: 루트 컴포넌트. 모든 useState(와 Dev-11의 useEffect)는 이 파일에서만 부른다 (MF-04 · P2-07 · P2-08).
++// [AI Note]: 루트 컴포넌트. 모든 useState · useEffect는 이 파일에서만 부른다 (MF-04 · P2-07 · P2-08).
+ // 자식(LayerPanel · Canvas · PropertyPanel)은 props만 받는 순수 함수이고, 바꾸고 싶은 것은 루트가 내려 주는 콜백 props로 알린다 (Lifting State Up).
+ // 상태 칸은 4개고 렌더마다 같은 순서로 부른다 (Hook 개수가 달라지면 엔진이 오류, dev_todo 공통 주의 9):
+ //   doc        = { main, instances } 한 칸 — Undo가 기록하는 것은 이것뿐
+@@ -20,7 +21,6 @@ export function App(): VNode {
+   const [selectedId, setSelectedId] = useState<string | null>(null);
+   const [history, setHistory] = useState<UndoState>(EMPTY_UNDO);
+   const [nextId, setNextId] = useState(4);
+-  // nextId는 아직 쓰이지 않는다 (추가는 Dev-9에서 연결한다).
+ 
+   // [AI Note]: 모든 편집은 이 함수 하나를 거친다 — doc과 history를 같이 바꾼다 (한 동작의 setter 두 번 = 모아서 렌더 한 번, 결정 9 B).
+   // next가 지금 doc과 같은 객체면(바뀐 것 없음) 어느 setter도 새 값을 못 받아 렌더 · 기록이 모두 안 일어난다.
+@@ -49,11 +49,66 @@ export function App(): VNode {
+     applyEdit(resetInstanceField(doc, selectedId, field), null);
+   };
+ 
++  // [AI Note]: [+ 인스턴스] = 번호 nextId로 끝에 붙이고(addInstance) nextId를 하나 올린다. 번호 칸은 doc 밖이라 Undo가 되돌리지 않는다 (Q17-3).
++  // 한 동작의 setter 값은 모두 이 렌더의 doc · nextId에서 계산한다 (묶음 2 검수 NON-BLOCKING 4) → 렌더는 한 번.
++  const onAdd = (): void => {
++    applyEdit(addInstance(doc, nextId), null);
++    setNextId(nextId + 1);
++  };
++
++  // [AI Note]: [↑] [↓] = 배열에서 그 인스턴스의 자리만 바꾼다(moveInstance). 선택은 id라서 순서가 바뀌어도 그대로다 (MF-26).
++  // 경계(맨 위의 [↑] · 맨 아래의 [↓])는 같은 Doc → applyEdit가 렌더 · 기록 없이 돌려보낸다 (④-13). 새 단계 하나(묶음 끝).
++  const onMove = (id: string, delta: -1 | 1): void => applyEdit(moveInstance(doc, id, delta), null);
++
++  // [AI Note]: 고른 인스턴스 삭제 = 문서 · 선택 · 기록을 이 렌더의 doc 하나에서 계산해 한 번에 바꾼다 (setter 3개 → 렌더 1번, 결정 9 B).
++  // 메인 · 선택 없음 · 이미 없는 id는 아무것도 안 함 (removeInstance가 같은 Doc을 돌려줌 → 렌더 · 기록 없음, MF-24).
++  // 지운 것이 고른 것이므로 reconcileSelection이 null로 정리한다 (MF-23).
++  const deleteSelected = (): void => {
++    if (selectedId === null || selectedId === 'main') return;
++    const next = removeInstance(doc, selectedId);
++    if (next === doc) return;
++    applyEdit(next, null);
++    setSelectedId(reconcileSelection(selectedId, next));
++  };
++
++  // [AI Note]: Undo · Redo = undo.ts가 돌려준 { state, doc }를 이 렌더의 값에서 한 번에 반영한다 (doc · history · selectedId 세 setter → 렌더 1번).
++  // 되돌릴 것이 없으면 undo()가 같은 state를 돌려주므로 아무 setter도 안 부른다 (렌더 · 기록 없음). 선택은 새 doc 기준으로 정리: 없는 인스턴스면 null (MF-32).
++  // nextId는 일부러 안 건드린다 — Undo가 번호까지 되돌리면 b4 추가 → Undo → 추가가 b4를 다시 만든다 (Q17-3).
++  const moveThroughHistory = (result: UndoResult): void => {
++    if (result.state === history) return;
++    setHistory(result.state);
++    setDoc(result.doc);
++    setSelectedId(reconcileSelection(selectedId, result.doc));
++  };
++
++  // [AI Note]: 키보드 = 마운트 때 한 번이 아니라 "핸들러가 읽는 state가 바뀔 때마다" document에 다시 등록한다 (엔진 이벤트는 click · input뿐이라 keydown은 직접 등록, MF-34).
++  // deps에 doc · selectedId · history를 넣어서 핸들러가 늘 이번 렌더의 값을 본다 — 빠지면 "b1을 고르고 b2를 고른 뒤 Delete"가 옛 선택 b1을 지운다.
++  // 다시 등록하기 전 cleanup이 먼저 removeEventListener를 불러서 리스너는 항상 1개다 (등록 − 해제 = 1). unmount() 때도 cleanup이 돈다.
++  // 한 동작(삭제 · Undo · Redo)은 모두 이번 렌더의 doc 하나에서 계산한다. 입력칸 안의 키 · 수정키 규칙은 keys.ts의 keyAction이 정한다 (preventDefault 안 함).
++  useEffect(() => {
++    const onKey = (event: KeyboardEvent): void => {
++      const target = event.target as Element | null;
++      const action = keyAction({
++        key: event.key,
++        ctrlKey: event.ctrlKey,
++        metaKey: event.metaKey,
++        shiftKey: event.shiftKey,
++        altKey: event.altKey,
++        targetTag: target?.tagName ?? null,
++      });
++      if (action === 'delete') deleteSelected();
++      else if (action === 'undo') moveThroughHistory(undo(history, doc));
++      else if (action === 'redo') moveThroughHistory(redo(history, doc));
++    };
++    document.addEventListener('keydown', onKey);
++    return () => document.removeEventListener('keydown', onKey);
++  }, [doc, selectedId, history]);
++
+   return h(
+     'div',
+     { class: 'app' },
+-    h(LayerPanel, { main: doc.main, instances: doc.instances, selectedId, onSelect }),
++    h(LayerPanel, { main: doc.main, instances: doc.instances, selectedId, onSelect, onAdd, onMove }),
+     h(Canvas, { main: doc.main, instances: doc.instances, selectedId, onSelect }),
+-    h(PropertyPanel, { main: doc.main, instances: doc.instances, selectedId, onEdit, onReset }),
++    h(PropertyPanel, { main: doc.main, instances: doc.instances, selectedId, onEdit, onReset, onDelete: deleteSelected }),
+   );
+ }
+diff --git a/fixtures/mini-figma/__tests__/app.test.ts b/fixtures/mini-figma/__tests__/app.test.ts
+index aada0a5..f8f0fe9 100644
+--- a/fixtures/mini-figma/__tests__/app.test.ts
++++ b/fixtures/mini-figma/__tests__/app.test.ts
+@@ -1,4 +1,5 @@
+-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
++import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
++import type { MockInstance } from 'vitest';
+ import { render } from '@mini-react/react-dom';
+ import type { FunctionComponent } from '@mini-react/react-reconciler';
+ import type { Patch, Path, StateHook, VNode } from '@mini-react/shared';
+@@ -97,17 +98,27 @@ const slot = (index: number): unknown => (instance.hooks[index] as StateHook).va
+ const layerNames = (): string[] =>
+   Array.from(root.querySelectorAll('[data-testid="layer-item"] [data-testid="layer-name"]')).map((el) => el.textContent ?? '');
+ 
++/** document의 addEventListener · removeEventListener 호출 기록 (render() 전에 걸어야 처음 등록까지 잡힌다 — 1회차 NON-BLOCKING 7) */
++let addSpy: MockInstance;
++let removeSpy: MockInstance;
++const keydownCalls = (spy: MockInstance): number => spy.mock.calls.filter((call) => call[0] === 'keydown').length;
++/** 지금 남아 있는 keydown 리스너 수 = 등록 − 해제 */
++const keydownListeners = (): number => keydownCalls(addSpy) - keydownCalls(removeSpy);
++
+ beforeEach(() => {
+   root = document.createElement('div');
+   root.setAttribute('data-testid', 'app-root');
+   document.body.append(root);
+   renders = 0;
++  addSpy = vi.spyOn(document, 'addEventListener');
++  removeSpy = vi.spyOn(document, 'removeEventListener');
+   instance = render(CountedApp, root);
+ });
+ 
+ afterEach(() => {
+   instance.unmount();
+   root.remove();
++  vi.restoreAllMocks();
+ });
+ 
+ describe('patch 세는 도우미 (canvasCounts · layerCounts)', () => {
+@@ -546,3 +557,416 @@ describe('인스턴스 속성 편집 · override 표시 · ↻ (MF-12 ~ 15 · MF
+     expect((slot(2) as UndoState).group).toBeNull();
+   });
+ });
++
++// ---------------------------------------------------------------------------
++// Dev-9: 인스턴스 추가 · 삭제 · 메인 삭제 불가 (P-16 · P-17, MF-22 ~ 24)
++// ---------------------------------------------------------------------------
++
++describe('인스턴스 추가 · 삭제 (Dev-9)', () => {
++  const addButton = (): HTMLElement => byId('add-instance');
++  const deleteButton = (): HTMLElement => byId('delete-instance');
++
++  it('P-16 [+ 인스턴스] 한 번 = 캔버스 { INSERT: 1 } · 레이어 { INSERT: 1 }, 렌더 1번, 끝에 b4, 선택은 그대로', async () => {
++    const before = renders;
++    await click(addButton());
++    expect(canvasCounts(instance.lastPatches)).toEqual({ INSERT: 1 });
++    expect(layerCounts(instance.lastPatches)).toEqual({ INSERT: 1 });
++    expect(renders - before).toBe(1);
++    expect(buttons().map((b) => b.getAttribute('data-id'))).toEqual(['main', 'b1', 'b2', 'b3', 'b4']);
++    expect(layerNames()).toEqual(['버튼', '취소', '삭제', '버튼']);
++    expect(slot(1)).toBeNull();
++  });
++
++  it('새 인스턴스는 override가 없다 (doc에 { id: b4 }만 있고 메인을 따른다)', async () => {
++    await click(addButton());
++    const doc = slot(0) as typeof INITIAL_DOC;
++    expect(doc.instances[3]).toEqual({ id: 'b4' });
++    expect(Object.keys(doc.instances[3])).toEqual(['id']);
++    expect(Object.keys(doc)).toEqual(['main', 'instances']);
++    expect(doc.instances.slice(0, 3)).toEqual(INITIAL_DOC.instances);
++    // 추가는 새 단계(묶음 없음)
++    expect((slot(2) as UndoState).past).toHaveLength(1);
++    expect((slot(2) as UndoState).group).toBeNull();
++  });
++
++  it('P-17 b2를 고르고 [삭제] = 캔버스 { REMOVE: 1 } · 레이어 { REMOVE: 1 } + 속성 패널 REPLACE 1줄 이상(머리 <h2> → 빈 <p>, D-05), 렌더 1번, 선택 풀림', async () => {
++    await click(buttonOf('b2'));
++    const heading = byId('property-title');
++    const before = renders;
++    await click(deleteButton());
++    expect(canvasCounts(instance.lastPatches)).toEqual({ REMOVE: 1 });
++    expect(layerCounts(instance.lastPatches)).toEqual({ REMOVE: 1 });
++    const panelReplaces = instance.lastPatches.filter((p) => p.kind === 'REPLACE' && startsWith(p.path, [0, 2]));
++    expect(panelReplaces.length).toBeGreaterThanOrEqual(1);
++    expect(heading.isConnected).toBe(false);
++    expect(byId('property-empty').localName).toBe('p');
++    expect(renders - before, '삭제 한 동작 = 렌더 1번 (doc · selectedId · history 세 setter가 한 번으로 합쳐짐)').toBe(1);
++    expect(slot(1)).toBeNull();
++    expect(buttons().map((b) => b.getAttribute('data-id'))).toEqual(['main', 'b1', 'b3']);
++    expect(layerNames()).toEqual(['버튼', '삭제']);
++    // 삭제는 새 단계 하나
++    expect((slot(2) as UndoState).past).toHaveLength(1);
++  });
++
++  it('메인을 골랐을 때는 [삭제] 버튼이 없다. 인스턴스를 고르면 생기고 선택이 풀리면 사라진다', async () => {
++    expect(root.querySelector('[data-testid="delete-instance"]')).toBeNull();
++    await click(buttonOf('main'));
++    expect(root.querySelector('[data-testid="delete-instance"]')).toBeNull();
++    await click(buttonOf('b1'));
++    expect(root.querySelector('[data-testid="delete-instance"]')).not.toBeNull();
++    await click(deleteButton());
++    expect(root.querySelector('[data-testid="delete-instance"]')).toBeNull();
++  });
++
++  it('지운 번호를 다시 쓰지 않는다: b3를 지우고 추가하면 b4, 또 추가하면 b5 (nextId는 doc 밖의 칸)', async () => {
++    await click(buttonOf('b3'));
++    await click(deleteButton());
++    await click(addButton());
++    expect((slot(0) as typeof INITIAL_DOC).instances.map((it) => it.id)).toEqual(['b1', 'b2', 'b4']);
++    await click(addButton());
++    expect((slot(0) as typeof INITIAL_DOC).instances.map((it) => it.id)).toEqual(['b1', 'b2', 'b4', 'b5']);
++    expect(slot(3)).toBe(6);
++  });
++
++  it('b1을 지운 뒤 b2를 고르면 b2가 골라진다 (선택은 위치가 아니라 id)', async () => {
++    await click(buttonOf('b1'));
++    await click(deleteButton());
++    await click(buttonOf('b2'));
++    expect(slot(1)).toBe('b2');
++    expect((slot(0) as typeof INITIAL_DOC).instances.map((it) => it.id)).toEqual(['b2', 'b3']);
++  });
++});
++
++// ---------------------------------------------------------------------------
++// Dev-10: 순서 바꾸기 [↑] [↓] (P-15 · P-20, MF-25)
++// ---------------------------------------------------------------------------
++
++describe('순서 바꾸기 (Dev-10)', () => {
++  const moveButton = (id: string, direction: 'up' | 'down'): HTMLElement => {
++    const found = layerRow(id).querySelector<HTMLElement>(`[data-testid="layer-${direction}"]`);
++    if (found === null) throw new Error(`${id} 행에 [${direction}]가 없다`);
++    return found;
++  };
++  const order = (): (string | null)[] => buttons().slice(1).map((b) => b.getAttribute('data-id'));
++
++  it('P-15 b1 행 [↓] = 캔버스 { MOVE: 1 } · 레이어 { MOVE: 1 } (INSERT · REMOVE · REPLACE · SET_TEXT 0), 렌더 1번, 순서 b2 b1 b3', async () => {
++    const before = renders;
++    await click(moveButton('b1', 'down'));
++    expect(canvasCounts(instance.lastPatches)).toEqual({ MOVE: 1 });
++    expect(layerCounts(instance.lastPatches)).toEqual({ MOVE: 1 });
++    expect(renders - before).toBe(1);
++    expect(order()).toEqual(['b2', 'b1', 'b3']);
++    expect(layerNames()).toEqual(['취소', '버튼', '삭제']);
++  });
++
++  it('순서를 바꿔도 버튼 · 레이어 행 DOM 노드는 같은 참조다 (다시 만들지 않고 옮겨짐)', async () => {
++    const held = [buttonOf('b1'), buttonOf('b2'), buttonOf('b3'), layerRow('b1'), layerRow('b2'), layerRow('b3')];
++    await click(moveButton('b1', 'down'));
++    await click(moveButton('b3', 'up'));
++    expect(order()).toEqual(['b2', 'b3', 'b1']);
++    const now = [buttonOf('b1'), buttonOf('b2'), buttonOf('b3'), layerRow('b1'), layerRow('b2'), layerRow('b3')];
++    held.forEach((node, i) => expect(now[i]).toBe(node));
++  });
++
++  it('[↑] · [↓]는 행의 고르기를 같이 부르지 않는다 (stopPropagation): 선택이 그대로이고 selected 클래스가 안 옮겨 감', async () => {
++    await click(buttonOf('b2'));
++    await click(moveButton('b1', 'down'));
++    await click(moveButton('b3', 'up'));
++    expect(slot(1)).toBe('b2');
++    expect(root.querySelectorAll('.selected')).toHaveLength(2); // b2의 캔버스 버튼 · 레이어 행
++    expect(buttonOf('b2').classList.contains('selected')).toBe(true);
++    expect(layerRow('b2').classList.contains('selected')).toBe(true);
++  });
++
++  it('선택이 없을 때 [↓]를 눌러도 행이 골라지지 않는다', async () => {
++    await click(moveButton('b1', 'down'));
++    expect(slot(1)).toBeNull();
++  });
++
++  it('P-20 경계: 맨 위 [↑] · 맨 아래 [↓]는 눌러도 렌더 0번 · 기록 없음 · lastPatches 그대로이고 버튼은 그대로 있다 (disabled 아님)', async () => {
++    await click(moveButton('b1', 'down')); // 준비: 순서 b2 b1 b3 (패치 값은 이 렌더의 것)
++    const patchesBefore = instance.lastPatches;
++    const historyBefore = slot(2);
++    const docBefore = slot(0);
++    const before = renders;
++    await click(moveButton('b2', 'up')); // 맨 위
++    await click(moveButton('b3', 'down')); // 맨 아래
++    expect(renders - before).toBe(0);
++    expect(instance.lastPatches).toBe(patchesBefore);
++    expect(slot(2)).toBe(historyBefore);
++    expect(slot(0)).toBe(docBefore);
++    expect(order()).toEqual(['b2', 'b1', 'b3']);
++    expect(moveButton('b2', 'up').hasAttribute('disabled')).toBe(false);
++    expect(moveButton('b3', 'down').hasAttribute('disabled')).toBe(false);
++  });
++
++  it('인스턴스 행마다 [↑] [↓]가 있고 메인 행에는 없다. 순서 바꾸기는 새 단계 하나(묶음 끝)다', async () => {
++    expect(root.querySelectorAll('[data-testid="layer-up"]')).toHaveLength(3);
++    expect(root.querySelectorAll('[data-testid="layer-down"]')).toHaveLength(3);
++    expect(layerRow('main').querySelector('[data-testid="layer-up"], [data-testid="layer-down"]')).toBeNull();
++    await click(moveButton('b1', 'down'));
++    expect((slot(2) as UndoState).past).toHaveLength(1);
++    expect((slot(2) as UndoState).group).toBeNull();
++  });
++
++  it('메인 값을 바꾼 뒤에도 순서 바꾸기는 글자 변경 없이 MOVE만이다 (SET_TEXT 0)', async () => {
++    await click(buttonOf('main'));
++    await typeInto('prop-label', '저장');
++    await click(moveButton('b2', 'up'));
++    expect(canvasCounts(instance.lastPatches)).toEqual({ MOVE: 1 });
++    expect(order()).toEqual(['b2', 'b1', 'b3']);
++  });
++});
++
++// ---------------------------------------------------------------------------
++// Dev-11: 키보드 · Undo/Redo 연결 (P-17 키 · P-18 · P-19 · P-20, MF-30 ~ 34, Q17-3 · Q17-4)
++// ---------------------------------------------------------------------------
++
++describe('키보드 · Undo/Redo (Dev-11)', () => {
++  interface KeyOptions {
++    ctrlKey?: boolean;
++    metaKey?: boolean;
++    shiftKey?: boolean;
++    altKey?: boolean;
++    repeat?: boolean;
++  }
++  /** 키 하나를 누른 것처럼 document까지 올라가는 keydown을 보내고 렌더가 끝나길 기다린다 (target 기본 = body) */
++  const press = async (key: string, options: KeyOptions = {}, target: Element = document.body): Promise<void> => {
++    target.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true, ...options }));
++    await Promise.resolve();
++  };
++  const undoKey = (): Promise<void> => press('z', { ctrlKey: true });
++  const redoKey = (): Promise<void> => press('z', { ctrlKey: true, shiftKey: true });
++  const ids = (): (string | null)[] => buttons().slice(1).map((b) => b.getAttribute('data-id'));
++  const docIds = (): string[] => (slot(0) as typeof INITIAL_DOC).instances.map((it) => it.id);
++
++  it('keydown 리스너는 처음에 1개이고, 상태가 여러 번 바뀐 뒤에도 1개다 (등록 − 해제 = 1, 쌓이지 않음 — MF-34)', async () => {
++    expect(keydownListeners()).toBe(1);
++    await click(buttonOf('b1'));
++    await click(buttonOf('b2'));
++    await typeInto('prop-label', '가');
++    await typeInto('prop-label', '가나');
++    await click(byId('add-instance'));
++    await click(layerRow('b1').querySelector('[data-testid="layer-down"]') as HTMLElement);
++    await click(buttonOf('main'));
++    await choose('prop-size', 'L');
++    await click(buttonOf('b3'));
++    await click(byId('delete-instance'));
++    await undoKey();
++    await redoKey();
++    await undoKey();
++    expect(keydownCalls(addSpy)).toBeGreaterThan(5);
++    expect(keydownListeners()).toBe(1);
++    // 직접 증거: 실제 숫자를 출력에 남긴다
++    console.log(`[keydown 리스너] add=${keydownCalls(addSpy)} remove=${keydownCalls(removeSpy)} 남음=${keydownListeners()} (렌더 ${renders}번)`);
++  });
++
++  it('unmount() 뒤에는 남은 리스너가 0개이고, 그 뒤 keydown을 보내도 아무 일 없다 (cleanup)', async () => {
++    await click(buttonOf('b2'));
++    const docBefore = slot(0);
++    const renderCount = renders;
++    instance.unmount();
++    expect(keydownListeners()).toBe(0);
++    await press('Delete');
++    await undoKey();
++    expect(slot(0)).toBe(docBefore);
++    expect(renders).toBe(renderCount);
++    expect(ids()).toEqual(['b1', 'b2', 'b3']);
++  });
++
++  it('P-17 키: b2를 고르고 Delete = 캔버스 { REMOVE: 1 } · 레이어 { REMOVE: 1 } + 속성 패널 REPLACE 1줄 이상, 렌더 1번, 선택 풀림 (Backspace도 같음)', async () => {
++    await click(buttonOf('b2'));
++    const before = renders;
++    await press('Delete');
++    expect(canvasCounts(instance.lastPatches)).toEqual({ REMOVE: 1 });
++    expect(layerCounts(instance.lastPatches)).toEqual({ REMOVE: 1 });
++    expect(instance.lastPatches.filter((p) => p.kind === 'REPLACE' && startsWith(p.path, [0, 2])).length).toBeGreaterThanOrEqual(1);
++    expect(renders - before, '삭제 한 동작 = 렌더 1번').toBe(1);
++    console.log(`[P-17 키] 캔버스 ${JSON.stringify(canvasCounts(instance.lastPatches))} 레이어 ${JSON.stringify(layerCounts(instance.lastPatches))} 속성 패널 REPLACE ${instance.lastPatches.filter((p) => p.kind === 'REPLACE' && startsWith(p.path, [0, 2])).length}줄 렌더 +${renders - before}`);
++    expect(slot(1)).toBeNull();
++    expect(ids()).toEqual(['b1', 'b3']);
++    await click(buttonOf('b3'));
++    await press('Backspace');
++    expect(ids()).toEqual(['b1']);
++    expect(slot(1)).toBeNull();
++  });
++
++  it('메인을 골랐거나 아무것도 안 골랐을 때 Delete · Backspace는 렌더 0번 · doc · history 그대로다 (MF-24)', async () => {
++    const doc = slot(0);
++    const history = slot(2);
++    await press('Delete'); // 선택 없음
++    await click(buttonOf('main'));
++    const afterSelect = renders;
++    await press('Delete');
++    await press('Backspace');
++    expect(renders - afterSelect).toBe(0);
++    expect(slot(0)).toBe(doc);
++    expect(slot(2)).toBe(history);
++    expect(slot(1)).toBe('main');
++    expect(ids()).toEqual(['b1', 'b2', 'b3']);
++  });
++
++  it('P-18 (삭제 뒤) Undo = 캔버스 { INSERT: 1 } · 레이어 { INSERT: 1 }, 렌더 1번, 선택은 풀린 채 (삭제 취소)', async () => {
++    await click(buttonOf('b2'));
++    await press('Delete');
++    const before = renders;
++    await undoKey();
++    expect(canvasCounts(instance.lastPatches)).toEqual({ INSERT: 1 });
++    expect(layerCounts(instance.lastPatches)).toEqual({ INSERT: 1 });
++    expect(renders - before, 'Undo 한 동작 = 렌더 1번').toBe(1);
++    expect(ids()).toEqual(['b1', 'b2', 'b3']);
++    expect(slot(1)).toBeNull();
++  });
++
++  it('P-19 메인 색 빨강(1단계) → Undo = 캔버스 { SET_ATTR: 3 }(메인 · b1 · b2) · 레이어 { }, Redo로 다시 빨강', async () => {
++    await click(buttonOf('main'));
++    await choose('prop-color', 'red');
++    const before = renders;
++    await undoKey();
++    expect(canvasCounts(instance.lastPatches)).toEqual({ SET_ATTR: 3 });
++    expect(layerCounts(instance.lastPatches)).toEqual({});
++    expect(renders - before).toBe(1);
++    expect(['main', 'b1', 'b2', 'b3'].map((id) => buttonOf(id).classList.contains('btn-blue'))).toEqual([true, true, true, false]);
++    await redoKey();
++    expect(canvasCounts(instance.lastPatches)).toEqual({ SET_ATTR: 3 });
++    expect(['main', 'b1', 'b2', 'b3'].map((id) => buttonOf(id).classList.contains('btn-red'))).toEqual([true, true, true, true]);
++    expect(slot(1)).toBe('main'); // 고르기는 그대로
++  });
++
++  it('Ctrl+Z · Meta+Z = Undo, Ctrl+Shift+Z(`Z`로 와도) · Meta+Shift+Z = Redo', async () => {
++    await click(buttonOf('main'));
++    await choose('prop-size', 'L');
++    await press('z', { metaKey: true });
++    expect(buttonOf('main').classList.contains('btn-M')).toBe(true);
++    await press('Z', { ctrlKey: true, shiftKey: true });
++    expect(buttonOf('main').classList.contains('btn-L')).toBe(true);
++    await press('z', { metaKey: true });
++    expect(buttonOf('main').classList.contains('btn-M')).toBe(true);
++    await press('Z', { metaKey: true, shiftKey: true });
++    expect(buttonOf('main').classList.contains('btn-L')).toBe(true);
++  });
++
++  it('한 키 입력 = 한 단계: 서로 다른 세 수정 뒤 Ctrl+Z 한 번은 마지막 묶음 하나만 되돌린다. 같은 칸을 연달아 고친 것은 한 번에 되돌아간다', async () => {
++    await click(buttonOf('main'));
++    await choose('prop-color', 'red'); // 단계 1
++    await choose('prop-size', 'L'); // 단계 2
++    await typeInto('prop-label', '새'); // 단계 3
++    await typeInto('prop-label', '새로'); // 단계 3에 묶임
++    expect((slot(2) as UndoState).past).toHaveLength(3);
++    await undoKey();
++    expect(labels()[0]).toBe('버튼'); // 단계 3 두 글자가 한 번에
++    expect(buttonOf('main').classList.contains('btn-L')).toBe(true);
++    expect(buttonOf('main').classList.contains('btn-red')).toBe(true);
++    expect((slot(2) as UndoState).past).toHaveLength(2);
++  });
++
++  it('입력칸 안의 keydown은 doc · history를 안 바꾼다 (target이 input · select · checkbox여도) — 렌더 0번', async () => {
++    await click(buttonOf('b2'));
++    await choose('prop-color', 'green');
++    const doc = slot(0);
++    const history = slot(2);
++    const before = renders;
++    const targets = [byId('prop-label'), byId('prop-size'), byId('prop-hasicon'), byId('prop-color')];
++    for (const target of targets) {
++      await press('Delete', {}, target);
++      await press('Backspace', {}, target);
++      await press('z', { ctrlKey: true }, target);
++      await press('z', { metaKey: true }, target);
++      await press('Z', { ctrlKey: true, shiftKey: true }, target);
++    }
++    expect(renders - before).toBe(0);
++    expect(slot(0)).toBe(doc);
++    expect(slot(2)).toBe(history);
++    expect(ids()).toEqual(['b1', 'b2', 'b3']);
++    expect(slot(1)).toBe('b2');
++  });
++
++  it('수정키 조합은 아무 일 없다 (Q17-4): Shift+Delete · Ctrl+Backspace · Alt+Delete · Meta+Backspace · Alt+Z · Ctrl+Alt+Z · Ctrl+Y · Escape · z', async () => {
++    await click(buttonOf('b2'));
++    await choose('prop-color', 'green');
++    const doc = slot(0);
++    const before = renders;
++    await press('Delete', { shiftKey: true });
++    await press('Backspace', { ctrlKey: true });
++    await press('Delete', { altKey: true });
++    await press('Backspace', { metaKey: true });
++    await press('z', { altKey: true });
++    await press('z', { ctrlKey: true, altKey: true });
++    await press('y', { ctrlKey: true });
++    await press('Escape');
++    await press('z');
++    expect(renders - before).toBe(0);
++    expect(slot(0)).toBe(doc);
++    expect(ids()).toEqual(['b1', 'b2', 'b3']);
++    // 대조: 수정키 없는 Delete는 지운다 (키 반복 repeat도 그대로 처리 — Q17-4)
++    await press('Delete', { repeat: true });
++    expect(ids()).toEqual(['b1', 'b3']);
++  });
++
++  it('Undo로 고른 것이 사라지면 선택이 null이다: b4를 추가해 고르고 Undo → null. 삭제를 Redo로 되풀이하면 다시 null', async () => {
++    await click(byId('add-instance'));
++    await click(buttonOf('b4'));
++    expect(slot(1)).toBe('b4');
++    await undoKey();
++    expect(slot(1)).toBeNull();
++    expect(byId('property-empty').localName).toBe('p');
++    // 삭제 → Undo(b2 복귀, 선택 풀린 채) → b2 고름 → Redo(b2 다시 삭제) → 선택 null
++    await click(buttonOf('b2'));
++    await press('Delete');
++    await undoKey();
++    expect(slot(1)).toBeNull();
++    await click(buttonOf('b2'));
++    await redoKey();
++    expect(slot(1)).toBeNull();
++    expect(ids()).toEqual(['b1', 'b3']);
++  });
++
++  it('다른 것이 끼어들거나 사라져도 선택은 id로 유지된다 (b3를 고른 채 b1 삭제 취소 · 다시 삭제)', async () => {
++    await click(buttonOf('b1'));
++    await press('Delete');
++    await click(buttonOf('b3'));
++    await undoKey();
++    expect(ids()).toEqual(['b1', 'b2', 'b3']);
++    expect(slot(1)).toBe('b3');
++    await redoKey();
++    expect(ids()).toEqual(['b2', 'b3']);
++    expect(slot(1)).toBe('b3');
++  });
++
++  it('Q17-3 b4 추가 → Undo → 다시 추가 = b5 (nextId는 Undo로 안 되돌아감). 또 Undo → 추가 = b6', async () => {
++    await click(byId('add-instance'));
++    expect(docIds()).toEqual(['b1', 'b2', 'b3', 'b4']);
++    expect(slot(3)).toBe(5);
++    await undoKey();
++    expect(docIds()).toEqual(['b1', 'b2', 'b3']);
++    expect(slot(3), 'nextId는 Undo가 안 건드림').toBe(5);
++    await click(byId('add-instance'));
++    expect(docIds()).toEqual(['b1', 'b2', 'b3', 'b5']);
++    await undoKey();
++    await click(byId('add-instance'));
++    expect(docIds()).toEqual(['b1', 'b2', 'b3', 'b6']);
++    expect(root.querySelector('[data-id="b4"]')).toBeNull();
++  });
++
++  it('P-20 되돌릴 것 · 다시 할 것이 없으면 Undo · Redo는 렌더 0번 · lastPatches 그대로다', async () => {
++    const patches = instance.lastPatches;
++    const before = renders;
++    await undoKey();
++    await redoKey();
++    expect(renders - before).toBe(0);
++    expect(instance.lastPatches).toBe(patches);
++    expect(slot(2)).toBe(EMPTY_UNDO);
++  });
++
++  it('Undo 한도 (Q17-2): [+ 인스턴스] 60번 = past 최대 49칸, Undo 49번 뒤 더는 안 돌아간다 (처음 b1~b3로는 못 감)', async () => {
++    const add = byId('add-instance');
++    for (let i = 0; i < 60; i += 1) await click(add);
++    expect((slot(2) as UndoState).past).toHaveLength(49);
++    expect(docIds()).toHaveLength(63);
++    for (let i = 0; i < 49; i += 1) await undoKey();
++    // 60번 추가 중 앞의 11번(b4~b14)은 기록에서 빠져 있다 → 49번 되돌리면 b1~b14가 남는다
++    expect(docIds()).toEqual(Array.from({ length: 14 }, (_, i) => `b${i + 1}`));
++    await undoKey();
++    expect(docIds()).toHaveLength(14);
++  });
++});
+diff --git a/fixtures/mini-figma/__tests__/rootOnlyHooks.test.ts b/fixtures/mini-figma/__tests__/rootOnlyHooks.test.ts
+index eaca769..b8eae4a 100644
+--- a/fixtures/mini-figma/__tests__/rootOnlyHooks.test.ts
++++ b/fixtures/mini-figma/__tests__/rootOnlyHooks.test.ts
+@@ -71,9 +71,21 @@ describe('T-16 코드 확인 — 루트(App.ts)만 Hook을 쓴다', () => {
+     });
+   }
+ 
+-  it('App.ts가 useState를 부른다 (루트가 상태를 가진다. useEffect 호출 확인은 Dev-11에서 더한다)', () => {
++  it('App.ts가 useState와 useEffect를 부른다 (루트가 상태 · keydown 등록을 가진다)', () => {
+     const app = stripNoise(sourceOf(topLevel, '../App.ts'));
+     expect(/\buseState\s*(<[^>(]*>)?\(/.test(app), 'useState 호출').toBe(true);
++    expect(/\buseEffect\s*\(/.test(app), 'useEffect 호출').toBe(true);
++  });
++
++  it('components/*.ts · model · undo · keys는 useEffect도 부르지 않는다 (keydown 등록은 App.ts 한 곳)', () => {
++    const files = [
++      ...Object.entries(components).map(([path, source]) => [path, source] as const),
++      ...['model.ts', 'undo.ts', 'keys.ts', 'main.ts'].map((file) => [file, sourceOf(topLevel, `../${file}`)] as const),
++    ];
++    for (const [path, source] of files) {
++      expect(/\buseEffect\b/.test(stripNoise(source)), `${path}의 useEffect`).toBe(false);
++      expect(/\baddEventListener\b/.test(stripNoise(source)), `${path}의 addEventListener`).toBe(false);
++    }
+   });
+ 
+   for (const file of ['model.ts', 'undo.ts', 'keys.ts']) {
+diff --git a/fixtures/mini-figma/components/LayerPanel.ts b/fixtures/mini-figma/components/LayerPanel.ts
+index 15b9f4a..a57452d 100644
+--- a/fixtures/mini-figma/components/LayerPanel.ts
++++ b/fixtures/mini-figma/components/LayerPanel.ts
+@@ -8,13 +8,17 @@ interface LayerPanelProps {
+   instances: readonly Instance[];
+   selectedId: string | null;
+   onSelect: (id: string) => void;
++  /** [+ 인스턴스]: 끝에 새 인스턴스를 붙인다 */
++  onAdd: () => void;
++  /** [↑] (-1) · [↓] (+1): 그 인스턴스를 한 칸 옮긴다 */
++  onMove: (id: string, delta: -1 | 1) => void;
+ }
+ 
+ // [AI Note]: 레이어 창 — props만 받는 순수 함수. 메인 행 + 인스턴스 행들(이름 = 지금 글자, 빈 글자면 id, ④-3).
+ // 인스턴스 행의 <ul>에는 `key: it.id`가 있는 <li>만 둔다 (메인 행은 ul 밖 별도 상자 — 형제 전부 key, dev_todo 공통 주의 1).
+-// 행을 누르면 고른다(고른 행은 클래스 selected). [↑] [↓] · [+ 인스턴스]는 Dev-9 · 10에서 더한다.
++// 행을 누르면 고른다(고른 행은 클래스 selected). [+ 인스턴스]는 맨 끝에 둔다 (Dev-9). 인스턴스 행마다 [↑] [↓]가 있고 메인 행에는 없다 (Dev-10).
+ export function LayerPanel(props: Props): VNode {
+-  const { main, instances, selectedId, onSelect } = props as unknown as LayerPanelProps;
++  const { main, instances, selectedId, onSelect, onAdd, onMove } = props as unknown as LayerPanelProps;
+   return h(
+     'section',
+     { class: 'layer-panel', 'data-testid': 'layer-panel' },
+@@ -43,8 +47,15 @@ export function LayerPanel(props: Props): VNode {
+             onClick: () => onSelect(it.id),
+           },
+           h('span', { class: 'layer-name', 'data-testid': 'layer-name' }, instanceName(main, it)),
++          // [AI Note]: [↑] [↓]는 행(<li>) 안에 있어서 눌러도 클릭이 바깥으로 올라가 행의 고르기 onClick까지 불린다 (브라우저 버블링, 공통 주의 3).
++          // 그래서 stopPropagation으로 막는다 → 순서를 바꿔도 고른 것이 안 바뀐다 (④-4). 맨 위 [↑] · 맨 아래 [↓]는 disabled 없이 그대로 두고,
++          // 눌러도 모델이 같은 Doc을 돌려줘서 아무 일도 안 일어난다 (④-13).
++          h('button', { type: 'button', class: 'layer-move', 'aria-label': '위로', 'data-testid': 'layer-up', onClick: (event: Event) => { event.stopPropagation(); onMove(it.id, -1); } }, '↑'),
++          h('button', { type: 'button', class: 'layer-move', 'aria-label': '아래로', 'data-testid': 'layer-down', onClick: (event: Event) => { event.stopPropagation(); onMove(it.id, 1); } }, '↓'),
+         ),
+       ),
+     ),
++    // [AI Note]: 추가 버튼은 <ul> 밖(섹션 맨 끝)에 둔다 — 인스턴스 <ul>에는 key 있는 <li>만 두는 규칙(공통 주의 1)을 지키려고
++    h('button', { type: 'button', class: 'layer-add', 'data-testid': 'add-instance', onClick: () => onAdd() }, '+ 인스턴스'),
+   );
+ }
+diff --git a/fixtures/mini-figma/components/PropertyPanel.ts b/fixtures/mini-figma/components/PropertyPanel.ts
+index 99727aa..5828eb2 100644
+--- a/fixtures/mini-figma/components/PropertyPanel.ts
++++ b/fixtures/mini-figma/components/PropertyPanel.ts
+@@ -11,6 +11,8 @@ interface PropertyPanelProps {
+   onEdit: (field: Field, value: MainProps[Field]) => void;
+   /** 인스턴스의 그 칸 override를 지운다 (↻). 메인에는 ↻가 없다 */
+   onReset: (field: Field) => void;
++  /** 고른 인스턴스를 지운다 ([삭제]). 메인에는 버튼이 없다 */
++  onDelete: () => void;
+ }
+ 
+ const SIZE_OPTIONS: readonly (readonly [Size, string])[] = [['S', 'S'], ['M', 'M'], ['L', 'L']];
+@@ -96,7 +98,7 @@ function propRows(values: MainProps, onEdit: PropertyPanelProps['onEdit'], overr
+ // 인스턴스 이름은 그 인스턴스의 지금 글자이고 빈 글자면 id (④-3). 인스턴스를 골랐을 때 칸에 보이는 값은 mergeProps(메인 값 위에 인스턴스 값) 결과다.
+ // 메인 · 인스턴스가 같은 5칸 부품을 쓰고, 인스턴스일 때만 칸마다 override 표시 + ↻가 붙는다.
+ export function PropertyPanel(props: Props): VNode {
+-  const { main, instances, selectedId, onEdit, onReset } = props as unknown as PropertyPanelProps;
++  const { main, instances, selectedId, onEdit, onReset, onDelete } = props as unknown as PropertyPanelProps;
+   const target = selectedId === 'main' ? null : instances.find((it) => it.id === selectedId);
+   const title = selectedId === 'main' ? '메인 Button' : target === undefined || target === null ? null : `인스턴스 · ${instanceName(main, target)}`;
+   return h(
+@@ -110,5 +112,9 @@ export function PropertyPanel(props: Props): VNode {
+       : target === undefined || target === null
+         ? null
+         : h('div', { class: 'prop-rows', 'data-testid': 'prop-rows' }, propRows(mergeProps(main, target), onEdit, { instance: target, onReset })),
++    // [AI Note]: [삭제]는 인스턴스를 골랐을 때만 그린다 — 메인에는 버튼 자체가 없다 (MF-24, 메인은 못 지움)
++    target === undefined || target === null || selectedId === 'main'
++      ? null
++      : h('button', { type: 'button', class: 'delete-instance', 'data-testid': 'delete-instance', onClick: () => onDelete() }, '삭제'),
+   );
+ }
+diff --git a/fixtures/mini-figma/index.html b/fixtures/mini-figma/index.html
+index 9aee120..c53d132 100644
+--- a/fixtures/mini-figma/index.html
++++ b/fixtures/mini-figma/index.html
+@@ -26,6 +26,8 @@
+       .layer-list { margin: 8px 0 0; padding: 0; list-style: none; }
+       .layer-row { display: flex; align-items: center; gap: 6px; padding: 4px 6px; border-radius: 4px; cursor: pointer; }
+       .layer-name { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
++      .layer-move { flex: 0 0 auto; padding: 2px 8px; font: inherit; cursor: pointer; }
++      .layer-add, .delete-instance { margin-top: 8px; padding: 6px 12px; font: inherit; cursor: pointer; }
+       .layer-row.selected { background: var(--select-bg); outline: 2px solid var(--select); }
+ 
+       /* 캔버스: 메인 버튼 상자 + 인스턴스 버튼 줄. 인스턴스가 많아지면 줄바꿈 (mobile 가로 스크롤 방지, Q17-5) */
