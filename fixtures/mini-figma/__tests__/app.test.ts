@@ -782,6 +782,7 @@ describe('키보드 · Undo/Redo (Dev-11)', () => {
     expect(layerCounts(instance.lastPatches)).toEqual({ REMOVE: 1 });
     expect(instance.lastPatches.filter((p) => p.kind === 'REPLACE' && startsWith(p.path, [0, 2])).length).toBeGreaterThanOrEqual(1);
     expect(renders - before, '삭제 한 동작 = 렌더 1번').toBe(1);
+    console.log(`[P-17 키] 캔버스 ${JSON.stringify(canvasCounts(instance.lastPatches))} 레이어 ${JSON.stringify(layerCounts(instance.lastPatches))} 속성 패널 REPLACE ${instance.lastPatches.filter((p) => p.kind === 'REPLACE' && startsWith(p.path, [0, 2])).length}줄 렌더 +${renders - before}`);
     expect(slot(1)).toBeNull();
     expect(ids()).toEqual(['b1', 'b3']);
     await click(buttonOf('b3'));
