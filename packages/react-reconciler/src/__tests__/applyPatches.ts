@@ -1,7 +1,7 @@
 // 테스트 전용 검산기. 테스트가 아니므로 직접 테스트하지 않는다 (diff · invertPatches 결과를 눈으로 믿지 않고 적용해서 확인하는 용도).
 // [AI Note]: VNode 목록에 patch를 "순서대로 하나씩" 적용해 새 목록을 만든다. 경로는 그 patch를 실행하는 순간의 트리 기준 (알고리즘 결정 4 A).
 // DOM 없이 순수 VNode만 다룬다. 입력은 고치지 않고 새 객체를 만든다. MOVE 포함 7종.
-import { COMMENT_NODE, TEXT_NODE } from '@mini-react/shared';
+import { COMMENT_NODE, DOM_PROP_ELEMENTS, TEXT_NODE } from '@mini-react/shared';
 import type { AreaChildren, ElementVNode, Patch, Path, StyleMap, VNode } from '@mini-react/shared';
 
 type Children = readonly VNode[];
@@ -109,12 +109,14 @@ export function normalizeTree(list: AreaChildren): AreaChildren {
     if (node.type === TEXT_NODE || node.type === COMMENT_NODE) return node;
     // [AI Note]: 쌍을 모아 fromEntries로 만든다 — `__proto__` 속성 이름도 보통 항목으로 남긴다 (검수 2회차 B-1).
     const entries: Array<[string, unknown]> = [];
+    // 검수 NB-4: 프로퍼티 규칙은 input · textarea · select에만. 다른 요소의 value · checked는 아래 보통 속성 규칙을 탄다
+    const asProperty = typeof node.type === 'string' && DOM_PROP_ELEMENTS.has(node.type.toLowerCase());
     for (const [name, value] of Object.entries(node.props)) {
       // value · checked는 diff의 diffProps와 같은 규칙: value = 문자열 · 숫자(→ 문자열), checked = true · "" → true, false → false, 나머지는 없음
-      if (name === 'value') {
+      if (asProperty && name === 'value') {
         if (typeof value === 'string') entries.push([name, value]);
         else if (typeof value === 'number') entries.push([name, String(value)]);
-      } else if (name === 'checked') {
+      } else if (asProperty && name === 'checked') {
         if (value === true || value === '') entries.push([name, true]);
         else if (value === false) entries.push([name, false]);
       } else if (name === 'style' && typeof value === 'object' && value !== null) entries.push([name, value]);

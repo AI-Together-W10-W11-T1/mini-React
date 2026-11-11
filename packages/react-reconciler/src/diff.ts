@@ -1,4 +1,4 @@
-import { COMMENT_NODE, TEXT_NODE } from '@mini-react/shared';
+import { COMMENT_NODE, DOM_PROP_ELEMENTS, TEXT_NODE } from '@mini-react/shared';
 import type { AreaChildren, DomPropName, DomPropValue, EventHandler, Key, Patch, Path, StyleMap, VNode } from '@mini-react/shared';
 
 // [AI Note]: 이전 · 새 VNode 두 개만 비교해 "고칠 일 목록"을 만든다 (P1-33 — 실제 DOM을 다시 읽지 않는다).
@@ -102,9 +102,11 @@ function diffNode(oldNode: VNode, newNode: VNode, path: Path, out: Patch[]): voi
   }
   diffAttrs(oldNode, newNode, path, out);
   diffStyle(oldNode, newNode, path, out);
-  diffProps(oldNode, newNode, path, out);
   diffEvents(oldNode, newNode, path, out);
   diffChildren(oldNode.children, newNode.children, path, out);
+  // [AI Note]: SET_PROP은 자식 비교 "뒤"에 둔다. `<select value>`는 새 `<option>`이 먼저 들어와야 그 값을 고를 수 있다.
+  // 이 요소 자신의 경로는 자식 INSERT · REMOVE · MOVE로 바뀌지 않으므로 순서를 바꿔도 안전하다.
+  diffProps(oldNode, newNode, path, out);
 }
 
 // [AI Note]: 속성 값 정규화 — 문자열 · 숫자 → 문자열, true → "" (boolean 속성), false · null · undefined → 속성 없음.
@@ -113,7 +115,7 @@ function readAttrs(node: VNode): Map<string, string> {
   const attrs = new Map<string, string>();
   for (const [name, value] of Object.entries(node.props)) {
     if (name === 'style' && isStyleMap(value)) continue;
-    if (isDomPropName(name)) continue; // value · checked는 속성이 아니라 DOM 프로퍼티 (diffProps)
+    if (isDomPropName(name) && hasDomProps(node)) continue; // input · textarea · select의 value · checked는 속성이 아니라 DOM 프로퍼티 (diffProps)
     if (typeof value === 'string') attrs.set(name, value);
     else if (typeof value === 'number') attrs.set(name, String(value));
     else if (value === true) attrs.set(name, '');
@@ -183,15 +185,21 @@ function diffEvents(oldNode: VNode, newNode: VNode, path: Path, out: Patch[]): v
   }
 }
 
-// [AI Note]: DOM 프로퍼티 (Phase 2, 정책 「§4.3 DOM 프로퍼티」). `value` · `checked`는 속성(SET_ATTR)이 아니라 SET_PROP 한 줄로 비교한다.
+// [AI Note]: DOM 프로퍼티 (Phase 2, 정책 「§4.3 DOM 프로퍼티」). `input` · `textarea` · `select`의 `value` · `checked`는 속성(SET_ATTR)이 아니라 SET_PROP 한 줄로 비교한다.
 // 입력창은 사용자가 타이핑하면 속성이 아니라 프로퍼티가 바뀌므로, patch가 프로퍼티로 넣는다 (실제 값과 다를 때만 — 커서 유지, Dev-5 · 6).
 // 정규화: value = 문자열 · 숫자(→ 문자열), checked = true · "" → true / false → false, 나머지는 props에 없는 것. null = props에 없음.
 function isDomPropName(name: string): name is DomPropName {
   return name === 'value' || name === 'checked';
 }
 
+// [AI Note]: 요소 종류 제한 (검수 NB-4) — `input` · `textarea` · `select`만 프로퍼티. 다른 요소의 value · checked는 readAttrs가 보통 속성으로 비교한다.
+function hasDomProps(node: VNode): boolean {
+  return typeof node.type === 'string' && DOM_PROP_ELEMENTS.has(node.type.toLowerCase());
+}
+
 function readDomProps(node: VNode): Map<DomPropName, DomPropValue> {
   const props = new Map<DomPropName, DomPropValue>();
+  if (!hasDomProps(node)) return props;
   const { value, checked } = node.props as { value?: unknown; checked?: unknown };
   if (typeof value === 'string') props.set('value', value);
   else if (typeof value === 'number') props.set('value', String(value));

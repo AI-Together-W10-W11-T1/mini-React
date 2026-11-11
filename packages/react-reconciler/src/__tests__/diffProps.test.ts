@@ -129,3 +129,54 @@ describe('diff — DOM 프로퍼티 value · checked (SET_PROP)', () => {
     }
   });
 });
+
+describe('diff — value · checked 프로퍼티는 input · textarea · select에서만 (검수 1회차 NB-4)', () => {
+  it('textarea · select의 value는 SET_PROP', () => {
+    expect(run([el('textarea', { value: 'a' })], [el('textarea', { value: 'b' })])).toEqual([
+      { kind: 'SET_PROP', path: [0], name: 'value', before: 'a', after: 'b' },
+    ]);
+    expect(run([el('select', { value: 'a' })], [el('select', { value: 'b' })])).toEqual([
+      { kind: 'SET_PROP', path: [0], name: 'value', before: 'a', after: 'b' },
+    ]);
+  });
+
+  it('div · li · option 같은 다른 요소의 value는 보통 속성(SET_ATTR)이다', () => {
+    expect(run([el('div', { value: 'a' })], [el('div', { value: 'b' })])).toEqual([
+      { kind: 'SET_ATTR', path: [0], name: 'value', before: 'a', after: 'b' },
+    ]);
+    expect(run([el('li', {})], [el('li', { value: 3 })])).toEqual([
+      { kind: 'SET_ATTR', path: [0], name: 'value', before: null, after: '3' },
+    ]);
+    expect(run([el('option', { value: 'x' })], [el('option', {})])).toEqual([
+      { kind: 'SET_ATTR', path: [0], name: 'value', before: 'x', after: null },
+    ]);
+  });
+
+  it('다른 요소의 checked는 boolean 속성 규칙(true = 값 "", false = 속성 없음)이고 SET_PROP이 아니다', () => {
+    expect(run([el('div', {})], [el('div', { checked: true })])).toEqual([
+      { kind: 'SET_ATTR', path: [0], name: 'checked', before: null, after: '' },
+    ]);
+    expect(run([el('div', { checked: true })], [el('div', { checked: false })])).toEqual([
+      { kind: 'SET_ATTR', path: [0], name: 'checked', before: '', after: null },
+    ]);
+  });
+
+  it('input은 그대로 SET_PROP (checked 포함)', () => {
+    expect(run([el('input', { checked: false })], [el('input', { checked: true })])).toEqual([
+      { kind: 'SET_PROP', path: [0], name: 'checked', before: false, after: true },
+    ]);
+  });
+
+  it('select의 value 변경은 새 option INSERT "뒤"에 온다 (새 option이 있어야 고를 수 있음)', () => {
+    const patches = run(
+      [el('select', { value: 'a' }, el('option', { value: 'a' }))],
+      [el('select', { value: 'b' }, el('option', { value: 'a' }), el('option', { value: 'b' }))],
+    );
+    expect(patches.map((p) => p.kind)).toEqual(['INSERT', 'SET_PROP']);
+  });
+
+  it('같은 자리에서 div → input처럼 태그가 바뀌면 REPLACE (새 요소의 value는 renderVNode가 프로퍼티로)', () => {
+    const patches = run([el('div', { value: 'a' })], [el('input', { value: 'a' })]);
+    expect(patches.map((p) => p.kind)).toEqual(['REPLACE']);
+  });
+});

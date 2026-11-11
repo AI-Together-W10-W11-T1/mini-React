@@ -232,6 +232,28 @@ describe('renderVNode — 이벤트 · DOM 프로퍼티 (Phase 2)', () => {
     expect(box.checked).toBe(true);
   });
 
+  it('textarea · select는 value를 프로퍼티로 넣는다 (검수 NB-4)', () => {
+    const textarea = renderVNode(deepFreeze(el('textarea', { value: 'memo' }))) as HTMLTextAreaElement;
+    expect(textarea.value).toBe('memo');
+    expect(textarea.hasAttribute('value')).toBe(false);
+    const select = renderVNode(deepFreeze(el('select', { value: 'b' }, el('option', { value: 'a' }), el('option', { value: 'b' })))) as HTMLSelectElement;
+    expect(select.value).toBe('b');
+    expect(select.hasAttribute('value')).toBe(false);
+  });
+
+  it('input · textarea · select가 아닌 요소의 value · checked는 보통 속성이다 (검수 NB-4, Phase 1과 같음)', () => {
+    const div = renderVNode(deepFreeze(el('div', { value: 'a', checked: true }))) as HTMLElement;
+    expect(div.getAttribute('value')).toBe('a');
+    expect(div.getAttribute('checked')).toBe('');
+    const li = renderVNode(deepFreeze(el('li', { value: 3 }))) as HTMLElement;
+    expect(li.getAttribute('value')).toBe('3');
+    const off = renderVNode(deepFreeze(el('div', { checked: false }))) as HTMLElement;
+    expect(off.hasAttribute('checked')).toBe(false);
+    // <option value>는 select의 선택 값이 아니라 option 자신의 속성
+    const option = renderVNode(deepFreeze(el('option', { value: 'x' }))) as HTMLOptionElement;
+    expect(option.getAttribute('value')).toBe('x');
+  });
+
   it('이벤트가 달린 요소가 renderAreaChildren으로 그려져도 동작한다', () => {
     const onClick = vi.fn();
     const area = document.createElement('div');
