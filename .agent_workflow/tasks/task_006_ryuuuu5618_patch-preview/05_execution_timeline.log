@@ -3,3 +3,8 @@
 2026-11-11T22:57 | stage=1 | agent=mr-worker | round=- | signal=UNKNOWN | - | by=hook
 2026-11-11T23:00 | stage=1 | agent=master | round=- | signal=TESTCASE_OK | 빠르게 범위 · A(구현 먼저) → B(테스트) 순서
 2026-11-11T23:09 | stage=2 | agent=mr-worker | round=- | signal=UNKNOWN | Dev-1~7 | by=hook
+2026-11-11T23:23 | stage=2 | agent=master | round=- | signal=DECISION | PP-07 변경: Patch → 도구 막대 redo 옆 (B 작업자에게 전달)
+2026-11-11T23:25 | stage=2 | agent=master | round=- | signal=DECISION | PP-07 변경 2: Undo 버튼 제거, 도구 막대에 뒤로 · 앞으로 · Patch
+2026-11-11T23:27 | stage=2 | agent=master | round=- | signal=DECISION | PP-11 단축키 = State History · PP-12 앱 편집 Undo 제거 (사용자 "추천으로 가자")
+2026-11-11T23:40 | stage=2 | agent=mr-worker | round=- | signal=UNKNOWN | Dev-7 | by=hook
+2026-11-11T23:41 | stage=2 | agent=master | round=- | signal=VERIFY | B 단계 끝: vitest 1178 · tsc 0 · playwright 308 · packages diff 0. 다음 = 개발 검수(diff 969edc4..HEAD) → QA → 사람 확인
