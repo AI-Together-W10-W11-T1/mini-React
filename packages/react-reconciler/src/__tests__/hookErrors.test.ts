@@ -220,7 +220,7 @@ describe('렌더 중 컴포넌트가 던진 예외 (§6.2 오류 복구)', () =>
     expect(fc.hooks[0]).toMatchObject({ value: 1000 });
   });
 
-  it('렌더가 던진 오류 뒤에도 effect 보호 코드 · 이전 VNode가 흔들리지 않는다 (다음 렌더의 patch before는 마지막 성공 모습)', async () => {
+  it('렌더가 던진 오류 뒤에도 이전 VNode가 흔들리지 않는다 (다음 렌더의 patch before는 마지막 성공 모습)', async () => {
     collectRenderErrors();
     let boom = false;
     let setN: Setter<number> = () => {};

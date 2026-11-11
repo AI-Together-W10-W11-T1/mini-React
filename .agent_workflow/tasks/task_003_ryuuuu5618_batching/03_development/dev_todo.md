@@ -61,3 +61,12 @@
   - **완료 근거 (Evidence)**:
     - 바꾼 줄 (전 → 후): `README.md`(표시 안 ~ 안만) 34째 줄 "setter마다 즉시 동기 렌더 (Batching 미구현)" → "setter는 칸 값을 바로 바꾸고 렌더는 마이크로태스크로 컴포넌트당 한 번 모음 (Batching, 같은 핸들러의 setter 3번 = 렌더 1번)" · 35째 줄 "React는 setter를 모아 한 번에 렌더" → "우리 Batching은 `queueMicrotask` 한 가지뿐 (우선순위 · 시간 분할 없음)" · 39째 줄 "즉시 동기 렌더라 [+3]은 렌더 · diff · patch가 3번" → "Batching이라 … 1번만 돌고(task_002 즉시 동기 때는 3번)". `wiki/architecture.md` 14째 줄(scheduler 역할: `scheduleRender(owner, task)` · 연달아 50번 · `setRenderErrorHandler`) · 49째 줄 흐름 그림(렌더 예약 → 끝난 직후 렌더) · 70째 줄 "[+3]은 렌더 3번" → "렌더 1번(task_002 즉시 동기 때는 3번)" · 88째 줄 결정 9 행(B로 변경, 이유 "리액트를 공부할려면 배칭 구현하는게 맞는 거 같아서", task_002 당시 말은 "task_002 당시 A를 고른 말"로 표시해 그대로 보존) · 99째 줄 React와의 차이 행 · 117째 줄 "Batching 비교 시나리오는 제외" 보충 · 118 · 124 · 125째 줄 옛 측정값에 "task_002 당시(즉시 동기)" 표시 + Batching 재측정 표 추가(Dev-2 실측 값: B-06 0.300 / 0.830 ms · patch 1 · 507 / 507, B-07 1.200 / 1.955 ms · patch 167(SET_EVENT 126) · 7 / 7, 렌더 1번 · 13번). `wiki/index.md` 16 · 24 · 25 · 43째 줄(task_002 당시 미구현 → task_003에서 구현). `wiki/qna_prep.md` 89~91 · 130 · 134 · 144째 줄(Batching 질문 · [+3] · 안전장치 문구 "연달아 50번" · React와의 차이). 토큰량 표 · 사용자 인용문은 건드리지 않음(인용문은 task_002 때 말임을 표시만). 기록에 없는 숫자는 쓰지 않음(새 숫자는 Dev-2 실측과 단위 테스트 한도 50뿐)
     - `grep -rn "즉시 동기\|Batching 미구현\|배칭은 구현하지\|구현 안 함\|미구현" README.md wiki` 결과: 남은 줄은 모두 "task_002 당시"로 표시된 이력(README 39 · architecture 70 · 88 · 99 · 118 · 124 · 125 · index 16 · 24 · 25 · 42(SVG, 무관) · 43 · qna_prep 91 · 130 · 134 · 144). `CLAUDE.md`는 건드리지 않음. 코드 · 테스트 변경 없음. 커밋 06b1f52
+
+## 검수 1회차 NON-BLOCKING 반영
+
+이름 · 문구 · 문서만 고쳤고 동작은 바뀌지 않았다. NB-5 · 6은 하지 않았다(`code_review_log.md`에 기록만).
+
+- NB-1: 초안 ③ e2e 표에 E-6(QA-16 탭 제목 쓰기 기록 `0·1·2·3·4` → `0·1·4`)을 추가하고 `qa_todo.md`의 「기대값만 바뀌는 기존 시나리오」에 QA-16 줄을 더했다.
+- NB-2: `e2e/phase2-log.spec.ts` QA-17 테스트 이름 · 주석의 "20번 넘게" → "20번 이상".
+- NB-3: `packages/react-reconciler/src/__tests__/hookErrors.test.ts` 새 테스트 이름에서 "effect 보호 코드"를 뺐다(단언은 그대로).
+- NB-4: `qa_todo.md` QA-3의 "포커스 유지"를 실제 동작(입력창 비워짐 · 같은 참조, [추가]를 클릭하므로 포커스는 버튼)으로 고쳤다.

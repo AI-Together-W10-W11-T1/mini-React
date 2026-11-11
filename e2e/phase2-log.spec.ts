@@ -140,7 +140,7 @@ test('QA-16 탭 제목: `카운터 N - Phase 2`, 이름 입력에는 그대로(e
   ]);
 });
 
-test('QA-17 렌더를 20번 넘게 일으킨 뒤에도 [+1] 한 번은 정확히 +1, [삭제] 한 번은 한 줄이며, (요소, 이벤트 이름)마다 addEventListener는 1번을 넘지 않는다', async ({ page }) => {
+test('QA-17 렌더를 20번 이상 일으킨 뒤에도 [+1] 한 번은 정확히 +1, [삭제] 한 번은 한 줄이며, (요소, 이벤트 이름)마다 addEventListener는 1번을 넘지 않는다', async ({ page }) => {
   // 요소(Element)마다 이벤트 이름별 addEventListener 호출 수를 센다
   await page.addInitScript(() => {
     const counts = new WeakMap<object, Record<string, number>>();
@@ -167,7 +167,7 @@ test('QA-17 렌더를 20번 넘게 일으킨 뒤에도 [+1] 한 번은 정확히
   });
   await page.goto(URL);
 
-  // 렌더를 20번 넘게: 이름 입력 · 할 일 추가 · 체크 · 이동 (카운터는 건드리지 않는다)
+  // 렌더를 20번 이상: 이름 입력 · 할 일 추가 · 체크 · 이동 (카운터는 건드리지 않는다)
   await page.getByTestId('name-input').pressSequentially('가나다라마바사아자차');
   for (const text of ['가', '나', '다']) await addTodo(page, text);
   await page.locator(inItem('todo-1', 'todo-check')).click();
