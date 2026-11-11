@@ -12,7 +12,7 @@ import { createPreview } from './preview';
 import type { Preview } from './preview';
 import { INITIAL_NAV, canBack, canForward, navBack, navForward, navPush } from './previewNav';
 import type { PreviewNav } from './previewNav';
-import { EMPTY_UNDO, canRedo, canUndo, recordEdit, redo, undo } from './undo';
+import { EMPTY_UNDO, recordEdit, redo, undo } from './undo';
 import type { UndoGroup, UndoResult, UndoState } from './undo';
 
 // [AI Note]: 루트 컴포넌트. 모든 useState · useEffect · useMemo는 이 파일에서만 부른다 (MF-04 · P2-07 · P2-08).
@@ -87,7 +87,7 @@ export function App(): VNode {
     setSelectedId(reconcileSelection(selectedId, result.doc));
   };
 
-  // [AI Note]: [↶] [↷] 버튼과 단축키가 같은 함수를 쓴다 — 한 동작 = setter 3개 = 렌더 1번 (FD-12). 되돌릴 것이 없으면 undo() · redo()가 같은 state를 돌려줘 아무 setter도 안 부른다.
+  // [AI Note]: Undo / Redo 단축키(Ctrl|Cmd+Z · Shift+Z)가 쓰는 함수다 (버튼 [↶] [↷]는 patch-preview에서 없앴다, FD-12) — 한 동작 = setter 3개 = 렌더 1번 (FD-12). 되돌릴 것이 없으면 undo() · redo()가 같은 state를 돌려줘 아무 setter도 안 부른다.
   const onUndo = (): void => moveThroughHistory(undo(history, doc));
   const onRedo = (): void => moveThroughHistory(redo(history, doc));
 
@@ -126,7 +126,7 @@ export function App(): VNode {
   // [AI Note]: 실제 영역(patch-preview, PP-09) — 기존 5칸(useState 4 + useEffect 1)의 순서는 그대로 두고 뒤에 3칸만 덧붙인다 (slot(0 ~ 3) 불변).
   //   [5] useMemo = 보관함: 한 번 만들어 계속 쓰는 같은 객체. 안에 createPreview 결과를 넣어 두는 자리이고 setter가 없어 바꿔도 렌더가 안 일어난다 (엔진에 useRef가 없어서 이렇게 한다)
   //   [6] useEffect([]) = 마운트 patch 직후 한 번: DOM에서 테스트 영역 · 실제 영역 상자 · 깜빡임 층을 찾아 createPreview를 만든다 (렌더 중에는 DOM이 아직 없다). cleanup = 보관함 비움
-  //   [7] useState(nav) = 뒤로 · 앞으로 가능 여부 (App state, PP-09). 렌더 중 canBack · canForward로 계산해 PreviewPanel에 내려 준다
+  //   [7] useState(nav) = 뒤로 · 앞으로 가능 여부 (App state, PP-09). 렌더 중 canBack · canForward로 계산해 Toolbar의 [뒤로] [앞으로]에 내려 준다
   const vault = useMemo<{ preview: Preview | null }>(() => ({ preview: null }), []);
   useEffect(() => {
     const testArea = document.querySelector('[data-testid="canvas"]');
@@ -157,11 +157,11 @@ export function App(): VNode {
     'div',
     { class: 'app' },
     // [AI Note]: 자식 순서 = 도구 막대(0) · 레이어(1) · 캔버스(2) · 속성(3). 이 순서가 엔진 patch 경로 접두 [0,0] ~ [0,3]이 된다 (FD-10)
-    h(Toolbar, { onAdd, canUndo: canUndo(history), canRedo: canRedo(history), onUndo, onRedo, onPatch: onPreviewPatch }),
+    h(Toolbar, { onAdd, canBack: canBack(nav), canForward: canForward(nav), onBack: onPreviewBack, onForward: onPreviewForward, onPatch: onPreviewPatch }),
     h(LayerPanel, { main: doc.main, instances: doc.instances, selectedId, onSelect, onMove }),
     h(Canvas, { main: doc.main, instances: doc.instances, selectedId, onSelect }),
     h(PropertyPanel, { main: doc.main, instances: doc.instances, selectedId, onEdit, onReset, onDelete: deleteSelected }),
     // 실제 영역 구역 = 5번째 자식 [0,4]. DOM 순서는 맨 끝, 자리는 CSS로 정한다 (앞 네 개의 경로 접두 [0,0] ~ [0,3]은 그대로)
-    h(PreviewPanel, { canBack: canBack(nav), canForward: canForward(nav), onBack: onPreviewBack, onForward: onPreviewForward }),
+    h(PreviewPanel, {}),
   );
 }
