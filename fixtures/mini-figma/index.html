@@ -4,13 +4,13 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="icon" href="data:," />
-    <title>mini-figma</title>
+    <title>Mini-Figma</title>
     <style>
       /* [AI Note]: 디자인 기준 = task_005 00_design_reference.md (어두운 바탕 + 한 단계 밝은 카드 + 강조색 파랑 하나 + 알약 버튼). 값은 문서 hex 그대로.
          외부 글꼴 · 이미지 · 외부 스타일 가져오기 없음 — 글꼴은 시스템에 있는 것을 순서대로 쓴다 (FD-05). 그림자 없음 (문서 「Elevation」 Flat). */
       :root {
-        --bg: #0a0b0d;
-        --card: #16181c;
+        --bg: #16181c;
+        --card: #0a0b0d;
         --ink: #ffffff;
         --ink-soft: #a8acb3;
         --accent: #0052ff;
@@ -28,9 +28,13 @@
       .app { display: grid; grid-template-columns: 220px minmax(0, 1fr) 300px; gap: 16px; align-items: start; }
       .app > * { min-width: 0; padding: 20px; border: 0; border-radius: 24px; background: var(--card); box-shadow: none; }
       .panel-title, .property-title { margin: 0 0 12px; font-size: 1.125rem; font-weight: 600; line-height: 1.33; color: var(--ink); overflow-wrap: anywhere; } /* 공백 없는 긴 이름(「인스턴스 · AAAA…」)도 패널 안에서 줄바꿈 — 안 하면 mobile에서 가로 스크롤이 생긴다 (QA-A2) */
+      .panel-title { font-size: 1rem; }
+      /* 레이어 패널 제목: 아래 선으로 레이어 목록과 구분, 선은 패널 안쪽 여백(20px)을 넘어 사이드바 가로 전체 */
+      .layer-panel .panel-title { margin: 0 -20px 12px; padding: 0 20px 12px; border-bottom: 1px solid var(--line); }
 
-      /* 도구 막대: 높이 64px(줄바꿈하면 늘어남), 앱 이름 + 알약 버튼 3개 */
-      .toolbar { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; gap: 12px; min-height: 64px; padding: 10px 20px; }
+      /* 도구 막대: 높이 64px(줄바꿈하면 늘어남), 앱 이름 + 알약 버튼 3개.
+         창 기준 가로 전체: body 여백 16px을 음수 마진으로 상쇄해 창 위 · 양옆 끝에 붙인다 (카드 모양 대신 아래 선만) */
+      .toolbar { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; gap: 12px; min-height: 64px; margin: -16px -16px 0; padding: 10px 20px; border-bottom: 1px solid var(--line); border-radius: 0; background: #0a0b0d; }
       .app-name { margin-right: auto; font-size: 1.125rem; font-weight: 600; letter-spacing: 0; }
       .btn-primary, .btn-secondary, .delete-instance, .layer-move, .prop-reset {
         display: inline-flex; align-items: center; justify-content: center; gap: 6px; border-radius: 100px; font-weight: 600; cursor: pointer; box-shadow: none;
@@ -40,19 +44,23 @@
       .btn-primary:active { background: var(--accent-active); border-color: var(--accent-active); }
       .btn-secondary, .delete-instance, .layer-move, .prop-reset { border: 1px solid #5b616e; background: transparent; color: var(--ink); }
       .btn-secondary:disabled { border-color: var(--line); color: var(--muted); cursor: not-allowed; }
-      .delete-instance { min-height: 44px; margin-top: 12px; padding: 0 20px; }
+      .delete-instance { min-height: 44px; padding: 0 20px; }
 
       /* 레이어 창 */
-      .layer-list { margin: 8px 0 0; padding: 0; list-style: none; }
-      .layer-row { display: flex; align-items: center; gap: 6px; min-height: 44px; padding: 4px 8px; border-radius: 12px; cursor: pointer; }
+      .layer-list { display: flex; flex-direction: column; gap: 4px; margin: 8px 0 0; padding: 0; list-style: none; } /* 행 사이 4px — 고른 행의 파랑 테두리가 이웃 행에 붙지 않게 */
+      .layer-row { display: flex; align-items: center; gap: 8px; min-height: 48px; padding: 8px 8px 8px 12px; border-radius: 12px; cursor: pointer; } /* 안쪽 여백: 이름 왼쪽 12px, [↑][↓]와 테두리 사이 8px */
       .layer-name { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
       .layer-move { flex: 0 0 auto; min-width: 32px; min-height: 32px; padding: 0 8px; }
       .layer-row.selected { background: var(--accent-wash); outline: 2px solid var(--accent); }
 
-      /* 캔버스: 어두운 바탕 위 점무늬. 메인 버튼 상자 + 인스턴스 버튼 줄. 인스턴스가 많아지면 줄바꿈 (mobile 가로 스크롤 방지, Q17-5) */
-      .canvas { min-height: 320px; padding: 24px; background-color: var(--bg); background-image: radial-gradient(circle, #3a3f47 1.5px, transparent 1.6px); background-size: 24px 24px; border: 1px solid var(--line); }
-      .canvas-main { margin-bottom: 16px; padding-bottom: 16px; border-bottom: 1px dashed var(--line); }
+      /* 캔버스: 테두리 · 점무늬 · 자체 배경 없이 카드 바탕 그대로. 메인 버튼 상자 + 인스턴스 버튼 줄. 인스턴스가 많아지면 줄바꿈 (mobile 가로 스크롤 방지, Q17-5) */
+      .canvas { min-height: 320px; padding: 24px; background: transparent; border: 0; border-radius: 0; } /* 테두리 · 자체 배경 없음 — 페이지 바탕이 그대로 보인다 */
+      .canvas-main { margin-bottom: 32px; } /* 컴포넌트 묶음과 인스턴스 묶음 사이 */
       .canvas-instances { display: flex; flex-wrap: wrap; gap: 12px; }
+      /* 묶음 이름: 점선 대신 각 묶음 위에 「컴포넌트」 · 「인스턴스」 글자. CSS 글자(::before)라 DOM · diff 경로는 그대로이고, 같은 클래스를 쓰는 실제 영역 사본에도 똑같이 붙는다 */
+      .canvas-main::before, .canvas-instances::before { display: block; margin-bottom: 8px; padding-left: 5px; color: var(--ink-soft); font-size: 0.75rem; font-weight: 600; line-height: 1.33; }
+      .canvas-main::before { content: '컴포넌트'; }
+      .canvas-instances::before { content: '인스턴스'; flex: 0 0 100%; margin-bottom: -4px; } /* 줄바꿈 줄의 첫 칸을 통째로 차지, 아래 간격 = 12px gap − 4px = 8px */
 
       /* 버튼(디자인 대상 컴포넌트): 크기 S/M/L은 클래스, 색(배경 · 글자색)은 인라인 style (FD-23). 알약 모양. 버튼은 flex 항목이라 max-width: 100% + 라벨 overflow-wrap: anywhere로
          공백 없는 긴 글자도 영역 안에서 줄바꿈된다 (word-break: break-word만으로는 flex 항목의 최소 너비가 안 줄어 가로 스크롤이 남음, QA-A2) */
@@ -63,14 +71,47 @@
       .btn-L { padding: 14px 28px; font-size: 1.25rem; }
       .figma-button.selected { outline: 3px solid var(--accent); outline-offset: 2px; }
 
+      /* 영역 제목 (캔버스 안 「테스트 영역」) */
+      .area-title { margin: 0 0 12px; font-size: 1.125rem; font-weight: 600; line-height: 1.33; color: var(--ink); }
+      /* 테스트 영역 제목: 아래 선으로 메인 Button과 구분, 선은 캔버스 안쪽 여백(24px)을 넘어 가운데 열 가로 전체 */
+      .canvas > .area-title { margin: 0 -24px 16px; padding: 0 24px 12px; border-bottom: 1px solid var(--line); }
+
+      /* 실제 영역 구역: 카드(.app > * 규칙 재사용) = 머리글(제목만) + 상자. [Patch] · [실행 취소] · [다시 실행]는 도구 막대로 옮겼다(PP-07 변경).
+         상자 = 바탕색(--bg) · 24px 모서리 · 24px 안쪽 여백, 점무늬 · 테두리 없음 (제목 아래 선으로 구분). 깜빡임 층은 상자와 같은 크기로 겹치고 마우스를 안 받는다. */
+      .real-section { display: flex; flex-direction: column; gap: 12px; }
+      .real-header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin: 0 -20px; padding: 0 20px 12px; border-bottom: 1px solid var(--line); } /* 캔버스 제목처럼 아래 선이 카드 가로 전체 */
+      .real-header .panel-title { margin: 0; }
+      .real-frame { position: relative; display: flex; flex: 1 1 auto; min-height: 0; }
+      .real-area { flex: 1 1 auto; min-width: 0; min-height: 120px; padding: 24px; background: var(--bg); border: 0; border-radius: 24px; } /* 점무늬 · 테두리 없음, 배경색은 바탕색(--bg) 상자 */
+      .real-area .figma-button { cursor: default; }
+      .real-overlay { position: absolute; inset: 0; pointer-events: none; overflow: hidden; border-radius: 24px; }
+      /* 깜빡임 박스: 바뀐 노드 위에 잠깐 뜨고 옅어져 사라진다. 파랑 버튼 위에서도 보이게 흰 테두리 + 파랑 바깥선 + 연한 흰 바탕. 그림자 · 주황 없음 (Phase 1 overlay.ts가 .viz-box를 만든다) */
+      .viz-box { position: absolute; box-sizing: border-box; border: 2px solid var(--ink); outline: 2px solid var(--accent); border-radius: 12px; background: rgba(255, 255, 255, 0.22); animation: viz-flash 0.7s ease-out forwards; }
+      @keyframes viz-flash { 0% { opacity: 1; } 100% { opacity: 0; } }
+
       .property-empty { margin: 0; color: var(--ink-soft); }
+      /* 속성 패널 = 세로 줄. 맨 끝 버튼 자리(메인: [+ 인스턴스] / 인스턴스: [삭제])는 남은 높이를 밀어내 패널 오른쪽 아래에 붙는다 */
+      .property-panel { display: flex; flex-direction: column; }
+      .property-actions { display: flex; justify-content: flex-end; margin-top: auto; padding-top: 16px; }
       /* 속성 칸: 이름 + 입력 부품. 긴 글자도 칸 안에서 줄어들게 min-width: 0 */
       .prop-row { display: flex; align-items: center; gap: 8px; margin: 10px 0; }
       .prop-name { flex: 0 0 5.5rem; color: var(--ink-soft); font-size: 0.875rem; word-break: keep-all; }
-      /* override 칸: 파랑 계열 표시(왼쪽 파랑 줄 + 연한 파랑 배경, ④-4) + ↻. 아닌 칸은 「메인 따름」 */
-      .prop-row.override { margin-left: -8px; margin-right: -8px; padding: 4px 8px; border-left: 4px solid var(--accent); border-radius: 12px; background: var(--accent-wash); }
-      .prop-follow { flex: 0 0 auto; color: var(--ink-soft); font-size: 0.75rem; }
+      /* override 표시: 행은 꾸미지 않고, 값을 넣는 칸에 레이어 고른 행(.layer-row.selected)과 같은 효과 = 옅은 파랑 바탕 + 파랑 2px */
+      .prop-row.override input[type='text'], .prop-row.override select { padding: 6px 12px; border: 2px solid var(--accent); background: var(--accent-wash); }
+      .prop-row.override input[type='checkbox'] { outline: 2px solid var(--accent); outline-offset: 2px; }
+      .prop-row.override .color-input { padding: 1px; border: 2px solid var(--accent); background: var(--accent-wash); }
+      .prop-row select option { background: var(--card); color: var(--ink); } /* 바탕이 반투명이어도 펼친 목록은 불투명하게 */
       .prop-reset { flex: 0 0 auto; min-width: 32px; min-height: 32px; padding: 0 8px; }
+      /* 입력 부품 + ↻ 감싸개: 글자 칸 · 선택 상자는 ↻를 칸 안 오른쪽에 겹치고(그만큼 오른쪽 여백), 체크박스는 바로 옆에 둔다. 색 칸은 감싸개 없이 칸 끝 */
+      .prop-field { position: relative; display: flex; flex: 1 1 auto; align-items: center; min-width: 0; }
+      .prop-field > input[type='text'], .prop-field > select { width: 100%; }
+      .prop-field:not(.prop-field-beside) > .prop-reset { position: absolute; top: 50%; right: 6px; min-width: 32px; min-height: 32px; border: 0; transform: translateY(-50%); }
+      .prop-field:not(.prop-field-beside) > .prop-reset:hover { background: rgba(255, 255, 255, 0.08); }
+      .prop-row.override .prop-field > input[type='text'] { padding-right: 44px; }
+      /* 선택 상자는 오른쪽 끝에 브라우저 화살표가 있어 ↻를 화살표 왼쪽에 둔다 */
+      .prop-row.override .prop-field > select { padding-right: 68px; }
+      .prop-field:not(.prop-field-beside) > select ~ .prop-reset { right: 30px; }
+      .prop-field-beside { flex: 0 0 auto; gap: 8px; }
       /* 입력칸: 12px 모서리, 포커스는 2px 파랑 테두리 (글자 칸 · 선택 상자). 포커스 때 테두리가 굵어지는 만큼 안쪽 여백을 줄여 칸이 안 움직인다 */
       .prop-row input[type='text'], .prop-row select { flex: 1 1 auto; min-width: 0; min-height: 44px; padding: 7px 13px; border: 1px solid var(--line); border-radius: 12px; background: var(--bg); color: var(--ink); }
       .prop-row input[type='text']:focus, .prop-row select:focus { padding: 6px 12px; border: 2px solid var(--accent); outline: none; }
@@ -95,13 +136,27 @@
         html, body { height: 100%; }
         body { overflow: hidden; }
         [data-testid='app-root'] { height: 100%; }
-        .app { height: 100%; grid-template-rows: auto minmax(0, 1fr); align-items: stretch; }
-        .app > .layer-panel, .app > .canvas, .app > .property-panel { overflow-y: auto; overscroll-behavior: contain; }
+        .app { height: 100%; grid-template-rows: auto minmax(0, 1fr) minmax(0, 1fr); align-items: stretch; }
+        .app > .layer-panel, .app > .canvas, .app > .property-panel, .app > .real-section { overflow-y: auto; overscroll-behavior: contain; }
         .canvas { min-height: 0; }
+        /* patch-preview 배치: 가운데 열을 위(테스트 영역 = 캔버스) · 아래(실제 영역)로 반반 나눈다. 레이어 · 속성은 두 행에 걸쳐 화면 아래까지.
+           DOM 순서는 도구 막대 · 레이어 · 캔버스 · 속성 · 실제 영역 그대로(경로 접두 불변), 자리만 grid 명시 배치로 정한다 */
+        .app > .layer-panel { grid-column: 1; grid-row: 2 / span 2; }
+        .app > .canvas { grid-column: 2; grid-row: 2; }
+        .app > .real-section { grid-column: 2; grid-row: 3; }
+        .app > .property-panel { grid-column: 3; grid-row: 2 / span 2; }
+        /* 도구 막대 버튼은 desktop에서 36px로 줄여 64px 막대 안 위아래 여백(14px)을 확보한다. mobile은 누르기 쉬운 44px 그대로 */
+        .toolbar .btn-primary, .toolbar .btn-secondary { min-height: 36px; padding: 0 16px; font-size: 0.875rem; }
+        /* 레이어 · 속성은 사이드바: 창 왼쪽 · 오른쪽 끝 + 도구 막대 바로 아래 + 화면 맨 아래까지 붙인다.
+           위 = 행 간격 16px, 옆 · 아래 = body 여백 16px을 음수 마진으로 상쇄. 모서리는 각지게 + 안쪽에 선 하나 */
+        .app > .layer-panel { margin: -16px 0 -16px -16px; border-right: 1px solid var(--line); border-radius: 0; }
+        .app > .property-panel { margin: -16px -16px -16px 0; border-left: 1px solid var(--line); border-radius: 0; }
       }
 
       @media (max-width: 720px) {
         .app { grid-template-columns: minmax(0, 1fr); }
+        /* 속성 패널만 뒤로 보내 순서 = 도구 막대 → 레이어 → 캔버스 → 실제 영역 → 속성 (DOM에서는 실제 영역이 맨 끝) */
+        .app > .property-panel { order: 1; }
         .toolbar { gap: 8px; }
         .btn-primary, .btn-secondary { padding: 0 14px; font-size: 0.875rem; }
         .layer-move { min-width: 40px; min-height: 40px; }

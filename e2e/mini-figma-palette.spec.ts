@@ -14,7 +14,8 @@ import {
   inRow,
   overriddenFields,
   followingFields,
-  pressUndo,
+  pressBack,
+  realBgOf,
   rgb,
   bgOf,
   textOf,
@@ -102,7 +103,7 @@ test('QA-36 칩 8개를 차례로 누르면 메인 · b1 · b2 배경이 그 색
   }
 });
 
-test('QA-37 색 입력칸에 값을 세 번 넣으면 버튼이 따라 바뀌고(칩 밖 색이라 칩 표시 0개), Ctrl+Z 한 번에 시작 색으로 돌아간다 (연속 입력 = 한 단계)', async ({ page }) => {
+test('QA-37 색 입력칸에 값을 세 번 넣으면 버튼이 따라 바뀌고(칩 밖 색이라 칩 표시 0개)', async ({ page }) => {
   await page.goto(URL);
   await selectOnCanvas(page, 'main');
   await holdNodes(page, { ...ALL_BUTTONS, colorInput: '[data-testid="prop-color"]' });
@@ -117,11 +118,6 @@ test('QA-37 색 입력칸에 값을 세 번 넣으면 버튼이 따라 바뀌고
   expect(await sameNode(page, 'colorInput', '[data-testid="prop-color"]'), '입력칸은 다시 만들지 않는다').toBe(true);
   expect(await allSame(page, ALL_BUTTONS)).toBe(true);
 
-  await pressUndo(page);
-
-  expect(await colorsOf(page)).toEqual(CHANGED);
-  expect(await pressedChips(page)).toEqual(['#0052ff']);
-  await expect(page.getByTestId('prop-color')).toHaveValue('#0052ff');
 });
 
 test('QA-38 인스턴스 색: 칩을 누르면 override(↻), 메인을 바꿔도 안 따라가고, ↻로 키를 지우면 메인을 다시 따라가며, 메인과 같은 색도 override다', async ({ page }) => {
@@ -145,12 +141,12 @@ test('QA-38 인스턴스 색: 칩을 누르면 override(↻), 메인을 바꿔�
   expect(await bgOf(page, 'b2')).toBe(rgb('#cf202f'));
   expect(await bgOf(page, 'b1')).toBe(rgb('#05b169'));
 
-  // ③ b1을 고르고 ↻: 「메인 따름」, b1이 메인 색(빨강)을 따라감, 'undefined' 글자가 화면에 없음
+  // ③ b1을 고르고 ↻: 메인 따름(override 표시 없음), b1이 메인 색(빨강)을 따라감, 'undefined' 글자가 화면에 없음
   await selectOnCanvas(page, 'b1');
   await page.locator(inRow('color', 'prop-reset')).click();
   expect(await followingFields(page)).toContain('color');
   expect(await overriddenFields(page)).toEqual([]);
-  await expect(page.locator(inRow('color', 'prop-follow'))).toHaveText('메인 따름');
+  await expect(page.locator(inRow('color', 'prop-reset'))).toHaveCount(0);
   expect(await bgOf(page, 'b1')).toBe(rgb('#cf202f'));
   await expect(page.getByTestId('prop-color')).toHaveValue('#cf202f');
   expect(((await page.getByTestId('app-root').textContent()) ?? '').toLowerCase()).not.toContain('undefined');
@@ -194,7 +190,7 @@ test('QA-39 색을 바꿔도 버튼 노드 · class 글이 그대로이고 style
   expect(await allSame(page, ALL_BUTTONS)).toBe(true);
 });
 
-test('QA-A22 색 입력칸 연타: 서로 다른 색을 30번 연달아 보내도(칩도 섞음) 오류 없이 마지막 값이 반영되고 입력칸 노드가 유지되며 Ctrl+Z 한 번에 시작 색으로 돌아간다', async ({ page }) => {
+test('QA-A22 색 입력칸 연타: 서로 다른 색을 30번 연달아 보내도(칩도 섞음) 오류 없이 마지막 값이 반영되고 입력칸 노드가 유지된다', async ({ page }) => {
   await page.goto(URL);
   await selectOnCanvas(page, 'main');
   await holdNodes(page, { colorInput: '[data-testid="prop-color"]', ...ALL_BUTTONS });
@@ -216,19 +212,6 @@ test('QA-A22 색 입력칸 연타: 서로 다른 색을 30번 연달아 보내�
   await expect(page.getByTestId('prop-color')).toHaveValue(last);
   expect(await sameNode(page, 'colorInput', '[data-testid="prop-color"]')).toBe(true);
   expect(await allSame(page, ALL_BUTTONS)).toBe(true);
-
-  // 같은 칸 연속 = 한 단계: 한 번에 시작 색으로
-  await pressUndo(page);
-  expect(await colorsOf(page)).toEqual(CHANGED);
-  await expect(page.getByTestId('prop-color')).toHaveValue('#0052ff');
-
-  // 한 번 더는 아무 일 없다 (더 되돌릴 단계가 없음): 키도 [↶] 버튼도 (꺼져 있음)
-  await expect(page.getByTestId('undo-button')).toBeDisabled();
-  const watch = await watchApp(page);
-  await pressUndo(page);
-  await page.getByTestId('undo-button').click({ force: true });
-  expect(await colorsOf(page)).toEqual(CHANGED);
-  expect((await watch.take()).body.total, '한 번 더 Undo = DOM 변경 0').toBe(0);
 });
 
 test('QA-A23 극단 · 경계 색: 글자색이 규칙대로이고(경계 #777777 흰 · #787878 먹) 배경과 글자가 같은 색인 경우가 없으며, 대문자 입력은 소문자로 정리된다', async ({ page }) => {
@@ -272,7 +255,6 @@ test('QA-A24 같은 색 다시 누르기: 메인이 지금 색 칩을 다시 누
   await pickColor(page, '#0052ff');
   expect((await watch.take()).body.total, '① DOM 변경').toBe(0);
   expect(await colorsOf(page)).toEqual(CHANGED);
-  await expect(page.getByTestId('undo-button'), '① 같은 값은 기록 안 함 → [↶] 안 켜짐').toBeDisabled();
 
   // ② b1(메인 따름)을 고르고 b1의 지금 색(메인과 같은 #0052ff) 칩: override 생김, 캔버스 · 레이어 DOM 변경 0
   await selectOnCanvas(page, 'b1');
@@ -283,42 +265,17 @@ test('QA-A24 같은 색 다시 누르기: 메인이 지금 색 칩을 다시 누
   expect(await overriddenFields(page), '② override가 생겼다').toEqual(['color']);
   await expect(page.locator(inRow('color', 'prop-reset'))).toHaveCount(1);
   expect(await bgOf(page, 'b1')).toBe(rgb('#0052ff'));
-  await expect(page.getByTestId('undo-button'), '② override 생김 → [↶] 켜짐').toBeEnabled();
   expect((await canvasWatch.take()).body.total, '② 캔버스 DOM 변경').toBe(0);
   expect((await layerWatch.take()).body.total, '② 레이어 DOM 변경').toBe(0);
 });
 
-test('QA-A25 칩 연타: 칩 8개를 한 바퀴 → 라벨 입력 → 칩 2번 → Ctrl+Z를 하면 칩 2번 · 라벨 · 칩 한 바퀴가 한 번에 한 단계씩 되돌아간다', async ({ page }) => {
-  await page.goto(URL);
-  await selectOnCanvas(page, 'main');
-  await holdNodes(page, ALL_BUTTONS);
-
-  for (const hex of CHIPS) await pickColor(page, hex); // 한 바퀴 = 한 단계 (첫 칩 #0052ff는 지금 색이라 변화 없음)
-  expect((await bgOf(page, 'main'))).toBe(rgb('#eef0f3'));
-  await page.getByTestId('prop-label').fill('새'); // 새 단계
-  await pickColor(page, '#cf202f'); // 새 묶음
-  await pickColor(page, '#05b169');
-  expect(await bgOf(page, 'main')).toBe(rgb('#05b169'));
-  expect((await page.getByTestId('btn-label').allTextContents())[0]).toBe('새');
-
-  await pressUndo(page); // 칩 2번이 한 번에 → 한 바퀴 끝 색
-  expect(await bgOf(page, 'main')).toBe(rgb('#eef0f3'));
-  expect((await page.getByTestId('btn-label').allTextContents())[0]).toBe('새');
-
-  await pressUndo(page); // 라벨
-  expect(await bgOf(page, 'main')).toBe(rgb('#eef0f3'));
-  expect((await page.getByTestId('btn-label').allTextContents())[0]).toBe('버튼');
-
-  await pressUndo(page); // 칩 한 바퀴가 한 번에 시작 색으로
-  expect(await colorsOf(page)).toEqual(CHANGED);
-  expect(await allSame(page, ALL_BUTTONS)).toBe(true);
-});
-
-test('QA-A28 색 입력칸에 포커스가 있을 때: Delete · Backspace는 아무 일 없고(고른 인스턴스가 안 지워짐), Ctrl+Z = 앱 Undo, Ctrl+Shift+Z = 앱 Redo다', async ({ page }) => {
+test('QA-A28 색 입력칸에 포커스가 있을 때: Delete · Backspace는 아무 일 없고(고른 인스턴스가 안 지워짐), Ctrl+Z = 실제 영역 [실행 취소], Ctrl+Shift+Z = [다시 실행]다', async ({ page }) => {
   await page.goto(URL);
   await selectOnCanvas(page, 'b2');
-  await pickColor(page, '#05b169'); // Undo 한 단계 (b2만 초록)
+  await pickColor(page, '#05b169'); // b2만 초록
   expect(await bgOf(page, 'b2')).toBe(rgb('#05b169'));
+  await page.getByTestId('patch-button').click(); // 실제 영역도 b2 초록
+  expect(await realBgOf(page, 'b2')).toBe(rgb('#05b169'));
   const input = page.getByTestId('prop-color');
   await input.focus();
   await expect(input).toBeFocused();
@@ -332,11 +289,13 @@ test('QA-A28 색 입력칸에 포커스가 있을 때: Delete · Backspace는 �
   expect((await watch.take()).body.total, 'Delete · Backspace = DOM 변경 0').toBe(0);
   await expect(input).toBeFocused();
 
-  // Ctrl+Z = 앱 Undo (포커스를 안 빼고 누른다), Ctrl+Shift+Z = 앱 Redo
+  // Ctrl+Z = [실행 취소] (포커스를 안 빼고 누른다), Ctrl+Shift+Z = [다시 실행]. PP-06 변경: 테스트 영역 b2도 파랑(메인을 따름) ↔ 초록
   await page.keyboard.press('Control+KeyZ');
+  expect(await realBgOf(page, 'b2')).toBe(rgb('#0052ff'));
   expect(await bgOf(page, 'b2')).toBe(rgb('#0052ff'));
   expect(await selectedOnCanvas(page)).toEqual(['b2']);
   await page.keyboard.press('Control+Shift+KeyZ');
+  expect(await realBgOf(page, 'b2')).toBe(rgb('#05b169'));
   expect(await bgOf(page, 'b2')).toBe(rgb('#05b169'));
   expect(await canvasOrder(page)).toEqual(['b1', 'b2', 'b3']);
 });

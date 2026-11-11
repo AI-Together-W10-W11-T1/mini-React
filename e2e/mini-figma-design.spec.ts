@@ -1,5 +1,5 @@
 import type { Page } from '@playwright/test';
-import { test, expect, URL, selectOnCanvas, selectInLayer, noHorizontalScroll, pickColor, textOf, rgb, buttonSel, layerSel, selectedOnCanvas, selectedInLayer } from './mini-figma-helpers';
+import { test, expect, URL, clickAdd, selectOnCanvas, selectInLayer, noHorizontalScroll, pickColor, textOf, rgb, buttonSel, layerSel, selectedOnCanvas, selectedInLayer } from './mini-figma-helpers';
 
 // [AI Note]: QA-40 ~ 42 (디자인 개편: 어두운 카드 · 점무늬 · 알약 · 글꼴 · 도구 막대 배치) · QA-A26 (좁은 화면 도구 막대) · QA-A29 (밝은 색 위 선택 표시).
 // 값은 computed style로 읽는다 — CSS 변수 이름이 아니라 실제 화면에 적용된 값이 문서 값(#0a0b0d · #16181c · #a8acb3 · #0052ff)인지 증명한다.
@@ -17,7 +17,7 @@ const tid = (id: string): string => `[data-testid="${id}"]`;
 // [AI Note]: desktop은 세 패널이 overflow-y: auto라 overflow-x도 계산상 auto가 된다 → 패널 안 가로 넘침이 페이지 scrollWidth에 안 잡힌다.
 // 그래서 noHorizontalScroll(페이지) 말고 패널마다 scrollWidth <= clientWidth를 따로 본다 (Dev-9 경량 검수 NB 1).
 async function expectPanelsNoHorizontalOverflow(page: Page, where: string): Promise<void> {
-  for (const id of ['layer-panel', 'canvas', 'property-panel']) {
+  for (const id of ['layer-panel', 'canvas', 'real-section', 'property-panel']) {
     const w = await page.getByTestId(id).evaluate((el) => ({ scrollWidth: el.scrollWidth, clientWidth: el.clientWidth }));
     expect(w.scrollWidth, `${where}: ${id} 안 가로 넘침 없음 (scrollWidth <= clientWidth)`).toBeLessThanOrEqual(w.clientWidth);
   }
@@ -29,7 +29,7 @@ const INK = 'rgb(10, 11, 13)';
 const CARD = 'rgb(22, 24, 28)';
 const SOFT = 'rgb(168, 172, 179)';
 
-test('QA-40 어두운 바탕 · 한 단계 밝은 카드 24px · 그림자 없음 · 점무늬 캔버스 · 알약 버튼 · 파랑 선택 표시', async ({ page }) => {
+test('QA-40 어두운 바탕 · 한 단계 밝은 카드 24px(desktop 사이드바는 0) · 그림자 없음 · 점무늬 없는 캔버스 · 알약 버튼 · 파랑 선택 표시', async ({ page }, testInfo) => {
   await page.goto(URL);
   // 아무것도 안 골랐을 때의 보조 글자 (속성 패널 빈 안내)
   expect((await styleOf(page, tid('property-empty'), ['color'])).color, '빈 안내 글자').toBe(SOFT);
@@ -37,30 +37,43 @@ test('QA-40 어두운 바탕 · 한 단계 밝은 카드 24px · 그림자 없�
   await selectInLayer(page, 'b2');
 
   // 바탕 · 카드
-  expect((await styleOf(page, 'body', ['background-color']))['background-color'], 'body 바탕').toBe(INK);
+  expect((await styleOf(page, 'body', ['background-color']))['background-color'], 'body 바탕').toBe(CARD);
   for (const id of ['layer-panel', 'property-panel']) {
     const s = await styleOf(page, tid(id), ['background-color', 'border-radius', 'color']);
-    expect(s['background-color'], `${id} 배경`).toBe(CARD);
-    expect(s['border-radius'], `${id} 모서리`).toBe('24px');
+    expect(s['background-color'], `${id} 배경`).toBe(INK);
+    // desktop은 창 끝에 붙은 사이드바라 각진 모서리, mobile은 카드 24px
+    expect(s['border-radius'], `${id} 모서리`).toBe(testInfo.project.name === 'desktop' ? '0px' : '24px');
     expect(s.color, `${id} 글자`).toBe(WHITE);
   }
-  // 보조 글자 (인스턴스를 골랐을 때 「메인 따름」)
-  expect((await styleOf(page, tid('prop-follow'), ['color'])).color, '「메인 따름」 글자').toBe(SOFT);
+  // 「메인 따름」 글자는 없앴다 — 메인을 따르는 칸은 아무 표시가 없다
+  await expect(page.getByTestId('prop-follow')).toHaveCount(0);
 
-  // 그림자 없음 (도구 막대 · 두 패널 · 캔버스 · [+ 인스턴스] · 칩 · 버튼)
-  for (const sel of [tid('toolbar'), tid('layer-panel'), tid('property-panel'), tid('canvas'), tid('add-instance'), tid('undo-button'), tid('color-chip'), tid('figma-button')]) {
+  // 그림자 없음 (도구 막대 · 두 패널 · 캔버스 · [Patch] · 칩 · 버튼) — [+ 인스턴스]는 아래에서 메인을 고른 뒤 따로 본다
+  for (const sel of [tid('toolbar'), tid('layer-panel'), tid('property-panel'), tid('canvas'), tid('patch-button'), tid('back-button'), tid('color-chip'), tid('figma-button')]) {
     expect((await styleOf(page, sel, ['box-shadow']))['box-shadow'], `${sel} 그림자`).toBe('none');
   }
 
-  // 캔버스: 점무늬 (radial-gradient)
-  expect((await styleOf(page, tid('canvas'), ['background-image']))['background-image']).toContain('radial-gradient');
+  // 바탕 · 캔버스에 점무늬 없음: 캔버스는 테두리 · 자체 배경 없이 페이지 바탕이 그대로 보인다
+  expect((await styleOf(page, 'body', ['background-image']))['background-image']).toBe('none');
+  const cv = await styleOf(page, tid('canvas'), ['background-image', 'background-color', 'border-top-width']);
+  expect(cv['background-image']).toBe('none');
+  expect(cv['background-color']).toBe('rgba(0, 0, 0, 0)');
+  expect(cv['border-top-width']).toBe('0px');
+  // 실제 영역 상자: 점무늬 · 테두리 없음, 배경색은 바탕색(--bg)
+  const ra = await styleOf(page, tid('real-area'), ['background-image', 'background-color', 'border-top-width']);
+  expect(ra['background-image'], '실제 영역 점무늬 없음').toBe('none');
+  expect(ra['background-color'], '실제 영역 배경 = 바탕색').toBe(CARD);
+  expect(ra['border-top-width'], '실제 영역 테두리 없음').toBe('0px');
 
-  // 알약 버튼: [+ 인스턴스] 파랑 배경 · 흰 글자 · 100px, [↶] [↷]도 100px
-  const add = await styleOf(page, tid('add-instance'), ['background-color', 'border-radius', 'color']);
+  // 알약 버튼: [+ 인스턴스](메인을 골랐을 때 속성 패널 오른쪽 아래) 파랑 배경 · 흰 글자 · 100px · 그림자 없음, [실행 취소] [다시 실행]도 100px
+  await selectOnCanvas(page, 'main');
+  const add = await styleOf(page, tid('add-instance'), ['background-color', 'border-radius', 'color', 'box-shadow']);
+  expect(add['box-shadow']).toBe('none');
   expect(add['background-color']).toBe(BLUE);
   expect(add['border-radius']).toBe('100px');
   expect(add.color).toBe(WHITE);
-  for (const id of ['undo-button', 'redo-button']) expect((await styleOf(page, tid(id), ['border-radius']))['border-radius'], id).toBe('100px');
+  await selectOnCanvas(page, 'b2'); // 아래 「고른 것 표시」는 b2를 고른 상태에서 본다
+  for (const id of ['back-button', 'forward-button']) expect((await styleOf(page, tid(id), ['border-radius']))['border-radius'], id).toBe('100px');
 
   // 입력칸 12px
   expect((await styleOf(page, tid('prop-label'), ['border-radius']))['border-radius']).toBe('12px');
@@ -111,6 +124,14 @@ test('QA-41 입력칸 포커스는 파랑 2px 테두리, 주황이 없고, 글�
     });
   expect(await scanOrange(), 'b3 선택(override 표시 있음)').toEqual([]);
   await expect(page.locator('[data-testid="prop-row"].override')).toHaveCount(2); // 이 화면에 override 칸이 실제로 있다
+  // override 표시 = 행이 아니라 값 넣는 칸에 레이어 고른 행과 같은 효과(옅은 파랑 바탕 + 파랑 2px), 행 자체는 바탕 없음
+  await page.getByTestId('prop-label').blur(); // 입력칸 포커스(파랑 2px)를 빼고 override 표시만 본다
+  const overrideRow = await styleOf(page, '[data-testid="prop-row"][data-field="label"]', ['background-color']);
+  expect(overrideRow['background-color'], 'override 행 바탕').toBe('rgba(0, 0, 0, 0)');
+  const overrideInput = await styleOf(page, tid('prop-label'), ['background-color', 'border-top-color', 'border-top-width']);
+  expect(overrideInput['background-color'], 'override 입력칸 바탕').toBe('rgba(0, 82, 255, 0.14)');
+  expect(overrideInput['border-top-color'], 'override 입력칸 테두리').toBe(BLUE);
+  expect(overrideInput['border-top-width']).toBe('2px');
   await selectOnCanvas(page, 'b2');
   expect(await scanOrange(), 'b2 선택').toEqual([]);
 
@@ -121,7 +142,7 @@ test('QA-41 입력칸 포커스는 파랑 2px 테두리, 주황이 없고, 글�
   // 브랜드 · 이미지 없음
   const text = await page.evaluate(() => `${document.title}\n${document.body.innerText}\n${document.documentElement.outerHTML}`);
   expect(text.toLowerCase()).not.toContain('coinbase');
-  expect(await page.title()).toBe('mini-figma');
+  expect(await page.title()).toBe('Mini-Figma');
   expect(await page.locator('img, svg').count()).toBe(0);
 
   // 페이지가 받은 요청은 같은 출처(localhost:5199) 또는 data:뿐 (외부 글꼴 · 이미지 안 받음)
@@ -143,46 +164,55 @@ test('QA-42 배치: desktop은 도구 막대가 맨 위에서 가로 전체 + �
   const layer = await box('layer-panel');
   const canvas = await box('canvas');
   const prop = await box('property-panel');
+  const real = await box('real-section');
 
   if (testInfo.project.name === 'desktop') {
     expect(toolbar.y).toBeLessThanOrEqual(layer.y);
     expect(toolbar.y + toolbar.height).toBeLessThanOrEqual(layer.y + 1);
-    expect(Math.abs(toolbar.x - layer.x)).toBeLessThanOrEqual(1);
-    expect(Math.abs(toolbar.x + toolbar.width - (prop.x + prop.width))).toBeLessThanOrEqual(1);
+    expect(Math.abs(toolbar.x)).toBeLessThanOrEqual(1);
+    expect(Math.abs(toolbar.width - (page.viewportSize()?.width ?? 0))).toBeLessThanOrEqual(1);
     // 아래 3열: 같은 줄
     expect(layer.x + layer.width).toBeLessThanOrEqual(canvas.x + 1);
     expect(canvas.x + canvas.width).toBeLessThanOrEqual(prop.x + 1);
-    expect(Math.abs(layer.y - canvas.y)).toBeLessThanOrEqual(1);
-    expect(Math.abs(canvas.y - prop.y)).toBeLessThanOrEqual(1);
+    // 레이어 · 속성은 사이드바: 도구 막대 바로 아래(여백 없음)에서 시작해 화면 맨 아래까지, 캔버스는 그 아래 간격을 두고 시작
+    const vh = page.viewportSize()?.height ?? 0;
+    for (const [name, b] of [['layer', layer], ['prop', prop]] as const) {
+      expect(Math.abs(b.y - (toolbar.y + toolbar.height)), `${name} 위 = 도구 막대 아래`).toBeLessThanOrEqual(1);
+      expect(Math.abs(b.y + b.height - vh), `${name} 아래 = 화면 아래`).toBeLessThanOrEqual(1);
+    }
+    expect(canvas.y).toBeGreaterThanOrEqual(layer.y);
     await expectPanelsNoHorizontalOverflow(page, '처음');
   } else {
     expect(toolbar.y + toolbar.height).toBeLessThanOrEqual(layer.y + 1);
     expect(layer.y + layer.height).toBeLessThanOrEqual(canvas.y + 1);
-    expect(canvas.y + canvas.height).toBeLessThanOrEqual(prop.y + 1);
+    expect(canvas.y + canvas.height).toBeLessThanOrEqual(real.y + 1);
+    expect(real.y + real.height).toBeLessThanOrEqual(prop.y + 1);
   }
   expect(await noHorizontalScroll(page)).toBe(true);
 });
 
-test('QA-A26 좁은 화면 도구 막대: 앱 이름 · 버튼 3개가 화면 밖으로 안 나가고(모자라면 줄바꿈) 눌러지는 크기이며, [+ 인스턴스] 20번 뒤에도 맨 위 첫 자식 · [↶]이 켜져 있다', async ({ page }) => {
+test('QA-A26 좁은 화면 도구 막대: 앱 이름 · 버튼 4개([+ 인스턴스] · [실행 취소] · [다시 실행] · [Patch])가 화면 밖으로 안 나가고(모자라면 줄바꿈) 눌러지는 크기이며, [+ 인스턴스] 20번 뒤에도 맨 위 첫 자식 · [Patch]가 켜져 있다', async ({ page }, testInfo) => {
   await page.goto(URL);
   const width = page.viewportSize()?.width ?? 0;
+  // 버튼 높이: mobile은 누르기 쉬운 40px 이상, desktop은 막대 안 여백을 위해 36px로 줄였다
+  const minButtonHeight = testInfo.project.name === 'desktop' ? 36 : 40;
   const check = async (where: string): Promise<void> => {
-    for (const id of ['app-name', 'add-instance', 'undo-button', 'redo-button']) {
+    for (const id of ['app-name', 'back-button', 'forward-button', 'patch-button']) {
       const b = await page.getByTestId(id).boundingBox();
       if (b === null) throw new Error(`${where}: ${id}가 안 보인다`);
       expect(b.x, `${where}: ${id} 왼쪽`).toBeGreaterThanOrEqual(0);
       expect(b.x + b.width, `${where}: ${id} 오른쪽`).toBeLessThanOrEqual(width + 0.5);
-      if (id !== 'app-name') expect(b.height, `${where}: ${id} 높이`).toBeGreaterThanOrEqual(40);
+      if (id !== 'app-name') expect(b.height, `${where}: ${id} 높이`).toBeGreaterThanOrEqual(minButtonHeight);
     }
     expect(await noHorizontalScroll(page), `${where}: 가로 스크롤`).toBe(true);
   };
   await check('처음');
 
-  for (let i = 0; i < 20; i += 1) await page.getByTestId('add-instance').click();
+  for (let i = 0; i < 20; i += 1) await clickAdd(page);
   await check('20번 추가 뒤');
   const first = await page.locator('[data-testid="app-root"] > .app').evaluate((app) => app.children[0].getAttribute('data-testid'));
   expect(first).toBe('toolbar');
-  await expect(page.getByTestId('undo-button')).toBeEnabled();
+  await expect(page.getByTestId('patch-button')).toBeEnabled();
   // 도구 막대는 맨 위에 그대로 (페이지를 안 내려도 보이는 위치)
   const top = await page.getByTestId('toolbar').boundingBox();
   expect(top?.y ?? 999).toBeLessThanOrEqual(24);
@@ -223,17 +253,22 @@ test('QA-43 전체 높이: desktop은 레이어 · 캔버스 · 속성이 화면
   const { scrollHeight, innerHeight } = await pageScrollHeights(page);
   const toolbar = await boxOf(page, 'toolbar');
   const canvas = await boxOf(page, 'canvas');
+  const real = await boxOf(page, 'real-section');
 
   if (testInfo.project.name === 'desktop') {
-    for (const id of ['layer-panel', 'canvas', 'property-panel']) {
+    // 레이어 · 속성은 화면 아래까지, 가운데 열은 캔버스(위) + 실제 영역(아래)이 남은 높이를 나눠 쓰므로 아래 끝 = 실제 영역 (patch-preview PP-01)
+    for (const id of ['layer-panel', 'real-section', 'property-panel']) {
       const b = await boxOf(page, id);
       expect(b.bottom, `${id} 아래 끝`).toBeLessThanOrEqual(innerHeight);
       expect(b.bottom, `${id} 아래 끝이 화면 아래 끝에서 ${BOTTOM_GAP}px 안`).toBeGreaterThanOrEqual(innerHeight - BOTTOM_GAP);
     }
-    // 캔버스가 남은 높이를 모두 씀: 도구 막대 바로 아래(칸 사이 간격 16px)에서 시작해 화면 아래까지 (전에는 320px쯤)
+    // 캔버스는 도구 막대 바로 아래(칸 사이 간격 16px)에서 시작하고 아래 끝은 실제 영역 위
     expect(canvas.y - toolbar.bottom, '도구 막대와 캔버스 사이 간격').toBeLessThanOrEqual(20);
-    expect(canvas.height).toBeGreaterThanOrEqual(innerHeight - canvas.y - BOTTOM_GAP);
-    expect(canvas.height).toBeGreaterThan(500);
+    expect(canvas.bottom, '캔버스 아래 끝이 실제 영역 시작 위').toBeLessThanOrEqual(real.y);
+    // 두 영역이 남은 높이를 반반 (각각 250px 이상, 차이 40px 이내)
+    expect(canvas.height).toBeGreaterThanOrEqual(250);
+    expect(real.height).toBeGreaterThanOrEqual(250);
+    expect(Math.abs(canvas.height - real.height), '두 영역 높이 차이').toBeLessThanOrEqual(40);
     expect(scrollHeight, '페이지 세로 스크롤 없음').toBeLessThanOrEqual(innerHeight);
   } else {
     // mobile: 위아래 쌓기 그대로 — 캔버스는 지금처럼 내용 높이(최소 320px)이고 패널 안 스크롤이 없다
@@ -250,7 +285,7 @@ test('QA-44 넘침: 인스턴스를 많이 추가해도 desktop 페이지는 세
   await selectOnCanvas(page, 'main');
   await page.getByTestId('prop-size').selectOption('L');
   const COUNT = 60;
-  for (let i = 0; i < COUNT; i += 1) await page.getByTestId('add-instance').click();
+  for (let i = 0; i < COUNT; i += 1) await clickAdd(page);
   await expect(page.getByTestId('layer-item')).toHaveCount(3 + COUNT);
   const lastId = `b${3 + COUNT}`;
 
@@ -259,8 +294,8 @@ test('QA-44 넘침: 인스턴스를 많이 추가해도 desktop 페이지는 세
     expect(scrollHeight, '60개 추가 뒤에도 페이지 세로 스크롤 없음').toBeLessThanOrEqual(innerHeight);
     expect(await noHorizontalScroll(page)).toBe(true);
     await expectPanelsNoHorizontalOverflow(page, '60개 추가 뒤');
-    // 세 영역은 여전히 화면 아래까지 (늘어나지 않음)
-    for (const id of ['layer-panel', 'canvas', 'property-panel']) {
+    // 레이어 · 실제 영역 · 속성은 여전히 화면 아래까지 (늘어나지 않음). 캔버스는 가운데 열 위 칸이라 아래 끝 단언에서 뺀다 (patch-preview)
+    for (const id of ['layer-panel', 'real-section', 'property-panel']) {
       const b = await boxOf(page, id);
       expect(b.bottom, `${id} 아래 끝`).toBeLessThanOrEqual(innerHeight);
       expect(b.bottom).toBeGreaterThanOrEqual(innerHeight - BOTTOM_GAP);
