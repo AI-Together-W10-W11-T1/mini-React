@@ -33,7 +33,7 @@
 - 되돌리기: 기록마다 VNode · 패치 · 역패치 저장 (양방향 연결 리스트, 한도 50), 뒤로 = 역패치를 역순 적용
 - Hooks · 재렌더 · 이벤트: `hooks` 배열에 부른 순서로 저장, `if` 안 Hook 금지, setter마다 즉시 동기 렌더 (Batching 미구현), 요소마다 리스너 한 번 + 핸들러 교체
 - 실제 React와 차이: 고칠 목록 대신 노드마다 표시 · React에는 History 없음 · React는 setter를 모아 한 번에 렌더
-- Reflow / Repaint와 VDOM (마스터 초안, 사용자 확인 대기):
+- Reflow / Repaint와 VDOM (마스터가 쓰고 사용자 확인, 2026-11-11):
   - 브라우저는 DOM이 바뀌면 스타일 계산 → **reflow**(위치 · 크기 다시 계산) → **repaint**(픽셀 다시 그리기)를 한다. 글자 · 크기가 바뀌면 reflow + repaint, 색만 바뀌면 repaint만 일어난다.
   - VDOM이 reflow를 없애 주지는 않는다. 우리 엔진이 하는 일은 ① diff로 **바뀐 곳만** 실제 DOM에 쓰고(텍스트 하나면 SET_TEXT 1줄), ② patch 도중 `offsetWidth` 같은 레이아웃 값을 **읽지 않아서** 브라우저가 JS가 끝난 뒤 reflow · repaint를 한 번에 하게 두는 것이다.
   - 즉시 동기 렌더라 [+3]은 렌더 · diff · patch가 3번 돌지만, 그리기는 클릭 처리 JS가 끝난 뒤 한 번이다. 비용이 늘어나는 곳은 JS(diff · patch) 쪽이다.

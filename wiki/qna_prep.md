@@ -148,6 +148,6 @@
 
 - 보충 받음 목록: task_001 Diff · Patch / State History 갈림길 / 실제 React와 차이 · task_002 의존성 · Hook 호출 순서(두 문항: 칸 구분, if) · 이벤트 리스너 (결정 8)
 - 답한 사람이 없는 질문:
-  - Reflow / Repaint와 VDOM 관계: README 「핵심 기술 포인트」 마스터 초안 (사용자 확인 대기)
+  - Reflow / Repaint와 VDOM 관계: README 「핵심 기술 포인트」 (마스터가 쓰고 사용자 확인)
 - 0번 기록에 key가 없어 첫 key update가 위치 비교가 되는 문제(task_001 `07_pr_body.md`): 해결됨: Phase 2는 `mount()` · `update()` 때 만든 VNode 자체를 이전 VNode로 저장해 DOM에서 다시 읽지 않으므로 첫 화면부터 key가 들어 있다 (task_002 `01_request_spec.md` 「정책」 이전 VNode 보관). Phase 1 검증 페이지는 key를 쓰지 않는다
 - 기록된 한계(답 있음): select 역패치 순서 한계 · value · checked 속성 한계 (task_002 `01_request_spec.md` 4절)
