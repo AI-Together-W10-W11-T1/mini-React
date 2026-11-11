@@ -59,7 +59,7 @@ fixtures/mini-figma/
 
 ## Dev 항목
 
-- [ ] **Dev-1** (`mini-figma`): 색 순수 함수 — 칩 8개 · 형식 검사 · 글자 색 자동 · 버튼 style [FD-21 · FD-23 · FD-24]
+- [x] **Dev-1** (`mini-figma`): 색 순수 함수 — 칩 8개 · 형식 검사 · 글자 색 자동 · 버튼 style [FD-21 · FD-23 · FD-24]
   - 의존: 없음 (새 파일만, 기존 동작 안 바뀜)
   - 대상 파일: `fixtures/mini-figma/color.ts` (신규) — `PALETTE: readonly string[]`(8개, 위 순서), `isHexColor(v: string): boolean`(`/^#[0-9a-f]{6}$/i`), `textColorFor(bg: string): '#ffffff' | '#0a0b0d'`(④-1 결정 따름), `buttonStyle(color: string): { 'background-color': string; color: string }`. DOM · Hook · 엔진 import 없음
   - 테스트(먼저 실패 확인): `fixtures/mini-figma/__tests__/color.test.ts`
@@ -70,8 +70,9 @@ fixtures/mini-figma/
   - `rootOnlyHooks.test.ts`: `color.ts`를 순수 모듈 목록에 더함 (Hook · `document` · `window` · 엔진 import 없음)
   - 알고리즘: 명세 5절 「칩 8개 · 글자 색 자동」 (④-1)
   - 완료 근거로 남길 것: 테스트 파일 · 건수, `npx vitest run fixtures/mini-figma` 통과 수, `npx tsc --noEmit`, 커밋 해시
+  - **완료 근거 (Evidence)**: `fixtures/mini-figma/color.ts` 신규 (`PALETTE` · `isHexColor` · `textColorFor`(WCAG 대비, 경계 `#777777` 흰 / `#787878` 먹) · `buttonStyle`), `fixtures/mini-figma/__tests__/color.test.ts` 30건. 처음 실패: `npx vitest run fixtures/mini-figma/__tests__/color.test.ts` → `Test Files 1 failed (1) / Tests no tests` (`../color` 없음). 구현 뒤 `npx vitest run fixtures/mini-figma` 294 passed, `npx tsc --noEmit` 오류 0, `rootOnlyHooks.test.ts`에 `color.ts` 순수 모듈 목록 추가. 커밋 3100d70
 
-- [ ] **Dev-2** (`mini-figma`): 색을 값으로 저장하고 버튼을 `style`로 칠한다 [FD-20 · FD-23 · FD-24 · FD-25 · MF-16]
+- [x] **Dev-2** (`mini-figma`): 색을 값으로 저장하고 버튼을 `style`로 칠한다 [FD-20 · FD-23 · FD-24 · FD-25 · MF-16]
   - 의존: Dev-1
   - 바깥 루프(먼저 실패): 고친 단언 — QA-1(색 단언), QA-7 · 10 · 13 · 19 ~ 24 · 29 · A5 · A8 · A10 · A11 · A13의 색 확인을 `btn-blue` 클래스 → 배경 `rgb(…)`/글자 `rgb(…)`로 (helpers `rgb()` · `bgOf()` · `textOf()` 추가). 색 고르기는 아직 `selectOption({ label: '빨강' })` 그대로 (선택 상자 라벨은 같음)
   - 대상 파일: `model.ts`(`Color` = `string`(`#rrggbb`), `INITIAL_DOC`: 메인 `#0052ff`, b3 `#cf202f`), `components/Button.ts`(클래스 `figma-button btn-{size}[ selected]` + `style: buttonStyle(color)`), `components/PropertyPanel.ts`(**임시**: `COLOR_OPTIONS` 값만 hex로 — 라벨 파랑 · 빨강 · 초록은 그대로, Dev-3에서 지워짐), `index.html`(`.btn-blue/red/green` · `--blue/--red/--green` 삭제, `.figma-button`은 크기 · 모양만)
@@ -80,8 +81,9 @@ fixtures/mini-figma/
     - `app.test.ts`: 「Button에 메인 값(크기 M · 파랑)」 → `style`의 배경 `rgb(0, 82, 255)` · 글자 `rgb(255, 255, 255)`, b3만 `rgb(207, 32, 47)`, **클래스에 색 이름이 없다**(`btn-blue` 같은 것 0). P-5 · P-5b · P-19를 qa_todo 표의 새 값(`SET_ATTR` → `SET_STYLE`, 글자색 줄 포함)으로. `SET_STYLE` 한 줄의 `property` = `'background-color'` · `before` · `after` = hex를 직접 단언
   - 알고리즘: 「override 판단」(그대로) · 명세 FD-23
   - 완료 근거로 남길 것: 고친 단언이 먼저 실패한 출력, `npx vitest run fixtures/mini-figma` · `npx playwright test e2e/mini-figma-*.spec.ts` 통과 수, 커밋 해시
+  - **완료 근거 (Evidence)**: `model.ts`(`Color = string`, `INITIAL_DOC` `#0052ff` · `#cf202f`), `components/Button.ts`(`style: buttonStyle(color)`, 클래스 `figma-button btn-{size}[ selected]`), `components/PropertyPanel.ts`(임시 선택 상자 값만 hex), `index.html`(`btn-blue/red/green` · `--blue/red/green` 삭제). e2e 고친 단언(QA-1 · 7 · 10 · 13 · 19 · 20 · 23 · 24 · 29 · A5 · A8 · A10 · A11 · A13, 도우미 `rgb` · `bgOf` · `textOf` · `colorsOf`)이 **먼저 실패**: `npx playwright test e2e/mini-figma-*.spec.ts --project=desktop` → `14 failed · 36 passed` (예: `Expected "rgb(207, 32, 47)" Received "rgb(197, 48, 48)"`). 단위도 먼저 `app.test.ts` 등 16건 실패 → 구현 뒤 `npx vitest run fixtures/mini-figma` 298 passed (model.test 63, app.test 새 단언: 시작 배경 `rgb(0, 82, 255)` ×3 + `rgb(207, 32, 47)`, 글자 `rgb(255, 255, 255)`, 클래스에 색 이름 없음, P-5 `{ SET_STYLE: 6 }`, P-5b `{ SET_STYLE: 3 }` + 한 줄 필드 `background-color` · `#0052ff` → `#cf202f`), `npx playwright test e2e/mini-figma-*.spec.ts` 100 passed (desktop · mobile), tsc 0. 커밋 2a4dcff
 
-- [ ] **Dev-3** (`mini-figma`): 팔레트 판 — 칩 8개 + 직접 고르기 [FD-21 · FD-22 · FD-25]
+- [x] **Dev-3** (`mini-figma`): 팔레트 판 — 칩 8개 + 직접 고르기 [FD-21 · FD-22 · FD-25]
   - 의존: Dev-2
   - 바깥 루프(먼저 실패): QA-35 · 36 · 37 · 38 · 39 + QA-A22 · A24 · A25를 `e2e/mini-figma-palette.spec.ts`(신규)에 쓴다. 기존 스펙의 색 고르기(`selectOption`)는 `pickColor(page, hex)`(칩 누르기) 도우미로 바꾼다(QA-7 · 10 · 13 · 19 · 20 · 23 · 24 · 29 · A5 · A8 · A10 · A11 · A13)
   - 대상 파일: `components/ColorPalette.ts`(신규) — props `{ value, onPick }`. 구조 `div.palette[data-testid=color-palette]` > 칩 8개(`button[type=button].chip[data-testid=color-chip][data-color][aria-pressed][aria-label][style=배경색] onClick → onPick(hex)`) + `input[type=color][data-testid=prop-color][aria-label=색 직접 고르기][value=value] onInput → onPick(event.target.value)` + `span[data-testid=color-hex]`(값 글자, ④-6). `components/PropertyPanel.ts`: 색 칸의 `<select>`를 `h(ColorPalette, …)`로 교체(`propRow('color', '색', …)`), `COLOR_OPTIONS` 삭제. 팔레트 값 → `onEdit('color', hex)`(묶음 `{ target, field: 'color' }`는 기존 그대로)
@@ -92,16 +94,18 @@ fixtures/mini-figma/
     - `rootOnlyHooks.test.ts`: 컴포넌트 파일 목록 6개 (`ColorPalette.ts` 추가), `ColorPalette.ts`도 Hook · DOM 접근 없음
   - 알고리즘: 명세 5절 「색 고르기 (다) 칩 8개 + 직접 고르기」
   - 완료 근거로 남길 것: 위 단언 건수, QA-35 ~ 39 · A22 · A24 · A25 desktop 먼저 실패 → 통과 출력, 커밋 해시
+  - **완료 근거 (Evidence)**: `components/ColorPalette.ts` 신규(칩 8개 + `input[type=color][data-testid=prop-color]` + `color-hex`), `PropertyPanel.ts` 색 칸 → `h(ColorPalette, …)`(`COLOR_OPTIONS` 삭제), `index.html` 팔레트 임시 스타일. `e2e/mini-figma-palette.spec.ts` 신규(QA-35 · 36 · 37 · 38 · 39 + A22 · A23 · A24 · A25), 기존 스펙 색 고르기 `selectOption` → `pickColor`(칩). **먼저 실패**: `npx playwright test e2e/mini-figma-palette.spec.ts --project=desktop` → `9 failed` (`expect(locator).toHaveCount(expected) failed`), 기존 스펙 포함 desktop `19 failed · 31 passed`. 단위 `npx vitest run fixtures/mini-figma` → `27 failed`. 구현 뒤: 단위 312 passed (`app.test.ts` 팔레트 12건: 칩 순서 · `aria-pressed` · `type=color` · P-25 `panelCounts { SET_ATTR: 2, SET_PROP: 1, SET_TEXT: 1 }` · P-26 `{ SET_STYLE: 3 }` ×3 + `{ SET_STYLE: 6 }`, `past` 1칸 · P-27 `{ SET_STYLE: 2 }` + 패널 REPLACE ≥ 1 · 같은 칩 · 같은 색 렌더 0 · 대문자 `#EEF0F3` → `#eef0f3` · override · MF-12 · ↻), `rootOnlyHooks` 컴포넌트 6개, e2e `npx playwright test e2e/mini-figma-*.spec.ts` 118 passed, tsc 0. 칩 연달아 + 입력칸 = `past` 1칸. 커밋 faa0b20
 
-- [ ] **Dev-4** (`mini-figma`): 색 입력칸에서도 Undo/Redo 키가 앱 동작이다 [Q18 ② 확장, ④-3 결정에 따름]
+- [x] **Dev-4** (`mini-figma`): 색 입력칸에서도 Undo/Redo 키가 앱 동작이다 [Q18 ② 확장, ④-3 결정에 따름]
   - 의존: Dev-3 · **④-3을 「안 넓힘」으로 정하면 이 Dev는 건너뛰고 QA-A28도 뺀다**
   - 바깥 루프(먼저 실패): QA-A28 (색 입력칸에 포커스가 있는 채 Ctrl+Z · Ctrl+Shift+Z = 앱 Undo/Redo, Delete · Backspace는 아무 일 없음)
   - 대상 파일: `keys.ts` — `isTextField`에서 `type="color"` 제외, `isChoiceControl`에 `type="color"` 추가 (선택 상자 · 체크박스와 같은 처리)
   - 테스트(먼저 실패 확인): `keys.test.ts`에 행 추가 — `INPUT color`(targetType `'color'`): Delete · Backspace = null, Ctrl+Z = `undo`, Ctrl+Shift+Z = `redo`; 글자 `INPUT text` · `INPUT number` · `TEXTAREA`는 그대로 null. `app.test.ts`: 색 입력칸(`prop-color`)에 보낸 Ctrl+Z → `defaultPrevented` true + 앱 Undo, Delete · Backspace → false · 렌더 0 (기존 「선택 상자 안」 테스트의 대상 목록에 포함). `rootOnlyHooks`는 변화 없음
   - 알고리즘: 해당 없음 (Q18 ②의 대상을 새 입력 부품으로 넓힘)
   - 완료 근거로 남길 것: `keys.test.ts` 건수, QA-A28 먼저 실패 → 통과, 커밋 해시
+  - **완료 근거 (Evidence)**: `keys.ts` — `isNonTextInput`(checkbox · color) 추가, `isTextField`에서 `type=color` 제외, `isChoiceControl`에 포함. QA-A28(`palette.spec.ts`) **먼저 실패**: `npx playwright test e2e/mini-figma-palette.spec.ts --project=desktop -g A28` → `1 failed` (`Expected "rgb(0, 82, 255)" Received "rgb(5, 177, 105)"`, Ctrl+Z가 앱 Undo 아님). `keys.test.ts`(INPUT color 행 추가: Delete · Backspace null, Ctrl/Meta+Z `undo`, Ctrl/Meta+Shift+Z `redo`; 글자 input · number · TEXTAREA · range null) + `app.test.ts` 색 입력칸 키 1건 먼저 3 failed → 통과. `npx vitest run fixtures/mini-figma` 323 passed (`keys.test.ts` 100), e2e 120 passed, tsc 0. 커밋 9977d2c
 
-- [ ] **Dev-5** (`mini-figma`): `Toolbar`(앱 이름 + [+ 인스턴스])를 첫 자식으로 — 경로 접두 이동 [FD-10 · FD-11 · FD-06]
+- [x] **Dev-5** (`mini-figma`): `Toolbar`(앱 이름 + [+ 인스턴스])를 첫 자식으로 — 경로 접두 이동 [FD-10 · FD-11 · FD-06]
   - 의존: Dev-4
   - 바깥 루프(먼저 실패): QA-31(도구 막대 구성 — 이 Dev에서는 앱 이름 · [+ 인스턴스]만, [↶] [↷]는 Dev-6) · QA-34 · QA-1(최상위 자식 `['toolbar','layer-panel','canvas','property-panel']`) · QA-2(세 영역 배치 + 도구 막대가 위)
   - 대상 파일: `components/Toolbar.ts`(신규, `<header class="toolbar" data-testid="toolbar">` > 앱 이름 `span.app-name[data-testid=app-name]` 「mini-figma」 + `button.btn-primary[data-testid=add-instance]` 「+ 인스턴스」), `components/LayerPanel.ts`(`onAdd` prop · [+ 인스턴스] 버튼 삭제), `App.ts`(`h(Toolbar, { onAdd })`를 첫 자식으로, LayerPanel에서 `onAdd` 제거), `index.html`(**최소 CSS만**: `.toolbar { grid-column: 1 / -1 }` — 전면 개편은 Dev-7)
@@ -111,8 +115,9 @@ fixtures/mini-figma/
     - `rootOnlyHooks.test.ts`: 컴포넌트 파일 목록 7개 (`Toolbar.ts` 추가), `Toolbar.ts`도 Hook · DOM 접근 없음
   - 알고리즘: 해당 없음
   - 완료 근거로 남길 것: 접두 갱신 뒤 P-1 ~ 22 통과 수, QA-1 · 2 · 31 · 34 먼저 실패 → 통과, 기존 e2e 전체 회귀, 커밋 해시
+  - **완료 근거 (Evidence)**: `components/Toolbar.ts` 신규(`header.toolbar` > `span.app-name` 「mini-figma」 + `button.btn-primary[add-instance]`), `LayerPanel.ts`(`onAdd` · 버튼 삭제), `App.ts`(`h(Toolbar, …)` 첫 자식), `index.html`(`.toolbar { grid-column: 1 / -1 }`). `e2e/mini-figma-toolbar.spec.ts` 신규(QA-31 · 34), QA-1 · QA-2 단언 갱신. **먼저 실패**: `npx playwright test e2e/mini-figma-render.spec.ts e2e/mini-figma-toolbar.spec.ts --project=desktop` → `4 failed`. 단위 `32 failed` → `app.test.ts` 접두 갱신(`TOOLBAR [0,0]` · `LAYER [0,1]` · `CANVAS [0,2]` · `PANEL [0,3]`, `B2_PATH [0,2,1,1]`, 최상위 4개, `toolbarCounts`), `rootOnlyHooks` 컴포넌트 7개. `npx vitest run fixtures/mini-figma` 328 passed (P-1 ~ 22 접두 이동 통과, P-16 도구 막대 `[+ 인스턴스]` 렌더 1번), e2e `npx playwright test e2e/mini-figma-*.spec.ts` 124 passed, tsc 0. 커밋 8584258
 
-- [ ] **Dev-6** (`mini-figma`): [↶ 되돌리기] · [↷ 다시 하기] 버튼 — 키와 같은 동작 · 없으면 꺼짐 [FD-12 · MF-30 ~ 32]
+- [x] **Dev-6** (`mini-figma`): [↶ 되돌리기] · [↷ 다시 하기] 버튼 — 키와 같은 동작 · 없으면 꺼짐 [FD-12 · MF-30 ~ 32]
   - 의존: Dev-5
   - 바깥 루프(먼저 실패): QA-31(나머지) · QA-32 · QA-33 + QA-A20 · A21
   - 대상 파일: `undo.ts`(`canUndo(state)` = `past.length > 0`, `canRedo(state)` = `future.length > 0`), `components/Toolbar.ts`(props `canUndo` · `canRedo` · `onUndo` · `onRedo`, 버튼 둘 `button[type=button][data-testid=undo-button|redo-button][disabled=!can…][aria-label]` 글자 「↶ 되돌리기」 · 「↷ 다시 하기」), `App.ts`(`onUndo = () => moveThroughHistory(undo(history, doc))` · `onRedo` 같은 모양. 키 핸들러(`useEffect`)도 같은 함수를 부른다)
@@ -123,22 +128,25 @@ fixtures/mini-figma/
     - `Toolbar`는 Hook 없음 (rootOnlyHooks 그대로 통과)
   - 알고리즘: 해당 없음 (동작은 MF-30 ~ 32 그대로)
   - 완료 근거로 남길 것: 도구 막대 열 단언 통과 수, QA-31 ~ 33 · A20 · A21 먼저 실패 → 통과, 커밋 해시
+  - **완료 근거 (Evidence)**: `undo.ts`(`canUndo` · `canRedo`), `components/Toolbar.ts`(props `canUndo` · `canRedo` · `onUndo` · `onRedo`, 버튼 `[disabled=!can…]`), `App.ts`(`onUndo` · `onRedo`를 버튼 · 키 핸들러가 같이 씀, 렌더 중 계산, Hook 4 + effect 1 그대로 `instance.hooks` 5칸). `toolbar.spec.ts`에 QA-31(나머지) · 32 · 33 · A20(2건) · A21, `render.spec.ts` QA-1 [↶] [↷] disabled, `palette.spec.ts` A22 · A24 보강. **먼저 실패**: `npx playwright test e2e/mini-figma-render.spec.ts e2e/mini-figma-toolbar.spec.ts e2e/mini-figma-palette.spec.ts --project=desktop` → `10 failed · 9 passed`. 단위 `32 failed`(app 28 + undo 8 중) → 통과. `npx vitest run fixtures/mini-figma` 346 passed (`undo.test.ts` canUndo · canRedo 8건, `app.test.ts` Undo/Redo 버튼 9건 + P-3 ~ P-22 도구 막대 열: 첫 수정 `{ SET_ATTR: 1 }` · 같은 칸 묶음 `{}` · Undo/Redo(P-18 · 19 · 23 · 24 · 28) `{ SET_ATTR: 2 }`), e2e 134 passed, tsc 0. 커밋 6a05321
 
-- [ ] **Dev-7** (`mini-figma`): 디자인 개편 CSS — 어두운 카드 · 점무늬 · 알약 · 글꼴 [FD-01 ~ 07]
+- [x] **Dev-7** (`mini-figma`): 디자인 개편 CSS — 어두운 카드 · 점무늬 · 알약 · 글꼴 [FD-01 ~ 07]
   - 의존: Dev-6
   - 바깥 루프(먼저 실패): QA-40 · 41 · 42 · QA-2(배치 세부) · QA-A26 (computed style 단언 — 값은 qa_todo 참조)
   - 대상 파일: `index.html` `<style>`만 (TS 코드는 클래스 이름이 부족할 때만 최소로 — 새 클래스가 필요하면 Dev에 기록): 색 변수(`--bg #0a0b0d` · `--card #16181c` · `--ink-soft #a8acb3` · `--accent #0052ff`), 카드 24px · 입력칸 12px · 알약 100px · 칩 원, 점무늬 캔버스(`radial-gradient`), 선택 표시 파랑(캔버스 버튼 `outline` 3px + `outline-offset` 2px · 레이어 행 `outline` 2px), override 칸 표시(④-4), 입력칸 포커스 = `border` 2px 파랑, 보조 글자(`property-empty` · `prop-follow`) `#a8acb3`, 그림자 없음, 폰트(`Inter, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif` · 숫자 · 색 값 `ui-monospace, "JetBrains Mono", "Geist Mono", monospace`), 도구 막대 높이 64px · mobile(≤720px) 쌓기 · 도구 막대 줄바꿈(375에서 버튼 3개가 안 넘침). **외부 글꼴 · 이미지 · `@import` · `https://` 0** (FD-05)
   - 테스트(먼저 실패 확인): `__tests__/design.test.ts`(신규) — `../index.html?raw` · `../**/*.ts?raw`에서 (1) `coinbase`(대소문자 무관) 0건 (FD-07), (2) `@import` · `@font-face` · `http://` · `https://`가 `index.html`에 0건 (FD-05, 외부 글꼴 안 받음), (3) 색 변수에 문서 값(`#0a0b0d` · `#16181c` · `#a8acb3` · `#0052ff`)이 정의돼 있다(글자 있는지만). 값이 실제 화면에 적용되는지는 e2e computed style이 증명한다
   - 알고리즘: 해당 없음 (디자인 기준 = `../00_design_reference.md`)
   - 완료 근거로 남길 것: QA-40 ~ 42 · A26 먼저 실패 → 통과, desktop · mobile 화면 확인(캡처는 QA 단계), `design.test.ts` 건수, 커밋 해시
+  - **완료 근거 (Evidence)**: `index.html` `<style>` 전면 개편(변수 `--bg #0a0b0d` · `--card #16181c` · `--ink-soft #a8acb3` · `--accent #0052ff`, 카드 24px · 입력칸 12px · 알약 100px · 칩 원 · 점무늬 `radial-gradient` · 파랑 선택 outline · override 파랑 줄 · 포커스 2px 파랑 · 도구 막대 64px · mobile 줄바꿈, 외부 글꼴 · `@import` · `https://` 0). TS는 안 바꿈(새 클래스 필요 없었음). `e2e/mini-figma-design.spec.ts` 신규(QA-40 · 41 · 42 · A26 · A29) + `design.test.ts` 신규 12건. **먼저 실패**: `npx playwright test e2e/mini-figma-design.spec.ts` → `8 failed · 2 passed`(QA-42는 Dev-5 배치로 이미 통과; 예: `Expected "rgb(168, 172, 179)" Received "rgb(59, 66, 82)"`, 입력칸 포커스 `Expected "rgb(0, 82, 255)" Received "rgb(118, 118, 118)"`, 버튼 높이 `>= 40 Received 37`), `design.test.ts` `6 failed`. 구현 뒤 `design.test.ts` 12 passed, `npx vitest run fixtures/mini-figma` 358 passed, e2e 144 passed, tsc 0. **발견한 버그 하나**: 인스턴스를 골랐을 때 공백 없는 긴 이름이 속성 패널 머리 `<h2>`에서 가로로 넘쳐 mobile에서 가로 스크롤(scrollWidth 2569) → `.property-title { overflow-wrap: anywhere }`로 고침, QA-A2에 「인스턴스를 고른 상태에서도 가로 스크롤 없음」 단언 추가(Dev-8 커밋). desktop · mobile 화면 육안 확인(임시 캡처, 정식 캡처는 QA 단계). 커밋 ea24a2e
 
-- [ ] **Dev-8** (`mini-figma`): 공격 · 경계 마무리 + 회귀 [FD 전체 · QA-A23 · A27 · A29]
+- [x] **Dev-8** (`mini-figma`): 공격 · 경계 마무리 + 회귀 [FD 전체 · QA-A23 · A27 · A29]
   - 의존: Dev-7
   - 바깥 루프: QA-A23 · A27 · A29를 쓰고 나머지 공격(A20 ~ A28)이 모두 desktop · mobile에서 도는지 확인. 필요한 도우미만 `mini-figma-helpers.ts`에 더한다
   - 대상 파일: `e2e/mini-figma-*.spec.ts` · `e2e/mini-figma-helpers.ts` (앱 코드는 시나리오가 버그를 찾을 때만 고치고 Dev에 기록). `README.md` 「알려진 한계」의 「터치 기기 Undo 없음」 삭제는 이 task 끝난 뒤 mr-wiki가 한다 (Dev 범위 밖)
   - 회귀 · 환경: `npx vitest run` 전체 · `npx tsc --noEmit` · `npx playwright test` 전체(Phase 1 · 2 포함) · `git diff --stat c0699a1 -- packages/` 비어 있음
   - 알고리즘: 해당 없음
   - 완료 근거로 남길 것: 위 네 명령의 출력(통과 수), 커밋 해시
+  - **완료 근거 (Evidence)**: `e2e/mini-figma-attack.spec.ts` — QA-A27(새로고침) 추가, QA-A2 보강(인스턴스 선택 시 긴 이름 가로 스크롤). QA-A20 ~ A26 · A28 · A29는 Dev-3 · 4 · 6 · 7에서 이미 써서 desktop · mobile 모두 통과(아래 전체 실행에 포함). A27은 앱 동작이 이미 있어 처음부터 통과(`npx playwright test e2e/mini-figma-attack.spec.ts -g A27` 2 passed). 도우미 추가는 앱 코드 변경 없이 `mini-figma-helpers.ts`(`rgb` · `bgOf` · `textOf` · `colorsOf` · `classOf` · `pickColor` · `pickColorInput`). **회귀 실행**: `npx vitest run` → `Test Files 43 passed (43) · Tests 1159 passed (1159)` (시작 전 1064), `npx tsc --noEmit` exit 0 · 출력 없음, `npx playwright test` 전체 → `318 passed (36.2s)` (desktop · mobile, Phase 1 · 2 · mini-figma 포함), `git diff --stat c0699a1 -- packages/` (= `git diff --stat main -- packages/`, main = c0699a1) 출력 없음 = 비어 있음. 커밋 1361282
 
 <!-- 완료 예시
 - [x] **Dev-3 [#12]** (`mini-figma`): 팔레트 판
