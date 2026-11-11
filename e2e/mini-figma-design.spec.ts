@@ -17,7 +17,7 @@ const tid = (id: string): string => `[data-testid="${id}"]`;
 // [AI Note]: desktop은 세 패널이 overflow-y: auto라 overflow-x도 계산상 auto가 된다 → 패널 안 가로 넘침이 페이지 scrollWidth에 안 잡힌다.
 // 그래서 noHorizontalScroll(페이지) 말고 패널마다 scrollWidth <= clientWidth를 따로 본다 (Dev-9 경량 검수 NB 1).
 async function expectPanelsNoHorizontalOverflow(page: Page, where: string): Promise<void> {
-  for (const id of ['layer-panel', 'canvas', 'property-panel']) {
+  for (const id of ['layer-panel', 'canvas', 'real-section', 'property-panel']) {
     const w = await page.getByTestId(id).evaluate((el) => ({ scrollWidth: el.scrollWidth, clientWidth: el.clientWidth }));
     expect(w.scrollWidth, `${where}: ${id} 안 가로 넘침 없음 (scrollWidth <= clientWidth)`).toBeLessThanOrEqual(w.clientWidth);
   }
@@ -143,6 +143,7 @@ test('QA-42 배치: desktop은 도구 막대가 맨 위에서 가로 전체 + �
   const layer = await box('layer-panel');
   const canvas = await box('canvas');
   const prop = await box('property-panel');
+  const real = await box('real-section');
 
   if (testInfo.project.name === 'desktop') {
     expect(toolbar.y).toBeLessThanOrEqual(layer.y);
@@ -158,7 +159,8 @@ test('QA-42 배치: desktop은 도구 막대가 맨 위에서 가로 전체 + �
   } else {
     expect(toolbar.y + toolbar.height).toBeLessThanOrEqual(layer.y + 1);
     expect(layer.y + layer.height).toBeLessThanOrEqual(canvas.y + 1);
-    expect(canvas.y + canvas.height).toBeLessThanOrEqual(prop.y + 1);
+    expect(canvas.y + canvas.height).toBeLessThanOrEqual(real.y + 1);
+    expect(real.y + real.height).toBeLessThanOrEqual(prop.y + 1);
   }
   expect(await noHorizontalScroll(page)).toBe(true);
 });
@@ -223,17 +225,22 @@ test('QA-43 전체 높이: desktop은 레이어 · 캔버스 · 속성이 화면
   const { scrollHeight, innerHeight } = await pageScrollHeights(page);
   const toolbar = await boxOf(page, 'toolbar');
   const canvas = await boxOf(page, 'canvas');
+  const real = await boxOf(page, 'real-section');
 
   if (testInfo.project.name === 'desktop') {
-    for (const id of ['layer-panel', 'canvas', 'property-panel']) {
+    // 레이어 · 속성은 화면 아래까지, 가운데 열은 캔버스(위) + 실제 영역(아래)이 남은 높이를 나눠 쓰므로 아래 끝 = 실제 영역 (patch-preview PP-01)
+    for (const id of ['layer-panel', 'real-section', 'property-panel']) {
       const b = await boxOf(page, id);
       expect(b.bottom, `${id} 아래 끝`).toBeLessThanOrEqual(innerHeight);
       expect(b.bottom, `${id} 아래 끝이 화면 아래 끝에서 ${BOTTOM_GAP}px 안`).toBeGreaterThanOrEqual(innerHeight - BOTTOM_GAP);
     }
-    // 캔버스가 남은 높이를 모두 씀: 도구 막대 바로 아래(칸 사이 간격 16px)에서 시작해 화면 아래까지 (전에는 320px쯤)
+    // 캔버스는 도구 막대 바로 아래(칸 사이 간격 16px)에서 시작하고 아래 끝은 실제 영역 위
     expect(canvas.y - toolbar.bottom, '도구 막대와 캔버스 사이 간격').toBeLessThanOrEqual(20);
-    expect(canvas.height).toBeGreaterThanOrEqual(innerHeight - canvas.y - BOTTOM_GAP);
-    expect(canvas.height).toBeGreaterThan(500);
+    expect(canvas.bottom, '캔버스 아래 끝이 실제 영역 시작 위').toBeLessThanOrEqual(real.y);
+    // 두 영역이 남은 높이를 반반 (각각 250px 이상, 차이 40px 이내)
+    expect(canvas.height).toBeGreaterThanOrEqual(250);
+    expect(real.height).toBeGreaterThanOrEqual(250);
+    expect(Math.abs(canvas.height - real.height), '두 영역 높이 차이').toBeLessThanOrEqual(40);
     expect(scrollHeight, '페이지 세로 스크롤 없음').toBeLessThanOrEqual(innerHeight);
   } else {
     // mobile: 위아래 쌓기 그대로 — 캔버스는 지금처럼 내용 높이(최소 320px)이고 패널 안 스크롤이 없다
@@ -259,8 +266,8 @@ test('QA-44 넘침: 인스턴스를 많이 추가해도 desktop 페이지는 세
     expect(scrollHeight, '60개 추가 뒤에도 페이지 세로 스크롤 없음').toBeLessThanOrEqual(innerHeight);
     expect(await noHorizontalScroll(page)).toBe(true);
     await expectPanelsNoHorizontalOverflow(page, '60개 추가 뒤');
-    // 세 영역은 여전히 화면 아래까지 (늘어나지 않음)
-    for (const id of ['layer-panel', 'canvas', 'property-panel']) {
+    // 레이어 · 실제 영역 · 속성은 여전히 화면 아래까지 (늘어나지 않음). 캔버스는 가운데 열 위 칸이라 아래 끝 단언에서 뺀다 (patch-preview)
+    for (const id of ['layer-panel', 'real-section', 'property-panel']) {
       const b = await boxOf(page, id);
       expect(b.bottom, `${id} 아래 끝`).toBeLessThanOrEqual(innerHeight);
       expect(b.bottom).toBeGreaterThanOrEqual(innerHeight - BOTTOM_GAP);

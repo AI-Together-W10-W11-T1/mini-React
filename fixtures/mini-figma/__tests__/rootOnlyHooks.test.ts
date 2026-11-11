@@ -61,8 +61,8 @@ describe('검사기 자체 확인 — 위반을 잡는다', () => {
 });
 
 describe('T-16 코드 확인 — 루트(App.ts)만 Hook을 쓴다', () => {
-  it('컴포넌트 파일은 정확히 7개다 (Button · Canvas · ColorPalette · Icons · LayerPanel · PropertyPanel · Toolbar) — 새 파일이 검사 밖으로 새지 않게', () => {
-    expect([...componentFiles].sort()).toEqual(['Button.ts', 'Canvas.ts', 'ColorPalette.ts', 'Icons.ts', 'LayerPanel.ts', 'PropertyPanel.ts', 'Toolbar.ts']);
+  it('컴포넌트 파일은 정확히 8개다 (Button · Canvas · ColorPalette · Icons · LayerPanel · PreviewPanel · PropertyPanel · Toolbar) — 새 파일이 검사 밖으로 새지 않게', () => {
+    expect([...componentFiles].sort()).toEqual(['Button.ts', 'Canvas.ts', 'ColorPalette.ts', 'Icons.ts', 'LayerPanel.ts', 'PreviewPanel.ts', 'PropertyPanel.ts', 'Toolbar.ts']);
   });
 
   for (const name of componentFiles) {
@@ -71,10 +71,11 @@ describe('T-16 코드 확인 — 루트(App.ts)만 Hook을 쓴다', () => {
     });
   }
 
-  it('App.ts가 useState와 useEffect를 부른다 (루트가 상태 · keydown 등록을 가진다)', () => {
+  it('App.ts가 useState · useEffect · useMemo를 부른다 (루트가 상태 · keydown 등록 · 실제 영역 보관함을 가진다)', () => {
     const app = stripNoise(sourceOf(topLevel, '../App.ts'));
     expect(/\buseState\s*(<[^>(]*>)?\(/.test(app), 'useState 호출').toBe(true);
     expect(/\buseEffect\s*\(/.test(app), 'useEffect 호출').toBe(true);
+    expect(/\buseMemo\s*(<[^>(]*>)?\(/.test(app), 'useMemo 호출').toBe(true);
   });
 
   it('components/*.ts · model · undo · keys · color는 useEffect도 부르지 않는다 (keydown 등록은 App.ts 한 곳)', () => {

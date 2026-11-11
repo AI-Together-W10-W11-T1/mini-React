@@ -176,11 +176,11 @@ describe('patch 세는 도우미 (toolbarCounts · canvasCounts · layerCounts)'
 });
 
 describe('시작 화면 (MF-16 · MF-04)', () => {
-  it('영역 상자 안 최상위는 <div class="app"> 하나이고 자식 순서는 도구 막대 · 레이어 · 캔버스 · 속성 패널이다 (경로 접두 [0,0] · [0,1] · [0,2] · [0,3])', () => {
+  it('영역 상자 안 최상위는 <div class="app"> 하나이고 자식 순서는 도구 막대 · 레이어 · 캔버스 · 속성 패널 · 실제 영역이다 (경로 접두 [0,0] ~ [0,3] 불변, 실제 영역 [0,4])', () => {
     expect(root.children).toHaveLength(1);
     expect(area().localName).toBe('div');
     expect(area().className).toBe('app');
-    expect(Array.from(area().children).map(testId)).toEqual(['toolbar', 'layer-panel', 'canvas', 'property-panel']);
+    expect(Array.from(area().children).map(testId)).toEqual(['toolbar', 'layer-panel', 'canvas', 'property-panel', 'real-section']);
     // 접두 [0, 0 ~ 3]이 정말 그 영역을 가리키는지 한 줄씩 지킨다 (qa_todo 「접두 맞는지 한 줄 단언」)
     expect(['toolbar', 'layer-panel', 'canvas', 'property-panel']).toEqual([0, 1, 2, 3].map((i) => testId(root.firstElementChild?.children[i])));
   });
@@ -228,7 +228,13 @@ describe('시작 화면 (MF-16 · MF-04)', () => {
 
   it('화면에 patch · 줄 수 · 렌더 횟수를 알리는 요소가 없다 (MF-05)', () => {
     expect(root.querySelector('[data-testid^="log-"]')).toBeNull();
-    expect((root.textContent ?? '').toLowerCase()).not.toContain('patch');
+    // PP-07이 [Patch] 버튼을 더하므로 글 전체 검사는 못 한다: 「Patch」 글자는 patch-button 하나뿐이고 나머지에는 patch가 없다 (patch 목록 · 줄 수를 안 보여 준다는 뜻은 그대로)
+    expect(byId('patch-button').textContent).toBe('Patch');
+    const rest = Array.from(root.querySelectorAll('*'))
+      .filter((el) => el.getAttribute('data-testid') !== 'patch-button')
+      .flatMap((el) => Array.from(el.childNodes).filter((n) => n.nodeType === Node.TEXT_NODE).map((n) => n.textContent ?? ''))
+      .join('');
+    expect(rest.toLowerCase()).not.toContain('patch');
   });
 
   it('처음 그리기(mount)는 patch를 만들지 않는다 (lastPatches 비어 있음)', () => {
@@ -449,7 +455,7 @@ const followRows = (): string[] =>
     .filter((r) => r.querySelector('[data-testid="prop-follow"]') !== null)
     .map((r) => r.getAttribute('data-field') ?? '');
 /** b2 버튼 안 경로 접두: 캔버스 [0, 2] → 인스턴스 줄(1번 자식) → 위치 1 */
-const B2_PATH: Path = [0, 2, 1, 1];
+const B2_PATH: Path = [0, 2, 2, 1]; // 캔버스 첫 자식으로 제목 <h2>가 생겨 캔버스 안 경로가 한 칸 밀림
 
 describe('인스턴스 속성 편집 · override 표시 · ↻ (MF-12 ~ 15 · MF-21) — patch 기대 표 P-9 ~ P-14 · P-21 · P-22', () => {
   it('인스턴스를 고르면 5칸이 합쳐진 값(메인 값 위에 인스턴스 값)으로 뜨고 override 칸은 색 구분 + ↻, 아닌 칸은 「메인 따름」이다 (b2 · b3 · b1)', async () => {
@@ -819,18 +825,18 @@ describe('Undo/Redo 버튼 (Dev-6)', () => {
     await Promise.resolve();
   };
 
-  it('처음에는 [↶] [↷] 모두 disabled 속성이 있고 글자는 「↶ 되돌리기」 · 「↷ 다시 하기」다. Hook은 그대로 useState 4칸 + useEffect 1칸이다', () => {
+  it('처음에는 [↶] [↷] 모두 disabled 속성이 있고 글자는 「↶ 되돌리기」 · 「↷ 다시 하기」다. Hook은 기존 5칸(useState 4 + useEffect 1)이 그대로고 뒤에 실제 영역용 3칸(useMemo · useEffect · useState)이 붙는다', () => {
     expect(undoButton().hasAttribute('disabled')).toBe(true);
     expect(redoButton().hasAttribute('disabled')).toBe(true);
     expect(undoButton().textContent).toBe('↶ 되돌리기');
     expect(redoButton().textContent).toBe('↷ 다시 하기');
     expect(Array.from(byId('toolbar').children).map(testId)).toEqual(['app-name', 'add-instance', 'undo-button', 'redo-button']);
-    // Hook 칸 순서 불변: doc · selectedId · history · nextId (+ keydown effect 1칸)
+    // Hook 칸 순서 불변: doc · selectedId · history · nextId (+ keydown effect 1칸) + 실제 영역 3칸(보관함 useMemo · 초기화 useEffect · nav useState)
     expect(slot(0)).toBe(INITIAL_DOC);
     expect(slot(1)).toBeNull();
     expect(slot(2)).toBe(EMPTY_UNDO);
     expect(slot(3)).toBe(4);
-    expect(instance.hooks).toHaveLength(5);
+    expect(instance.hooks).toHaveLength(8);
   });
 
   it('수정하면 [↶]이 켜지고(disabled 없음) [↷]은 꺼진 채다. 고르기만 해서는 안 켜진다', async () => {
