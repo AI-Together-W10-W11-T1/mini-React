@@ -126,3 +126,10 @@
   5. 검증 페이지 세부(빈 이름 안내 문구, 빈 할 일 [추가] 무시, 경계 이동 무시, `todoList = { items, nextId }`, 목록 처음엔 비어 있음) — 작업자 안
   6. 숫자 칸 정책: `readNumberInput` 빼고 "해당 없음 · 기록만" (화면에 숫자 칸 없음)
   7. Dev-16(엔진 통합 테스트) 빼기 → 필수 21개 (다른 Dev 단위 테스트 · e2e와 겹침, 마감)
+
+## 개발 검수 1회차 NON-BLOCKING 반영 (2026-11-11)
+
+- 마스터가 NB 1~8과 추천을 표로 보여 줌 → A (원문): "응" → 추천대로
+  - 고침: NB-1 렌더 중 setter는 오류 · NB-2 실패한 렌더가 effect 예약을 되돌림 · NB-4 `value` · `checked` 프로퍼티는 `input` · `textarea` · `select`에만 · NB-5 qa_todo QA-A2 40 → 60 · NB-6 경고 문구 · NB-7 patch 적용 도중 오류면 마지막 VNode로 다시 그리기(Phase 1 C2와 같은 방식)
+  - 기록만: NB-3 렌더 실패 시 state는 남고 화면은 다음 성공 렌더에서 맞춰짐 · NB-8 `mount()` 두 번 · mount 전 `update()`는 오류
+  - 순서: NB 반영 → 확장 1 대시보드(Dev-23~26) → 2.5단계 공부 → 3단계 QA
