@@ -55,6 +55,7 @@ mini-figma 캔버스를 **테스트 영역**(편집하면 바로 바뀜)으로 �
 - 단위: 정리 함수(PP-05), 실제 영역 patch 줄 수(예: 색 하나 바꾸고 Patch = 실제 영역 `SET_STYLE` 줄, 고르기만 하고 Patch = 기록 안 함) → `fixtures/mini-figma/__tests__/`
 - 회귀: `git diff --stat main -- packages/` 비어 있음, vitest · tsc · playwright 전체
 - 테스트 케이스 확인: 2026-11-11T23:00 사용자 "응" — 「빠르게」 범위(인수 QA-46 ~ 54 + 공격 A30 · A31 · A32, A36은 단위로), 순서 = A 구현 + 기존 테스트 통과 → 화면 확인 → B 새 테스트 · 검수 · QA (사용자 결정, TDD 순서 예외)
+- 범위 확대: 2026-11-12T00:08 사용자 "A33 · 34 · 35 · 37도 테스트 케이스 진행하자" → QA-A33 · A34 · A35 · A37 e2e 추가 (A36은 단위 그대로)
 
 ## 7. [고정] 필수 제약
 - task_004 · 005와 같음: `packages/` 수정 금지, Hook은 `App`에만, 자식은 props만, 화면 2개 (desktop 1280x800 · mobile 375x812)

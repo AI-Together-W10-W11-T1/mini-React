@@ -1,9 +1,9 @@
-import { test, expect, URL, selectOnCanvas, pickColor, pressBack, pressForward, realBgOf, watchSel, watchApp, noHorizontalScroll, areaSnapshot, realLabels, realButtonSel, watchFlash, boxInside, boxOverlap, boxSame, overlayCounts, navState, setMainLabel, titleText, buttonSel } from './mini-figma-helpers';
+import { test, expect, URL, selectOnCanvas, moveInLayer, pickColor, pressBack, pressForward, realBgOf, watchSel, watchApp, noHorizontalScroll, areaSnapshot, realLabels, realButtonSel, watchFlash, boxInside, boxOverlap, boxSame, overlayCounts, navState, setMainLabel, titleText, buttonSel } from './mini-figma-helpers';
 import type { ButtonLook } from './mini-figma-helpers';
 import { holdNodes as holdReal, sameNode as sameReal } from './phase1-helpers';
 
-// [AI Note]: patch-preview(task_006) 인수 QA-46 ~ 54 + 공격 QA-A30 ~ A32. 이 스펙의 테스트는 desktop · mobile 두 프로젝트에서 모두 돈다.
-// 기준: .agent_workflow/tasks/task_006_ryuuuu5618_patch-preview/04_qa_evidence/qa_todo.md. 시간 부족으로 QA-A33 ~ A37은 이번 범위에서 뺐다 (A36 한도 50은 단위 preview.test.ts · previewNav.test.ts가 맡음).
+// [AI Note]: patch-preview(task_006) 인수 QA-46 ~ 54 + 공격 QA-A30 ~ A35 · A37. 이 스펙의 테스트는 desktop · mobile 두 프로젝트에서 모두 돈다.
+// 기준: .agent_workflow/tasks/task_006_ryuuuu5618_patch-preview/04_qa_evidence/qa_todo.md. QA-A36(한도 50)만 e2e로 안 만들고 단위 preview.test.ts · previewNav.test.ts가 맡는다 (사용자 결정: 느린 ≈ 110번 클릭 시나리오).
 // 콘솔 error · 선언 안 한 dialog는 phase1-helpers의 test 확장이 자동으로 잡는다.
 // 깜빡임은 시간에 기대는 효과라 사라지는 시간은 재지 않고, 박스가 「생길 때」의 위치(watchFlash)만 본다.
 // 실제 영역 상자는 inert라 Playwright 기본 click()이 못 누른다고 기다리다 실패한다 → 눌러도 반응 없음을 볼 때만 click({ force: true }).
@@ -54,10 +54,14 @@ test('QA-46 두 영역 배치: 머리글이 있고 desktop은 가운데 열 위 
     expect(Math.abs(canvas.x - real.x)).toBeLessThanOrEqual(1);
     expect(Math.abs(canvas.width - real.width)).toBeLessThanOrEqual(1);
     expect(canvas.y + canvas.height).toBeLessThanOrEqual(real.y + 1);
-    // 캔버스는 레이어와 같은 줄에서 시작하고(가운데 열 위 칸), 레이어 · 속성은 두 영역의 합만큼 길어 아래 끝이 실제 영역 아래 끝과 같다
-    expect(Math.abs(canvas.y - layer.y)).toBeLessThanOrEqual(1);
-    expect(Math.abs(layer.y + layer.height - (real.y + real.height))).toBeLessThanOrEqual(1);
-    expect(Math.abs(prop.y + prop.height - (real.y + real.height))).toBeLessThanOrEqual(1);
+    // 레이어 · 속성은 사이드바: 도구 막대 바로 아래(여백 없음)에서 시작해 화면 맨 아래까지, 가운데 두 영역은 그 안쪽에 들어간다
+    const vh = page.viewportSize()?.height ?? 0;
+    for (const [name, b] of [['layer', layer], ['prop', prop]] as const) {
+      expect(Math.abs(b.y - (toolbar.y + toolbar.height)), `${name} 위 = 도구 막대 아래`).toBeLessThanOrEqual(1);
+      expect(Math.abs(b.y + b.height - vh), `${name} 아래 = 화면 아래`).toBeLessThanOrEqual(1);
+    }
+    expect(canvas.y).toBeGreaterThanOrEqual(layer.y);
+    expect(real.y + real.height).toBeLessThanOrEqual(layer.y + layer.height);
     expect(layer.x + layer.width).toBeLessThanOrEqual(canvas.x + 1);
     expect(canvas.x + canvas.width).toBeLessThanOrEqual(prop.x + 1);
     expect(toolbar.y + toolbar.height).toBeLessThanOrEqual(layer.y + 1);
@@ -508,4 +512,146 @@ test('QA-A32 특수문자 라벨 `<b>x</b> &amp; "q" \'a\' 😀`는 실제 영�
   await back(page);
   expect(await realLabels(page)).toEqual(INITIAL_LABELS);
   expect(await real.locator('b').count()).toBe(0);
+});
+
+test('QA-A33 빈 입력: 메인 라벨을 모두 지우고 [Patch]하면 실제 영역 메인 · b1 글자 span이 빈 글자로 남고(노드 제거 아님), [실행 취소]하면 `버튼`으로 돌아간다', async ({ page }) => {
+  await page.goto(URL);
+  const spanSel = (id: string) => `${realButtonSel(id)} [data-testid="real-btn-label"]`;
+  await holdReal(page, { realMainLabel: spanSel('main'), realB1Label: spanSel('b1') });
+  await setMainLabel(page, '');
+  await patch(page);
+
+  // 글자 span 4개가 그대로(노드 제거 아님), 메인 · b1 글자만 비어 있다
+  await expect(page.getByTestId('real-btn-label')).toHaveCount(4);
+  expect(await realLabels(page)).toEqual(['', '', '취소', '삭제']);
+  expect(await sameReal(page, 'realMainLabel', spanSel('main')), '메인 글자 span이 같은 노드').toBe(true);
+  expect(await sameReal(page, 'realB1Label', spanSel('b1')), 'b1 글자 span이 같은 노드').toBe(true);
+  await expectAreasSame(page, '빈 라벨 Patch 뒤');
+  const testAfterPatch = await areaSnapshot(page, 'test');
+  expect(testAfterPatch.map((b) => b.label)).toEqual(['', '', '취소', '삭제']);
+
+  // [실행 취소] = 버튼 복원, 테스트 영역은 그대로
+  await back(page);
+  expect(await realLabels(page)).toEqual(INITIAL_LABELS);
+  await expect(page.getByTestId('real-btn-label')).toHaveCount(4);
+  expect(await sameReal(page, 'realMainLabel', spanSel('main'))).toBe(true);
+  expect(await areaSnapshot(page, 'test')).toEqual(testAfterPatch);
+});
+
+test('QA-A34 새로고침: 편집 · [Patch] · [실행 취소] 뒤 새로고침하면 실제 영역이 처음 모습(테스트 영역과 같음)이고 기록이 비어 있다', async ({ page }) => {
+  await page.goto(URL);
+  const initial = await areaSnapshot(page, 'real');
+  await setMainLabel(page, '확인');
+  await patch(page);
+  await back(page);
+  expect(await realLabels(page)).toEqual(INITIAL_LABELS);
+  expect((await navState(page)).forward, '새로고침 전에는 [다시 실행]이 켜져 있다').toBe(true);
+
+  await page.reload();
+  await expect(page.getByTestId('real-figma-button')).toHaveCount(4);
+  expect(await areaSnapshot(page, 'real')).toEqual(initial);
+  await expectAreasSame(page, '새로고침 뒤');
+  expect(await realLabels(page)).toEqual(INITIAL_LABELS);
+  const state = await navState(page);
+  expect(state.back, '[실행 취소] 꺼짐').toBe(false);
+  expect(state.forward, '[다시 실행] 꺼짐').toBe(false);
+  expect(state.patch).toBe(true);
+});
+
+test('QA-A35 구조 바꾸기를 섞어서(추가 → 순서 바꾸기 → 삭제 → 라벨 · 색) [Patch]할 때마다 두 영역이 같고, [실행 취소]를 끝까지 하면 처음 모습, [다시 실행]을 끝까지 하면 마지막 모습이다', async ({ page }) => {
+  await page.goto(URL);
+  const snaps = [await areaSnapshot(page, 'real')]; // 처음, 이어서 단계마다 [Patch] 직후 모습
+  expect(snaps[0].map((b) => b.id)).toEqual(['main', 'b1', 'b2', 'b3']);
+
+  // 1) [+ 인스턴스] → [Patch]
+  await page.getByTestId('add-instance').click();
+  await patch(page);
+  await expectAreasSame(page, '추가 뒤');
+  snaps.push(await areaSnapshot(page, 'real'));
+  expect(snaps[1].map((b) => b.id)).toEqual(['main', 'b1', 'b2', 'b3', 'b4']);
+
+  // 2) b1 [↓] → [Patch] (순서 바꾸기)
+  await moveInLayer(page, 'b1', 'down');
+  await patch(page);
+  await expectAreasSame(page, '순서 바꾸기 뒤');
+  snaps.push(await areaSnapshot(page, 'real'));
+  expect(snaps[2].map((b) => b.id)).toEqual(['main', 'b2', 'b1', 'b3', 'b4']);
+
+  // 3) b2 삭제 → [Patch]
+  await selectOnCanvas(page, 'b2');
+  await page.keyboard.press('Delete');
+  await patch(page);
+  await expectAreasSame(page, '삭제 뒤');
+  snaps.push(await areaSnapshot(page, 'real'));
+  expect(snaps[3].map((b) => b.id)).toEqual(['main', 'b1', 'b3', 'b4']);
+
+  // 4) 라벨 · 색 → [Patch]
+  await setMainLabel(page, '확인');
+  await pickColor(page, '#cf202f');
+  await patch(page);
+  await expectAreasSame(page, '라벨 · 색 뒤');
+  snaps.push(await areaSnapshot(page, 'real'));
+  expect(snaps[4].map((b) => b.label)[0]).toBe('확인');
+  expect(snaps[4].map((b) => b.bg)[0]).toBe(RED);
+  const testLast = await areaSnapshot(page, 'test');
+  expect(testLast).toEqual(snaps[4]);
+
+  // [실행 취소]를 끝까지: 한 칸씩 그 기록 모습, 테스트 영역은 그대로
+  for (let i = 3; i >= 0; i -= 1) {
+    await back(page);
+    expect(await areaSnapshot(page, 'real'), `[실행 취소] 뒤 실제 영역 = 기록 ${i}`).toEqual(snaps[i]);
+    expect(await areaSnapshot(page, 'test'), '테스트 영역 그대로').toEqual(testLast);
+  }
+  expect((await navState(page)).back, '처음에서 [실행 취소] 꺼짐').toBe(false);
+  expect(await realLabels(page)).toEqual(INITIAL_LABELS);
+
+  // [다시 실행]을 끝까지
+  for (let i = 1; i <= 4; i += 1) {
+    await forward(page);
+    expect(await areaSnapshot(page, 'real'), `[다시 실행] 뒤 실제 영역 = 기록 ${i}`).toEqual(snaps[i]);
+    expect(await areaSnapshot(page, 'test'), '테스트 영역 그대로').toEqual(testLast);
+  }
+  expect((await navState(page)).forward, '끝에서 [다시 실행] 꺼짐').toBe(false);
+  expect(await areaSnapshot(page, 'real')).toEqual(testLast);
+});
+
+test('QA-A37 인스턴스를 60번 더하고 긴 라벨(`A`×200)로 [Patch]해도 desktop은 페이지가 안 늘고 실제 영역 구역 안에서 스크롤되며, 두 크기 모두 가로 스크롤 · 버튼 넘침이 없다', async ({ page }, testInfo) => {
+  await page.goto(URL);
+  await selectOnCanvas(page, 'main');
+  await page.getByTestId('prop-size').selectOption('L');
+  const COUNT = 60;
+  for (let i = 0; i < COUNT; i += 1) await page.getByTestId('add-instance').click();
+  await expect(page.getByTestId('figma-button')).toHaveCount(4 + COUNT);
+  await patch(page);
+  await expect(page.getByTestId('real-figma-button')).toHaveCount(4 + COUNT);
+
+  // 긴 라벨 → [Patch] (깜빡임 박스가 떠 있는 동안 아래를 잰다)
+  await setMainLabel(page, 'A'.repeat(200));
+  await patch(page);
+  expect((await realLabels(page))[0]).toBe('A'.repeat(200));
+  await expectAreasSame(page, '60개 · 긴 라벨 Patch 뒤');
+  expect(Number((await overlayCounts(page)).flash), '깜빡임 박스가 생겼다').toBeGreaterThan(0);
+
+  // 두 크기 공통: 가로 스크롤 없음, 실제 영역 버튼의 오른쪽 끝이 실제 영역 오른쪽 끝을 안 넘음
+  expect(await noHorizontalScroll(page)).toBe(true);
+  const area = await page.getByTestId('real-area').boundingBox();
+  if (area === null) throw new Error('실제 영역이 안 보인다');
+  const rights = await page.getByTestId('real-figma-button').evaluateAll((els) => els.map((el) => el.getBoundingClientRect().right));
+  expect(rights).toHaveLength(4 + COUNT);
+  for (const right of rights) expect(right).toBeLessThanOrEqual(area.x + area.width + 0.5);
+
+  if (testInfo.project.name === 'desktop') {
+    const heights = await page.evaluate(() => ({ scrollHeight: (document.scrollingElement ?? document.documentElement).scrollHeight, innerHeight: window.innerHeight }));
+    expect(heights.scrollHeight, '페이지 세로 스크롤 없음').toBeLessThanOrEqual(heights.innerHeight);
+    const section = await page.getByTestId('real-section').evaluate((el) => ({ scrollHeight: el.scrollHeight, clientHeight: el.clientHeight, overflowY: getComputedStyle(el).overflowY }));
+    expect(['auto', 'scroll'], 'real-section overflow-y').toContain(section.overflowY);
+    expect(section.scrollHeight, '실제 영역 구역 안쪽 높이가 보이는 높이보다 큼').toBeGreaterThan(section.clientHeight);
+    for (const id of ['layer-panel', 'real-section', 'property-panel']) {
+      const b = await page.getByTestId(id).boundingBox();
+      if (b === null) throw new Error(`${id}가 안 보인다`);
+      expect(b.y + b.height, `${id} 아래 끝`).toBeLessThanOrEqual(heights.innerHeight);
+      expect(b.y + b.height, `${id} 아래 끝이 화면 아래 20px 안`).toBeGreaterThanOrEqual(heights.innerHeight - 20);
+    }
+    expect(await page.evaluate(() => window.scrollY)).toBe(0);
+  }
 });

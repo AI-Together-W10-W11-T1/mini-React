@@ -38,7 +38,7 @@ fixtures/mini-figma/
   App.ts                    Hook 3칸 + 핸들러 3개 + PreviewPanel 5번째 자식 (Dev-4 · 5)
   index.html                배치 CSS (Dev-4), 디자인 · 깜빡임 CSS (Dev-6)
   __tests__/                previewVNode · previewNav · preview 신규, app · rootOnlyHooks · design 갱신
-e2e/mini-figma-preview.spec.ts   (신규) QA-46 ~ 54, QA-A30 ~ A37 (공격은 Dev-7)
+e2e/mini-figma-preview.spec.ts   (신규) QA-46 ~ 54, QA-A30 ~ A35 · A37 (공격은 Dev-7, A36은 단위)
 e2e/mini-figma-helpers.ts        실제 영역 도우미 추가 / 기존 render · design · attack 스펙 단언 몇 줄 갱신 (qa_todo 「바뀌는 기존 단언」)
 ```
 
@@ -127,10 +127,11 @@ e2e/mini-figma-helpers.ts        실제 영역 도우미 추가 / 기존 render 
   - 알고리즘: 해당 없음 (CSS만)
   - 완료 근거로 남길 것: QA 먼저 실패 → 통과, `design.test.ts` 건수, desktop · mobile 육안 확인(정식 캡처는 QA 단계), 커밋 해시
 
-- [x] **Dev-7** (`mini-figma`): 공격 · 경계 마무리 + 회귀 + 사용자 변경(도구 막대 · 앱 Undo 제거) [PP 전체 · QA-46 ~ 54 · QA-A30 ~ A32]
+- [x] **Dev-7** (`mini-figma`): 공격 · 경계 마무리 + 회귀 + 사용자 변경(도구 막대 · 앱 Undo 제거) [PP 전체 · QA-46 ~ 54 · QA-A30 ~ A35 · A37]
   - **완료 근거 (Evidence)**:
     - **새 단위 테스트**: `previewVNode.test.ts` 16건 · `previewNav.test.ts` 11건(엔진 `History`와 같은 연산 대조 + 무작위 2000번 + 한도 50) · `preview.test.ts` 25건(patch 기대 표 R-1 ~ 13 · 뒤로 · 앞으로 · 한도 50(55번 Patch → back 정확히 49번) · 깜빡임 연결 · 테스트 영역 불변) · `app.test.ts` 「실제 영역」 describe 12건(상자 노드 같은 참조 + 변경 0 · Hook 7칸 · [Patch] 뒤 doc · selectedId 같은 객체 · 같은 틱 연타 · 단축키와 버튼이 같은 기록) · `design.test.ts` `.viz-box` 4건(주황 없음 · 그림자 없음)
-    - **새 e2e** `e2e/mini-figma-preview.spec.ts` 12건 × desktop · mobile = 24건: QA-46 ~ 54 + A30 · A31 · A32 (A33 ~ A37은 사용자 「빠르게」로 제외, A36 한도 50은 단위 테스트가 맡음). QA-52 · 54 · A31에는 단축키 경로(Ctrl+Z = [실행 취소])도 포함. 도우미 `areaSnapshot` · `watchFlash` · `navState` · `realBgOf` 등 (`mini-figma-helpers.ts`)
+    - **새 e2e** `e2e/mini-figma-preview.spec.ts` 16건 × desktop · mobile = 32건: QA-46 ~ 54 + A30 ~ A35 · A37 (A36 한도 50만 단위 테스트가 맡음; A33 · A34 · A35 · A37은 사용자 결정으로 나중에 추가). QA-52 · 54 · A31에는 단축키 경로(Ctrl+Z = [실행 취소])도 포함. 도우미 `areaSnapshot` · `watchFlash` · `navState` · `realBgOf` 등 (`mini-figma-helpers.ts`)
+    - **범위 확대 추가 (사용자 결정, `01_request_spec.md` §6)**: QA-A33 · A34 · A35 · A37 e2e 4건 × 2 프로젝트 = 8건 추가 (`e2e/mini-figma-preview.spec.ts`). 시나리오 문장이 앱 동작과 달라 고친 곳 없음(앱은 명세 PP-01 ~ 12대로 동작). 깨짐 확인(앱 코드를 잠깐 깨고 되돌림, 되돌린 뒤 앱 파일 변경 없음 확인): A33 → `previewVNode.ts`에서 빈 글자 span 제거 시 desktop · mobile 실패(`real-btn-label` 4 기대 · 2개 받음) / A34 → `preview.ts` 처음 모습 채우기 끔 시 실패 / A35 → `preview.ts` `back`을 두 칸씩 가게 하면 실패(「[실행 취소] 뒤 실제 영역 = 기록 3」) / A37 → `index.html`에서 `.real-section`의 `overflow-y: auto` 제거 시 desktop 실패(페이지 높이 14240 > 800), `.btn-label`의 `overflow-wrap: anywhere` 제거 시 mobile 실패(가로 스크롤). 최종 회귀: `npx playwright test e2e/mini-figma-preview.spec.ts` 32 passed, `npx playwright test` **316 passed**(308 + 8), `npx vitest run` 1178 passed, `npx tsc --noEmit` 오류 0. 5199 LISTEN 없음.
     - **구현을 일부러 깨서 테스트가 실패하는지 확인한 뒤 되돌림** (되돌린 뒤 `git diff`로 앱 파일 변경 0 확인): ① `previewVNode.ts`에서 `selected` 빼기 끔 → `previewVNode.test.ts` + `preview.test.ts` 15건 실패, e2e QA-48 · 49 · 51 실패 ② `App.ts`에서 `setNav(...)` 호출 제거(nav 갱신 끔) → `app.test.ts` 6건 실패, e2e QA-50 · 52 · 53 · 54 · A30 · A31 · A32 실패 ③ `setNav(navBack(nav))`(낡은 nav 읽기, 함수형 setter 아님) → `app.test.ts` 「연타 정확성」 1건 실패 ④ `createOverlay(…, () => false)`(깜빡임 끔) → `preview.test.ts` 깜빡임 2건 + e2e QA-48 · 49 실패 ⑤ 키 핸들러에서 `preventDefault` 제거 → `app.test.ts` 키 5건 실패
     - **테스트가 찾은 계획 오류 (앱 버그 아님)**: 실제 영역은 DOM에서 읽어 key가 없어 **위치 비교**라서 아이콘 켜기 · 끄기는 `{ INSERT: 4 }` · `{ REMOVE: 4 }`가 아니라 `{ SET_ATTR: 12, SET_TEXT: 4, INSERT: 4 }` · `{ SET_ATTR: 12, SET_TEXT: 4, REMOVE: 4 }`이고(0번 글자 span이 아이콘으로 바뀌고 글자 span은 1번에 새로 생김, 화면 결과는 테스트 영역과 같음), QA-50의 「글자 span 노드 같은 참조」 단언은 성립하지 않아 모습 비교로 바꿨다. `qa_todo.md` R-6 · R-7 표와 `B2_PATH` `[0,2,2,1,1]` 오기(정답 `[0,2,2,1]`)를 고침. 앱 코드 버그는 발견 못 함
     - **jsdom 한계**: `Range.getBoundingClientRect`가 없어 깜빡임 위치 재기가 불리면 예외 → 테스트 파일(`preview.test.ts` · `app.test.ts`)에서만 0 크기 대역을 둠. 위치 · 크기 단언은 e2e(`watchFlash`)가 맡음

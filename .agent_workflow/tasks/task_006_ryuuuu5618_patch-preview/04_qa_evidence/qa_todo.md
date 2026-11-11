@@ -1,7 +1,7 @@
 # qa_todo: patch-preview
 
 - 명세: `../01_request_spec.md` (PP-01 ~ 12) · Dev 목록: `../03_development/dev_todo.md`
-- **PP → QA 연결**: PP-01 = QA-46 (계획 A37) / PP-02 · 03 = QA-47 / PP-04 = QA-48 ~ 51 · A30 · A32 (계획 A33 · A35) / PP-05 = QA-47 · 51 · A32 / PP-06 = QA-52 · 53 · A30 · A31 (계획 A34 · A35 · A36, A36은 단위) / PP-07 = QA-47 · 52 · 54 · QA-31(toolbar) / PP-08 = QA-48 · 49 · 52 / PP-09 = QA-54 + 단위 `rootOnlyHooks.test.ts` · `app.test.ts` / PP-10 = QA-54 + 기존 e2e 회귀 / **PP-11 = QA-52 · 54 · A31(단축키 경로) · 기존 A8 · A10 · A28(Ctrl+Z가 실제 영역 [실행 취소])** / **PP-12 = QA-19 ~ 25 · 29 · 30 · 32 · 33 · A9 · A15 · A17 · A19 · A20 · A21 · A25 · A27 삭제, QA-54 · 31 · 34 · A6 · A8 · A10 · A18 에서 「앱 [↶] [↷] · 앱 Undo 없음」 단언 (아래 「바뀌는 기존 단언」)**
+- **PP → QA 연결**: PP-01 = QA-46 · A37 / PP-02 · 03 = QA-47 / PP-04 = QA-48 ~ 51 · A30 · A32 · A33 · A35 / PP-05 = QA-47 · 51 · A32 / PP-06 = QA-52 · 53 · A30 · A31 · A34 · A35 (A36 한도 50은 단위만) / PP-07 = QA-47 · 52 · 54 · QA-31(toolbar) / PP-08 = QA-48 · 49 · 52 / PP-09 = QA-54 + 단위 `rootOnlyHooks.test.ts` · `app.test.ts` / PP-10 = QA-54 + 기존 e2e 회귀 / **PP-11 = QA-52 · 54 · A31(단축키 경로) · 기존 A8 · A10 · A28(Ctrl+Z가 실제 영역 [실행 취소])** / **PP-12 = QA-19 ~ 25 · 29 · 30 · 32 · 33 · A9 · A15 · A17 · A19 · A20 · A21 · A25 · A27 삭제, QA-54 · 31 · 34 · A6 · A8 · A10 · A18 에서 「앱 [↶] [↷] · 앱 Undo 없음」 단언 (아래 「바뀌는 기존 단언」)**
 - 실행: `npx playwright test e2e/mini-figma-preview.spec.ts` (desktop 1280x800 · mobile 375x812 두 프로젝트, 모든 시나리오가 두 프로젝트에서 돈다). 기존 Phase 1 · 2 e2e와 task_004 · 005 e2e(`mini-figma-*.spec.ts`)는 회귀로 모두 통과해야 한다 (아래 「바뀌는 기존 단언」만 고침)
 - 시나리오 하나 = `e2e/*.spec.ts` 테스트 하나. 테스트 이름은 시나리오 문장 그대로. **번호는 task_005에서 이어 쓴다** (새 인수 = QA-46 ~ , 새 공격 = QA-A30 ~ )
 - 근거 ID: 이 task의 `PP-xx` · task_004 `MF-xx` · task_005 `FD-xx` · Diff 기본 케이스 `D-01 ~ 05`(앱 화면에서 본 대응. 엔진은 안 바꾸므로 엔진 단위 테스트가 회귀로 덮음)
@@ -87,7 +87,7 @@
 
 ## 공격적 시나리오 (새)
 
-> **e2e로 만든 것은 QA-A30 ~ A32뿐** (`mini-figma-preview.spec.ts`). **QA-A33 ~ A37은 이번 범위에서 e2e를 만들지 않았다** (사용자 「빠르게」). 한도 50(A36)은 단위 `preview.test.ts`(55번 Patch → back 정확히 49번) · `previewNav.test.ts`가 맡고, 나머지(A33 · A34 · A35 · A37)는 단위로도 e2e로도 같은 모양의 시험이 아직 없다. 아래 표의 A33 ~ A37 행은 계획 기록으로 남긴다 (`01_request_spec.md` 구현 제외 범위 아님, 후속 보강 후보).
+> **e2e로 만든 것은 QA-A30 ~ A35 · A37** (`mini-figma-preview.spec.ts`; A33 · A34 · A35 · A37은 사용자 결정으로 뒤에 추가, `01_request_spec.md` §6 「범위 확대」). **QA-A36(한도 50)만 e2e로 만들지 않았다** — 느린 시나리오(≈ 110번 클릭)라 단위 `preview.test.ts`(55번 Patch → back 정확히 49번) · `previewNav.test.ts`가 맡는다. A37은 desktop · mobile 기대가 달라 한 테스트 안에서 프로젝트별로 나눠 단언한다.
 
 | QA | 시나리오 | Then | 근거 ID | 스펙 파일 |
 | --- | --- | --- | --- | --- |
