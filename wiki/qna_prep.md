@@ -53,16 +53,16 @@
   - A: 렌더 1번. 한 동작의 setter 값(`doc` · `selectedId` · `history`)은 같은 렌더의 값에서 계산한다 (Batching, 결정 9 B). 단위 테스트: 메인 편집 = 렌더 1번, 삭제 = 렌더 +1.
   - 출처: task_004 `03_development/dev_todo.md` 공통 주의 6 · Dev-7 · Dev-9 · `code_review_log.md` 묶음 2 NB 4
 
-- Q: 메인 한 번 편집 뒤 Undo 한 번에 무엇이 되돌아가나? 왜 49번인가?
+- Q: 메인 한 번 편집 뒤 Undo 한 번에 무엇이 되돌아가나? 왜 49번인가? *(task_006에서 제거: 앱 편집 Undo 기록 없음. 되돌리기는 State History — 아래 「시연 앱 mini-figma · 실제 영역 · 되돌리기 (task_006)」)*
   - A: 같은 대상 + 같은 칸이 연달아 바뀐 것이 한 단계 (시간 기준 없음). 다른 칸 · 다른 대상, 추가 · 삭제 · 순서 · ↻ · Undo/Redo는 묶음을 끝낸다. 기록은 처음 상태 포함 50개 = Undo 49번 (Phase 1과 같은 뜻, 이 앱은 `UNDO_LIMIT = 50` 별도 상수).
   - 사용자 말(Q14): "다른 속성을 건드렸나면 그건 묶음이 끝났지" · "기록 개수는 50개로~"
   - 출처: task_004 `00_master_dialogue.md` Q14 · Q17 · `03_development/dev_todo.md` Dev-3 · 공통 주의 14
 
-- Q: 고르기(선택)는 Undo 기록에 왜 안 넣나?
+- Q: 고르기(선택)는 Undo 기록에 왜 안 넣나? *(task_006 변경: [실행 취소] · [다시 실행]에서도 `selectedId`는 그대로 두고, 되돌린 doc에 없는 인스턴스면 푼다)*
   - A(사용자 말, Q14): "2번은 안 해도 될 것 같아" → 고르기는 기록 밖. 되돌려서 고른 인스턴스가 사라지면 선택은 `null`로 풀린다 (`reconcileSelection`).
   - 출처: task_004 `00_master_dialogue.md` Q14 · `01_request_spec.md` MF-32
 
-- Q: Undo로 지운 인스턴스 번호를 다시 쓰나? (추가 → Undo → 추가)
+- Q: Undo로 지운 인스턴스 번호를 다시 쓰나? (추가 → Undo → 추가) *(task_006 변경: 앱 Undo 없음 → 「추가 → 삭제 → 추가 = b5 · b6」로 확인. 번호는 되돌리지 않음, PP-06 ③)*
   - A: 안 쓴다. `nextId`는 Undo로 되돌리지 않는다. b4 추가 → Undo → 추가 = b5 (QA-A18). 이유는 "지운 번호 재사용 안 함" (Q17-3, 추천안 수용, 이유 미기재).
   - 출처: task_004 `00_master_dialogue.md` Q17 · `04_qa_evidence/qa_todo.md` QA-A18 · `03_development/dev_todo.md` Dev-11
 
@@ -92,16 +92,16 @@
 
 ### 시연 앱 mini-figma · 버그와 수정 (Q18)
 
-- Q: Ctrl+Z 한 번에 두 단계가 되돌아간 이유는?
+- Q: Ctrl+Z 한 번에 두 단계가 되돌아간 이유는? *(task_006 변경: 앱 편집 Undo 제거 → Ctrl+Z = [실행 취소](State History). Q18 키 규칙은 그대로)*
   - A: 재현 (묶음 3 1회차): 메인 고르기 → 라벨 `새` 입력 → 색 빨강 → 포커스를 빼고 Ctrl+Z = 글자 `버튼` + 색 파랑 (두 단계), Ctrl+Shift+Z = 라벨만 `새` (빨강 단계 사라짐). 원인: Chromium의 글자 되돌리기 기록이 포커스를 빼도 남아, Ctrl+Z에 기본 Undo가 라벨 칸에 적용되고 그 `input`을 `onInput`이 새 편집으로 기록 (`future` 비움). `onKey`가 `preventDefault`를 하지 않았다.
   - 출처: task_004 `03_development/code_review_log.md` 묶음 3 1회차 BLOCKING 1 · 재현
 
-- Q: 어떻게 고쳤나?
+- Q: 어떻게 고쳤나? *(task_006 변경: 「앱 Undo/Redo」 → State History 뒤로 · 앞으로, 규칙은 그대로)*
   - A(사용자 결정 Q18, 2026-11-11T19:19 "응" · 19:23 ② 변경): 입력칸 밖 · 선택 상자 · 체크박스 = 앱 Undo/Redo + 브라우저 기본 동작 막기. 라벨 글자 칸 안 = 앱 동작 없음 · 막지 않음 (브라우저 글자 되돌리기, 결과는 일반 수정). Delete · Backspace는 입력칸 · 선택 상자 · 체크박스 안에서 무시 · 막지 않음.
   - 사용자 말(② 변경): "그러면 추천대로 수정해도 브라우저에서도 undo가 가능하다면 추전하는대로 수정해줘"
   - 출처: task_004 `00_master_dialogue.md` 2단계 Q18
 
-- Q: 그럼 라벨 칸에서는 Undo가 안 되나? (사용자 질문 "그러면 undo는 못 하는거야?")
+- Q: 그럼 라벨 칸에서는 Undo가 안 되나? *(task_006 변경: 앱 편집 Undo 없음. 빈 곳 · 선택 상자 · 체크박스 · 색 입력칸 = State History 뒤로 · 앞으로, 라벨 글자 칸 = 브라우저 글자 되돌리기 그대로)* (사용자 질문 "그러면 undo는 못 하는거야?")
   - A(마스터 답): 앱 Undo는 그대로 된다. 막은 것은 브라우저가 같이 하던 글자 되돌리기뿐. 라벨 칸 = 브라우저 글자 되돌리기(일반 수정), 빈 곳 · 선택 상자 · 체크박스 = 앱 Undo.
   - 출처: task_004 `00_master_dialogue.md` 2단계 사용자 질문 3건
 
@@ -264,6 +264,149 @@
   - A(마스터 설명): 같은 점 = 생략 · `[]` · 값 배열 규칙, stale closure + 의존성 검사 도구. 다른 점 = 실제 React는 실행 시점이 더 복잡하고, 우리는 patch 직후 한 번.
   - 출처: task_004 `00_master_dialogue.md` 「이해 체크포인트 · Hooks」 🔁
 
+## 시연 앱 mini-figma · 실제 영역 · 되돌리기 (task_006)
+
+- Q: 실제 영역은 왜 [Patch]를 눌러야만 바뀌나?
+  - A: 편집은 테스트 영역 DOM만 바꾼다. [Patch]가 테스트 영역을 읽어 실제 영역에 diff · patch하고, 바뀐 것이 있을 때만 기록이 쌓인다 (PP-04). 0단계 사용자 제안(「Patch 버튼을 눌렀을 때 실제 영역이 바뀌는 모습」)에 마스터가 「거의 맞음」이라고 답함.
+  - 출처: task_006 `01_request_spec.md` PP-04 · `00_master_dialogue.md` 0단계
+
+- Q: 실제 영역은 왜 state로 VNode를 바로 만들지 않고 DOM에서 다시 읽나? (Phase 1 「DOM → VDOM」)
+  - A: Phase 1의 「DOM → VDOM」을 그대로 보여 주려고 `readAreaChildren`으로 읽는다. 읽은 뒤 `toRealVNodes`가 테스트 영역 제목 · `selected` 토큰 · testid를 뺀다. 버린 후보: state로 바로 VNode — 「DOM → VDOM」을 못 보여 줌.
+  - 출처: task_006 `01_request_spec.md` 5절 「새 VNode 만들기」 · `03_development/dev_todo.md` Dev-1
+
+- Q: 실제 영역에서 두 버튼 순서를 바꾸면 왜 MOVE가 아니라 SET_ATTR · SET_TEXT인가?
+  - A: 실제 영역 VNode는 DOM에서 읽어서 `key`가 없다 (이벤트 · key는 DOM에 없음). key 없는 자식은 위치끼리만 비교하므로 `data-id` · 글자를 위치별로 고친다 (`{ SET_ATTR: 2, SET_TEXT: 2 }`). 엔진의 정상 동작이라 계획 표를 이것에 맞춰 고쳤다.
+  - 출처: task_006 `03_development/dev_todo.md` 공통 주의 3 · Dev-3 · Dev-7 「테스트가 찾은 계획 오류」
+
+- Q: 깜빡임은 왜 실제 노드에 클래스를 붙이지 않고 위에 덧칠 층을 두나?
+  - A: 실제 노드에 클래스를 붙이면 VNode와 DOM이 어긋난다. 깜빡임 층은 Phase 1 `createOverlay`를 그대로 가져다 쓰고 실제 영역 밖 형제 요소로 둔다.
+  - 출처: task_006 `01_request_spec.md` 5절 「실시간 표시」 · PP-08 · `03_development/dev_todo.md` 공통 주의 5 · 8
+
+- Q: 실제 영역은 왜 클릭 · 키에 반응하지 않나?
+  - A: 이벤트 핸들러는 DOM에서 읽히지 않는다. 실제 영역은 보기 전용(`inert`)이고, 상자 안은 `createVDomRoot`만 채운다 (PP-05 · PP-10).
+  - 출처: task_006 `01_request_spec.md` PP-05 · PP-10 · `03_development/dev_todo.md` 공통 주의 3 · 5
+
+- Q: 실제 영역 상자는 왜 자식 없는 빈 요소로 그리나?
+  - A: 미니 React의 diff는 상자 안을 모른다. App이 여러 번 다시 그려도 상자 안 노드를 건드리지 않게 하려고, 상자 안은 `createVDomRoot`가 채운다 (Phase 2 기록판의 「빈 칸에 직접 쓰기」와 같은 방식).
+  - 출처: task_006 `01_request_spec.md` PP-09 · `03_development/dev_todo.md` 공통 주의 5
+
+- Q: 뒤로 · 앞으로 버튼의 꺼짐 상태는 왜 App state에 두나?
+  - A: PP-09 「버튼 꺼짐 상태(뒤로 · 앞으로 가능 여부)는 App state」. 엔진 `VDomRoot`에는 「뒤로 갈 수 있나」를 묻는 메서드가 없어서 앱이 같은 규칙으로 따로 센다 (`previewNav.ts`, 엔진 History와 대조 테스트).
+  - 출처: task_006 `01_request_spec.md` PP-09 · `03_development/dev_todo.md` Dev-2
+
+- Q: [실행 취소]를 누르면 왜 테스트 영역도 같이 되돌아가나?
+  - A: PRD T-08 「뒤로 · 앞으로 이동하면 두 영역이 해당 이력 상태로 복원」. 사용자 질문: "그럼 실행 취소를 눌렀으면 테스트 영역도 실제 영역과 다시 같이 져야 하는 것 아니야?" → 추천안 「응」. 방법: [Patch]로 기록이 생길 때 그 순간의 `doc`을 같은 칸 번호로 저장하고, 이동하면 그 칸의 `doc`으로 `setDoc`.
+  - 출처: task_006 `00_master_dialogue.md` 「PP-06 변경」 (2026-11-12T00:32) · `01_request_spec.md` PP-06
+
+- Q: 되돌릴 때 DOM을 다시 읽지 않고 저장해 둔 `doc` 사본을 쓰는 이유는?
+  - A: 실제 영역 DOM을 다시 읽어 `doc`을 만들면 override 키 정보가 DOM에 없다. 그래서 칸마다 `doc` 사본을 저장한다 (`previewDocs.ts`, `trackPush` · `trackDoc`).
+  - 출처: task_006 `01_request_spec.md` 5절 「뒤로 · 앞으로」 버린 후보 · `03_development/dev_todo.md` Dev-8
+
+- Q: 되돌린 뒤 선택과 번호는 어떻게 되나?
+  - A: `selectedId`는 그대로 두되, 되돌린 `doc`에 없는 인스턴스면 푼다. `nextId`는 되돌리지 않는다 (번호 재사용 없음).
+  - 출처: task_006 `01_request_spec.md` PP-06 ② · ③ · `03_development/dev_todo.md` Dev-8
+
+- Q: Patch 안 한 편집이 있는데 [실행 취소]를 누르면?
+  - A: 그 편집은 버려지고 기록 상태로 이동한다 (PP-06 ④, 추천안 「응」). 처음 · 끝 칸에서는 버튼이 꺼져 있어, 편집만 하고 Patch를 안 한 상태는 버튼 · 단축키로 버릴 수 없다 (명세 「처음 · 끝에서는 꺼짐」 우선).
+  - 발표 전 보충 후보: 「왜 골랐나」 (체크포인트 생략 · 사용자 답 없음). 위 답은 기록 기준이다.
+  - 출처: task_006 `01_request_spec.md` PP-06 ④ · `00_master_dialogue.md` 2026-11-12T00:32 · `03_development/dev_todo.md` Dev-8 「알려진 결과」
+
+- Q: 뒤로 간 뒤 Patch를 하면 앞쪽 기록은?
+  - A: 앞쪽 기록과 `doc` 사본을 버린다 (엔진 History 정책 그대로, 한도 50).
+  - 출처: task_006 `01_request_spec.md` PP-06 · `03_development/dev_todo.md` Dev-8
+
+- Q: 한도 50은 어디서 맞췄나? (Patch 55번 뒤 [실행 취소])
+  - A: 엔진 History와 같은 한도 `HISTORY_LIMIT` = 50 (0번 포함). Patch 55번 뒤 [실행 취소]는 정확히 49번 참이고 50번째는 거짓 (단위 테스트).
+  - 출처: task_006 `03_development/dev_todo.md` Dev-3 · Dev-7 · `CLAUDE.md` 「내 설계 결정」 (정책: 보관 한도 50)
+
+- Q: 앱 편집 Undo는 왜 없앴나?
+  - A: 사용자: 「스테이트 히스토리 관련 기능들에 Ctrl/Cmd+Z · Ctrl/Cmd+Shift+Z 단축키로 할당하자」. 그러면 앱 Undo를 부를 방법이 없어져, 마스터 추천 A 「추천으로 가자」(2026-11-11T23:27)로 앱 편집 Undo 기록 · `undo.ts`를 없앰. 버린 후보: B 다른 키(Ctrl+Alt+Z)로 앱 Undo 유지.
+  - 출처: task_006 `00_master_dialogue.md` 2026-11-11T23:27 · `01_request_spec.md` PP-11 · PP-12
+
+- Q: 도구 막대의 되돌리기 버튼은 왜 [실행 취소] · [다시 실행]이고 [Patch]는 그 옆인가?
+  - A: 사용자 요청(2026-11-11T23:25): State History 버튼들을 `undo-button` · `redo-button` 자리로 옮기고 그 둘은 제거. 글자는 사용자 요청(2026-11-11T23:43)으로 「뒤로 · 앞으로」 → 「실행 취소 · 다시 실행」. 처음 추천안(실제 영역 머리글)은 사용자 요청으로 바뀜.
+  - 출처: task_006 `00_master_dialogue.md` 2026-11-11T23:25 · 23:43 · `01_request_spec.md` PP-07 · 5절
+
+- Q: [인스턴스 생성] · [삭제]는 왜 속성 패널에 있나?
+  - A: 사용자 변경 81e1e2d: [+ 인스턴스]를 「인스턴스 생성」으로 이름 바꿔 속성 패널 오른쪽 아래로 옮김 (메인을 고르면 인스턴스 생성, 인스턴스를 고르면 삭제). (옮긴 이유는 기록하지 않음 — 사용자 "패스")
+  - 출처: task_006 `01_request_spec.md` PP-07
+
+- Q: 같은 틱에 [실행 취소] 다음 [Patch]를 이어 부르면?
+  - A: 코드로는 이동 전 `doc`이 저장될 수 있다. 실제 클릭은 이벤트마다 마이크로태스크가 비워져 생기지 않아, 기록만 남기고 고치지 않았다.
+  - 출처: task_006 `03_development/code_review_log.md` 회차 1/3 Dev-8 NB 2 · `07_pr_body.md` 「남은 일」
+
+## 시연 앱 mini-figma · 디자인 · 팔레트 (task_005)
+
+- Q: 도구 막대를 왜 CSS만이 아니라 컴포넌트(`Toolbar`)로 만들었나?
+  - A: 사용자 "c로 가자" (B에 대해 "b는 장식용인거면 없어도 되는거 아니야?"). 버린 후보: A CSS만 — 막대 없음 · B 고정 막대 — 기능 없는 장식.
+  - 출처: task_005 `01_request_spec.md` 5절 · `00_master_dialogue.md` 0단계 Q2
+
+- Q: 색을 이름(blue · red)이 아니라 `#rrggbb` 값으로 저장하는 이유는?
+  - A: 사용자 요청 「팔레트 판 넣어서 우리가 색 지정할 수 있게」(0단계 Q3)에 따라 색 칸을 값으로 바꿈 (FD-20). 이름으로는 칩 8개 밖 색을 담을 수 없다.
+  - 출처: task_005 `01_request_spec.md` FD-20 · 5절 「색 고르기」 · `00_master_dialogue.md` 0단계 Q3 · Q4
+
+- Q: 팔레트 판은 왜 칩 8개 + 직접 고르기인가?
+  - A: 사용자 "(다)로 진행하자" (요청: "팔레트 판 넣어서 우리가 색 지정할 수 있게"). 버린 후보: (가) 칩만 — 8개 밖 색 불가 · (나) 선택기만 — 디자인 톤 흐트러짐.
+  - 출처: task_005 `00_master_dialogue.md` 0단계 Q4 · `01_request_spec.md` 5절
+
+- Q: 글자 색(흰 · 먹)은 어떻게 정하나?
+  - A: 배경과 흰 `#ffffff` · 먹 `#0a0b0d` 중 WCAG 대비가 큰 쪽. 경계: `#777777` 흰, `#787878` 먹. 추천안 수용 (테스트 케이스 확인 「응」, 이유 기록 없음).
+  - 출처: task_005 `03_development/dev_todo.md` ④-1 · `00_master_dialogue.md` 2026-11-11T20:52 · `03_development/code_review_log.md` 회차 1/3 확인 1
+
+- Q: 색을 바꾸면 patch는 어떤 줄로 나오나?
+  - A: 배경 · 글자색이 모두 `style`이라 `SET_STYLE` 줄로 나온다 (항목 하나당 한 줄). 기대 값: `P-5` `{ SET_STYLE: 6 }`, `P-5b` `{ SET_STYLE: 3 }` (한 줄 필드 `background-color`, `#0052ff` → `#cf202f`).
+  - 출처: task_005 `03_development/dev_todo.md` Dev-2 근거 · 공통 주의 1
+
+- Q: 같은 색 칩을 다시 누르거나 같은 색을 입력하면?
+  - A: 렌더 0번 (같은 값은 다시 그리지 않음, `Object.is`). 기대 표 P-20.
+  - 출처: task_005 `03_development/dev_todo.md` Dev-3 · `CLAUDE.md` 「내 설계 결정」 (정책: 같은 값 setter는 다시 그리지 않음)
+
+- Q: 색 입력칸(`<input type="color">`)에서 Ctrl+Z를 누르면?
+  - A: 선택 상자 · 체크박스와 같은 규칙으로 앱 키 동작 (Q18 ② 확장, 추천안 「응」). task_005에서는 앱 Undo, task_006 이후에는 State History 뒤로 (QA-A28). 넓히지 않으면 색 입력칸에서 Ctrl+Z가 아무 일도 안 한다.
+  - 출처: task_005 `03_development/dev_todo.md` ④-3 · Dev-4 · `00_master_dialogue.md` 2026-11-11T20:52 · task_006 `03_development/dev_todo.md` Dev-7
+
+- Q: 전체 높이(FD-08)는 왜 추가했나?
+  - A: 명세에 없던 디자인 추가. 개발 검수 뒤 마스터가 캔버스가 화면 높이를 다 쓰지 않는 것을 발견 → 사용자 「둘 다 해」(2026-11-11T21:31, NB 1 · 3 반영 + 전체 높이).
+  - 출처: task_005 `01_request_spec.md` FD-08 · `00_master_dialogue.md` 「개발 검수 뒤 결정」
+
+## 시연 앱 mini-figma · 변수 (task_007)
+
+- Q: 「값을 복사해 넣기」와 「이름으로 가리키기」는 무엇이 다른가?
+  - A: 값을 복사하면 원본이 바뀌어도 버튼은 그대로이고, 이름으로 가리키면 그릴 때마다 풀어서 원본을 따라간다. 이 task는 후자를 보여 주는 장면이다.
+  - 출처: task_007 `07_pr_body.md` 「동작 원리」 · `01_request_spec.md` 1절
+
+- Q: 연결 저장을 왜 `'var:<id>'` 문자열 한 칸으로 했나? (2.5 「왜 이걸 골랐나」 대상)
+  - A: 사용자 위임 「너가 최선이라고 판단되는 걸로」 → 추천안 수용. 버린 후보 `colorVar` 칸 따로 — override · ↻ 규칙을 칸 두 개에 맞춰야 한다는 점을 피하는 쪽으로 골랐다. 버린 후보 객체 `{ var }` — 문자열 비교 · 사본 복사가 번거로움.
+  - 출처: task_007 `01_request_spec.md` 5절 · `00_master_dialogue.md` 0단계 Q0
+
+- Q: 변수 값을 바꾸면 렌더는 몇 번, 어떤 버튼이 바뀌나?
+  - A: 렌더 1번 (Batching). 연결된 버튼만 `SET_STYLE` — 다른 버튼 · 레이어 노드는 같은 참조. 메인 · b1 · b2가 Primary를 따르는 상태에서 값을 바꾸면 캔버스 `SET_STYLE` 6줄 (배경 3 + 글자색 3), b3(hex override)은 0줄.
+  - 출처: task_007 `03_development/dev_todo.md` VP-2 · VP-6 · 공통 주의 8 · `01_request_spec.md` VR-06
+
+- Q: 같은 값을 넣으면 렌더가 0번인 이유는?
+  - A: `setVariableValue`는 같은 값 · 없는 id · 형식 밖 값이면 같은 `doc`을 돌려주고, setter가 `Object.is`로 같다고 보면 다시 그리지 않는다 (VP-10 · A44). A44 e2e는 DOM만으로는 안 보여 렌더 예약 0번을 함께 본다.
+  - 출처: task_007 `03_development/dev_todo.md` 공통 주의 9 · 「작업자 정정」 (A44) · `CLAUDE.md` 「내 설계 결정」 (같은 값 setter `Object.is`는 다시 그리지 않음)
+
+- Q: 변수 값이 Patch · 되돌리기에 들어가나?
+  - A: 변수는 `doc` 안에 있어서 Patch 때 저장되는 `doc` 사본에 같이 들어간다. 실제 영역에는 푼 hex만 나가고 (DOM에 `var:` 글자 없음), 연결 정보는 `doc` 사본에만 있다.
+  - 출처: task_007 `01_request_spec.md` VR-07 · `03_development/dev_todo.md` 공통 주의 4 · RV-2
+
+- Q: 연결만 하고 Patch하면 어떻게 되나?
+  - A: 푼 색이 그대로라 테스트 영역 DOM이 안 바뀌어 `patch()`가 `false`가 되고, 기록 · `doc` 사본 모두 안 쌓인다 (무변경 Patch 규칙 그대로).
+  - 출처: task_007 `03_development/dev_todo.md` 공통 주의 10 · RV-1
+
+- Q: 변수 패널은 왜 레이어 아래(맨 끝)에 두고 별도 창으로 안 뺐나?
+  - A: 별도 창은 화면 배치가 늘어난다 (버린 후보). 레이어 맨 끝 자식으로 두면 `div.app` 최상위 자식 수와 경로가 그대로이고, 레이어 접기를 해도 변수 구역은 남는다 (작업자 정정 · a62dda5).
+  - 출처: task_007 `01_request_spec.md` 5절 · `03_development/dev_todo.md` 「시작 전 확인」 · 공통 주의 5
+
+- Q: 변수는 왜 색 3개 고정이고 추가 · 삭제 · 모드가 없나?
+  - A: 추가 · 삭제를 넣으면 연결된 변수를 지울 때 규칙이 더 필요하다 (버린 후보). 모드(Light / Dark)는 값 편집으로 같은 장면을 이미 보여 줘서 뺐다. 처음 버튼은 연결 없이 hex 그대로 둔다 (미리 연결하면 기존 테스트의 처음 데이터 단언이 많이 바뀜).
+  - 출처: task_007 `01_request_spec.md` 3절 · 5절
+
+- Q: 칩 · 색 입력칸을 고르면 연결은?
+  - A: 풀린다 (hex로 저장). 변수 선택 상자의 「없음」은 지금 푼 hex로 저장해 겉모습을 유지하고 연결만 푼다.
+  - 출처: task_007 `01_request_spec.md` VR-05
+
 ## 아직 답이 약한 질문
 
 - 보충 받음 목록: task_001 Diff · Patch / State History 갈림길 / 실제 React와 차이 · task_002 의존성 · Hook 호출 순서(두 문항: 칸 구분, if) · 이벤트 리스너 (결정 8) · task_004 키보드 리스너 (CP1 Q1 · Q2) · 의존성 `[]` (CP2) · override 판단 (Q3-1) · 배열 (Q9-2)
@@ -273,3 +416,4 @@
   - task_004 CP3 Instance swap patch: 건너뜀 (사용자 요청, 19:47). 정답(기록): diff 전에 컴포넌트를 풀어 ★ → ♥는 같은 `<span>`의 글자 변경 = 캔버스 `SET_TEXT` 4줄 (P-8). 사용자 답은 없음 — 발표 전 다시 할 후보
 - 0번 기록에 key가 없어 첫 key update가 위치 비교가 되는 문제(task_001 `07_pr_body.md`): 해결됨: Phase 2는 `mount()` · `update()` 때 만든 VNode 자체를 이전 VNode로 저장해 DOM에서 다시 읽지 않으므로 첫 화면부터 key가 들어 있다 (task_002 `01_request_spec.md` 「정책」 이전 VNode 보관). Phase 1 검증 페이지는 key를 쓰지 않는다
 - 기록된 한계(답 있음): select 역패치 순서 한계 · value · checked 속성 한계 (task_002 `01_request_spec.md` 4절)
+- 체크포인트 「생략」: task_005 · 006 · 007 이해 체크포인트는 사용자 「a로 가자」(2026-11-12T02:11)로 생략. 사용자 답은 없음. 위 task_005 · 006 · 007 절의 답은 기록 기준이며 사용자가 한 말이 아니다. 발표 전 보충 후보: task_006 PP-06 ④ 「Patch 안 한 편집은 버림」 · task_007 「연결 저장 방식」 (출처: task_005 · 006 · 007 `00_master_dialogue.md` 끝 · `07_pr_body.md`)

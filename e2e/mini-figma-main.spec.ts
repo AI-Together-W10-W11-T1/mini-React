@@ -134,3 +134,20 @@ test('QA-9 아이콘 종류를 `♥`로 바꾸면 4개 아이콘 글자가 ♥�
   expect(m.childList).toBe(0);
   expect(m.attributes).toBe(0);
 });
+
+test('QA-M1 아이콘 보이기가 꺼져 있으면 아이콘 종류 선택 상자가 꺼져 있고(흐림), 켜면 바로 고를 수 있으며 다시 끄면 꺼진다', async ({ page }) => {
+  await page.goto(URL);
+  await selectOnCanvas(page, 'main');
+  const iconSelect = page.getByTestId('prop-icon');
+  await expect(iconSelect).toBeDisabled();
+  expect(Number(await iconSelect.evaluate((el) => getComputedStyle(el).opacity))).toBeLessThan(1);
+
+  await page.getByTestId('prop-hasicon').click();
+  await expect(iconSelect).toBeEnabled();
+  await iconSelect.selectOption('heart');
+  await expect(page.locator(`${buttonSel('main')} [data-testid="btn-icon"]`)).toHaveText('♥');
+
+  await page.getByTestId('prop-hasicon').click();
+  await expect(iconSelect).toBeDisabled();
+  await expect(iconSelect).toHaveValue('heart');
+});

@@ -409,6 +409,19 @@ describe('메인 속성 편집 (MF-14 · MF-15 · P2-10 · D-01 ~ D-04) — patc
     }
   });
 
+  it('아이콘 보이기가 꺼져 있으면 아이콘 종류 선택 상자가 꺼진다(disabled). 켜면 같은 노드에서 disabled만 빠지고, 다시 끄면 붙는다', async () => {
+    const iconSelect = byId('prop-icon') as HTMLSelectElement;
+    expect(iconSelect.disabled, '처음 메인은 아이콘 꺼짐').toBe(true);
+    await toggle('prop-hasicon', true);
+    expect(byId('prop-icon')).toBe(iconSelect);
+    expect(iconSelect.disabled).toBe(false);
+    const disabledChanges = instance.lastPatches.filter((p) => p.kind === 'SET_ATTR' && p.name === 'disabled');
+    expect(disabledChanges, '속성 패널은 disabled 한 줄').toHaveLength(1);
+    await toggle('prop-hasicon', false);
+    expect(byId('prop-icon')).toBe(iconSelect);
+    expect(iconSelect.disabled).toBe(true);
+  });
+
   it('P-7 (P-6 뒤) 아이콘 끄기: 캔버스 { REMOVE: 4 } · 레이어 { }', async () => {
     await toggle('prop-hasicon', true);
     await toggle('prop-hasicon', false);
