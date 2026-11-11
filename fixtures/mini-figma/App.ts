@@ -17,7 +17,7 @@ import type { DocTrack } from './previewDocs';
 
 // [AI Note]: 루트 컴포넌트. 모든 useState · useEffect · useMemo는 이 파일에서만 부른다 (MF-04 · P2-07 · P2-08).
 // 자식(Toolbar · LayerPanel · Canvas · PropertyPanel)은 props만 받는 순수 함수이고, 바꾸고 싶은 것은 루트가 내려 주는 콜백 props로 알린다 (Lifting State Up).
-// 상태 칸은 3개(+ keydown effect 1칸 + 실제 영역용 3칸, 아래)고 렌더마다 같은 순서로 부른다 (Hook 개수가 달라지면 엔진이 오류, dev_todo 공통 주의 9):
+// 상태 칸은 3개(+ 실제 영역용 3칸 + keydown effect 1칸 + 레이어 펼침 1칸, 아래)고 렌더마다 같은 순서로 부른다 (Hook 개수가 달라지면 엔진이 오류, dev_todo 공통 주의 9):
 //   doc        = { main, instances } 한 칸
 //   selectedId = 'main' | 인스턴스 id | null (처음은 null, ④-2)
 //   nextId     = 새 인스턴스 번호 — 지운 번호를 다시 쓰지 않는다 (b4 추가 → 삭제 → 다시 추가 = b5, Q17-3)
@@ -74,7 +74,7 @@ export function App(): VNode {
     setSelectedId(reconcileSelection(selectedId, next));
   };
 
-  // [AI Note]: 실제 영역(patch-preview, PP-09) — 칸 순서: [0] doc · [1] selectedId · [2] nextId 다음에 아래 세 칸, 맨 끝에 keydown effect (앱 Undo를 없애 history 칸이 빠져 전체 7칸).
+  // [AI Note]: 실제 영역(patch-preview, PP-09) — 칸 순서: [0] doc · [1] selectedId · [2] nextId 다음에 아래 세 칸, 그다음 [6] keydown effect, 맨 끝 [7] 레이어 펼침 (전체 8칸).
   //   [3] useMemo = 보관함: 한 번 만들어 계속 쓰는 같은 객체. 안에 createPreview 결과를 넣어 두는 자리이고 setter가 없어 바꿔도 렌더가 안 일어난다 (엔진에 useRef가 없어서 이렇게 한다)
   //   [4] useEffect([]) = 마운트 patch 직후 한 번: DOM에서 테스트 영역 · 실제 영역 상자 · 깜빡임 층을 찾아 createPreview를 만든다 (렌더 중에는 DOM이 아직 없다). cleanup = 보관함 비움
   //   [5] useState(nav) = 실행 취소 · 다시 실행 가능 여부 (App state, PP-09). 렌더 중 canBack · canForward로 계산해 Toolbar의 [실행 취소] [다시 실행]에 내려 준다
@@ -156,15 +156,29 @@ export function App(): VNode {
     return () => document.removeEventListener('keydown', onKey);
   }, [doc, selectedId]);
 
+  // [AI Note]: [7] useState = 레이어 창의 인스턴스 목록 펼침 여부 (처음 펼침). 맨 끝 칸이라 앞 칸 번호 [0] ~ [6]은 그대로다.
+  // 접혀 있어도 인스턴스를 고르거나 [인스턴스 생성]을 누르면 펼친다 — 고른 행 · 새 행이 숨지 않게. setter가 같은 틱에 모여 렌더는 여전히 1번(결정 9 B),
+  // 이미 펼침이면 같은 값(Object.is)이라 렌더를 더 만들지 않는다. 메인을 고를 때는 펼침을 건드리지 않는다.
+  const [layersOpen, setLayersOpen] = useState(true);
+  const onToggleLayers = (): void => setLayersOpen(!layersOpen);
+  const selectAndReveal = (id: string): void => {
+    onSelect(id);
+    if (id !== 'main') setLayersOpen(true);
+  };
+  const addAndReveal = (): void => {
+    onAdd();
+    setLayersOpen(true);
+  };
+
   return h(
     'div',
     { class: 'app' },
     // [AI Note]: 자식 순서 = 도구 막대(0) · 레이어(1) · 캔버스(2) · 속성(3). 이 순서가 엔진 patch 경로 접두 [0,0] ~ [0,3]이 된다 (FD-10)
     h(Toolbar, { canBack: canBack(nav), canForward: canForward(nav), onBack: onPreviewBack, onForward: onPreviewForward, onPatch: onPreviewPatch }),
-    h(LayerPanel, { main: doc.main, instances: doc.instances, selectedId, onSelect, onMove }),
-    h(Canvas, { main: doc.main, instances: doc.instances, selectedId, onSelect }),
-    // [+ 인스턴스]는 속성 패널 오른쪽 아래(메인을 골랐을 때)에 있다 — [삭제]와 같은 자리
-    h(PropertyPanel, { main: doc.main, instances: doc.instances, selectedId, onEdit, onReset, onDelete: deleteSelected, onAdd }),
+    h(LayerPanel, { main: doc.main, instances: doc.instances, selectedId, open: layersOpen, onToggle: onToggleLayers, onSelect: selectAndReveal, onMove }),
+    h(Canvas, { main: doc.main, instances: doc.instances, selectedId, onSelect: selectAndReveal }),
+    // [인스턴스 생성]은 속성 패널 오른쪽 아래(메인을 골랐을 때)에 있다 — [삭제]와 같은 자리
+    h(PropertyPanel, { main: doc.main, instances: doc.instances, selectedId, onEdit, onReset, onDelete: deleteSelected, onAdd: addAndReveal }),
     // 실제 영역 구역 = 5번째 자식 [0,4]. DOM 순서는 맨 끝, 자리는 CSS로 정한다 (앞 네 개의 경로 접두 [0,0] ~ [0,3]은 그대로)
     h(PreviewPanel, {}),
   );

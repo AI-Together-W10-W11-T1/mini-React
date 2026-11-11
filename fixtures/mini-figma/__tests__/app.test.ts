@@ -974,6 +974,75 @@ describe('순서 바꾸기 (Dev-10)', () => {
 });
 
 // ---------------------------------------------------------------------------
+// 레이어 하위 목록 접기 · 펼치기: 인스턴스 행은 메인 아래 하위 레이어, 메인 행의 [▾]/[▸]로 접고 편다 (루트 state [7], 처음 펼침)
+// ---------------------------------------------------------------------------
+
+describe('레이어 하위 목록 접기 · 펼치기', () => {
+  const toggle = (): HTMLElement => byId('layer-toggle');
+  const list = (): HTMLElement => byId('layer-list');
+  const collapsed = (): boolean => list().classList.contains('collapsed');
+
+  it('처음은 펼침: [▾] · aria-expanded="true" · ul에 collapsed 없음. 버튼은 메인 행 안 이름 뒤(이름이 0번 자식 그대로)', () => {
+    expect(collapsed()).toBe(false);
+    expect(toggle().textContent).toBe('▾');
+    expect(toggle().getAttribute('aria-expanded')).toBe('true');
+    expect(toggle().getAttribute('type')).toBe('button');
+    expect(Array.from(layerRow('main').children).map(testId)).toEqual(['layer-name', 'layer-toggle']);
+  });
+
+  it('[▾]를 누르면 접힘: 레이어 안만 바뀌고(행 노드는 그대로) 캔버스 · 도구 막대 patch 0, 렌더 1번, 고르기는 안 바뀜. 다시 누르면 펼침', async () => {
+    const rows = Array.from(root.querySelectorAll('[data-testid="layer-item"]'));
+    const before = renders;
+    await click(toggle());
+    expect(collapsed()).toBe(true);
+    expect(toggle().textContent).toBe('▸');
+    expect(toggle().getAttribute('aria-expanded')).toBe('false');
+    expect(slot(7)).toBe(false);
+    expect(slot(1), '접기는 메인을 고르지 않음 (stopPropagation)').toBeNull();
+    expect(renders - before).toBe(1);
+    expect(canvasCounts(instance.lastPatches)).toEqual({});
+    expect(toolbarCounts(instance.lastPatches)).toEqual({});
+    expect(Object.keys(layerCounts(instance.lastPatches)).filter((k) => k !== 'SET_ATTR' && k !== 'SET_TEXT'), '행을 지우거나 새로 만들지 않음').toEqual([]);
+    expect(Array.from(root.querySelectorAll('[data-testid="layer-item"]'))).toEqual(rows);
+    const ulPath = [...LAYER_PREFIX, 2];
+    const ulClass = instance.lastPatches.filter((p) => p.kind === 'SET_ATTR' && p.name === 'class' && p.path.length === ulPath.length && p.path.every((n, i) => n === ulPath[i]));
+    expect(ulClass, 'ul(레이어 창 [2]) class 한 줄로 행 전체를 숨김').toHaveLength(1);
+    await click(toggle());
+    expect(collapsed()).toBe(false);
+    expect(toggle().textContent).toBe('▾');
+  });
+
+  it('접힌 채 캔버스에서 인스턴스를 고르면 펼쳐진다(렌더 1번), 메인을 고르면 접힘 그대로', async () => {
+    await click(toggle());
+    await click(buttonOf('main'));
+    expect(collapsed(), '메인 고르기는 펼침을 안 건드림').toBe(true);
+    const before = renders;
+    await click(buttonOf('b2'));
+    expect(collapsed()).toBe(false);
+    expect(slot(1)).toBe('b2');
+    expect(renders - before, '고르기 + 펼치기 = 렌더 1번').toBe(1);
+  });
+
+  it('접힌 채 [인스턴스 생성]을 누르면 펼쳐져 새 행 b4가 보인다(렌더 1번)', async () => {
+    await click(buttonOf('main'));
+    await click(toggle());
+    const before = renders;
+    await clickAdd();
+    expect(collapsed()).toBe(false);
+    expect(layerNames()).toEqual(['버튼', '취소', '삭제', '버튼']);
+    expect(renders - before).toBe(1);
+  });
+
+  it('이미 펼침일 때 인스턴스를 고르는 것은 지금과 같다: 레이어 patch는 고른 표시뿐(ul class 안 바뀜)', async () => {
+    await click(buttonOf('b1'));
+    expect(collapsed()).toBe(false);
+    const ulPath = [...LAYER_PREFIX, 2];
+    const ulChanges = instance.lastPatches.filter((p) => 'path' in p && p.path.length === ulPath.length && p.path.every((n, i) => n === ulPath[i]));
+    expect(ulChanges).toEqual([]);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Dev-11: 키보드 연결 (P-17 키 · P-20, MF-30 ~ 34, Q17-3 · Q17-4). task_006에서 Ctrl/Cmd+Z · Shift+Z는 앱 편집 Undo가 아니라 실제 영역 State History [실행 취소] · [다시 실행]다
 // ---------------------------------------------------------------------------
 
@@ -1321,13 +1390,14 @@ describe('실제 영역 (patch-preview, PP-01 ~ 10 · Dev-7)', () => {
     expect(byId('real-overlay').children).toHaveLength(0);
   });
 
-  it('Hook 7칸: doc · selectedId · nextId + [3] useMemo 보관함(같은 객체) · [4] useEffect · [5] useState(nav) + [6] keydown useEffect. 마운트 뒤 보관함에 preview가 들어 있다 (PP-09)', async () => {
-    expect(instance.hooks.map((hook) => hook.kind)).toEqual(['state', 'state', 'state', 'memo', 'effect', 'state', 'effect']);
-    expect(instance.hooks).toHaveLength(7);
+  it('Hook 8칸: doc · selectedId · nextId + [3] useMemo 보관함(같은 객체) · [4] useEffect · [5] useState(nav) + [6] keydown useEffect + [7] 레이어 펼침 useState. 마운트 뒤 보관함에 preview가 들어 있다 (PP-09)', async () => {
+    expect(instance.hooks.map((hook) => hook.kind)).toEqual(['state', 'state', 'state', 'memo', 'effect', 'state', 'effect', 'state']);
+    expect(instance.hooks).toHaveLength(8);
     expect(slot(0)).toBe(INITIAL_DOC);
     expect(slot(1)).toBeNull();
     expect(slot(2)).toBe(4);
     expect(slot(5)).toBe(INITIAL_NAV);
+    expect(slot(7), '레이어 인스턴스 목록은 처음 펼침').toBe(true);
     const vault = (instance.hooks[3] as MemoHook).value as { preview: unknown; track: unknown };
     expect(vault.preview).not.toBeNull();
     expect(vault.track, '보관함 track = 처음 칸만 (PP-06 변경, 새 Hook 칸 없음)').toEqual(initialTrack(INITIAL_DOC));

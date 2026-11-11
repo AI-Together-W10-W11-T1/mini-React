@@ -187,3 +187,48 @@ test('QA-18 b2를 고른 채 순서를 두 번 바꿔도 b2가 계속 골라져 
   await expect(page.getByTestId('prop-label')).toHaveValue('취소');
   expect(await allMovedNodesSame(page)).toBe(true);
 });
+
+// ---------------------------------------------------------------------------
+// 레이어 하위 목록 접기 · 펼치기 (인스턴스 = 메인 아래 하위 레이어, 처음 펼침)
+// ---------------------------------------------------------------------------
+
+test('QA-L1 레이어 하위 목록: 인스턴스 행 이름은 메인 이름 줄에 맞춰 들여 쓰이고, [▾]로 접으면 인스턴스 행만 숨고(고르기 · 행 노드 그대로), 캔버스에서 인스턴스를 고르면 다시 펼쳐진다', async ({ page }) => {
+  await page.goto(URL);
+  const toggle = page.getByTestId('layer-toggle');
+  await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+  await expect(toggle).toHaveText('▾');
+
+  // 들여쓰기: 인스턴스 행 이름의 왼쪽 = 메인 행 이름의 왼쪽 (±1px), [▾]는 메인 이름보다 왼쪽
+  const mainName = await page.locator(`${layerSel('main')} [data-testid="layer-name"]`).boundingBox();
+  const b1Name = await page.locator(`${layerSel('b1')} [data-testid="layer-name"]`).boundingBox();
+  const toggleBox = await toggle.boundingBox();
+  if (mainName === null || b1Name === null || toggleBox === null) throw new Error('레이어 행이 안 보인다');
+  expect(Math.abs(b1Name.x - mainName.x)).toBeLessThanOrEqual(1);
+  expect(toggleBox.x + toggleBox.width).toBeLessThanOrEqual(mainName.x + 1);
+
+  // 접기: 인스턴스 행이 안 보이고, 고르기는 그대로(아무것도 안 고름), 행 노드는 같은 참조
+  await holdNodes(page, { row1: layerSel('b1'), row2: layerSel('b2') });
+  await toggle.click();
+  await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+  await expect(toggle).toHaveText('▸');
+  await expect(page.locator(layerSel('b1'))).toBeHidden();
+  await expect(page.locator(layerSel('main'))).toBeVisible();
+  expect(await selectedInLayer(page)).toEqual([]);
+  expect(await sameNode(page, 'row1', layerSel('b1'))).toBe(true);
+
+  // 캔버스에서 b2를 고르면 펼쳐지고 b2 행이 고른 표시로 보인다
+  await selectOnCanvas(page, 'b2');
+  await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+  await expect(page.locator(layerSel('b2'))).toBeVisible();
+  expect(await selectedInLayer(page)).toEqual(['b2']);
+  expect(await sameNode(page, 'row2', layerSel('b2'))).toBe(true);
+
+  // 메인을 고르고 접은 뒤 [인스턴스 생성] → 펼쳐져 새 행 b4가 보인다
+  await selectOnCanvas(page, 'main');
+  await toggle.click();
+  await expect(page.locator(layerSel('b1'))).toBeHidden();
+  await clickAdd(page);
+  await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+  await expect(page.locator(layerSel('b4'))).toBeVisible();
+  expect(await layerOrder(page)).toEqual(['b1', 'b2', 'b3', 'b4']);
+});
