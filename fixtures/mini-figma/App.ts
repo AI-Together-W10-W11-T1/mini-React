@@ -160,10 +160,11 @@ export function App(): VNode {
     'div',
     { class: 'app' },
     // [AI Note]: 자식 순서 = 도구 막대(0) · 레이어(1) · 캔버스(2) · 속성(3). 이 순서가 엔진 patch 경로 접두 [0,0] ~ [0,3]이 된다 (FD-10)
-    h(Toolbar, { onAdd, canBack: canBack(nav), canForward: canForward(nav), onBack: onPreviewBack, onForward: onPreviewForward, onPatch: onPreviewPatch }),
+    h(Toolbar, { canBack: canBack(nav), canForward: canForward(nav), onBack: onPreviewBack, onForward: onPreviewForward, onPatch: onPreviewPatch }),
     h(LayerPanel, { main: doc.main, instances: doc.instances, selectedId, onSelect, onMove }),
     h(Canvas, { main: doc.main, instances: doc.instances, selectedId, onSelect }),
-    h(PropertyPanel, { main: doc.main, instances: doc.instances, selectedId, onEdit, onReset, onDelete: deleteSelected }),
+    // [+ 인스턴스]는 속성 패널 오른쪽 아래(메인을 골랐을 때)에 있다 — [삭제]와 같은 자리
+    h(PropertyPanel, { main: doc.main, instances: doc.instances, selectedId, onEdit, onReset, onDelete: deleteSelected, onAdd }),
     // 실제 영역 구역 = 5번째 자식 [0,4]. DOM 순서는 맨 끝, 자리는 CSS로 정한다 (앞 네 개의 경로 접두 [0,0] ~ [0,3]은 그대로)
     h(PreviewPanel, {}),
   );

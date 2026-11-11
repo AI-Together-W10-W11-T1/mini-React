@@ -75,6 +75,11 @@ const click = async (el: Element): Promise<void> => {
   (el as HTMLElement).click();
   await Promise.resolve();
 };
+/** [+ 인스턴스]는 메인을 골랐을 때만 속성 패널 오른쪽 아래에 있다 — 없으면 메인을 먼저 고르고 누른다 */
+const clickAdd = async (): Promise<void> => {
+  if (root.querySelector('[data-testid="add-instance"]') === null) await click(buttonOf('main'));
+  await click(byId('add-instance'));
+};
 const byId = (id: string): HTMLElement => {
   const found = root.querySelector<HTMLElement>(`[data-testid="${id}"]`);
   if (found === null) throw new Error(`data-testid="${id}"가 없다`);
@@ -787,42 +792,54 @@ describe('팔레트 판 (Dev-3)', () => {
 describe('인스턴스 추가 · 삭제 (Dev-9)', () => {
   const addButton = (): HTMLElement => byId('add-instance');
 
-  it('[+ 인스턴스]는 도구 막대에만 있고 레이어 창 안에는 없다', () => {
+  it('[+ 인스턴스]는 메인을 골랐을 때만 속성 패널 맨 끝 버튼 자리에 있고, 인스턴스를 고르면 같은 자리 · 같은 노드가 [삭제]로 바뀐다. 아무것도 안 골랐으면 버튼 자리가 없다', async () => {
+    expect(root.querySelector('[data-testid="add-instance"]')).toBeNull();
+    expect(root.querySelector('.property-actions')).toBeNull();
+    await click(buttonOf('main'));
     expect(root.querySelectorAll('[data-testid="add-instance"]')).toHaveLength(1);
-    expect(addButton().closest('[data-testid="toolbar"]')).not.toBeNull();
-    expect(root.querySelector('[data-testid="layer-panel"] [data-testid="add-instance"]')).toBeNull();
+    expect(addButton().closest('[data-testid="property-panel"]')).not.toBeNull();
+    expect(addButton().parentElement?.classList.contains('property-actions')).toBe(true);
+    expect(addButton().getAttribute('type')).toBe('button');
+    expect(addButton().textContent).toBe('인스턴스 생성');
+    expect(root.querySelector('[data-testid="toolbar"] [data-testid="add-instance"]')).toBeNull();
+    expect(root.querySelector('[data-testid="delete-instance"]')).toBeNull();
+    const slotButton = addButton();
+    await click(buttonOf('b2'));
+    expect(root.querySelector('[data-testid="add-instance"]')).toBeNull();
+    expect(byId('delete-instance')).toBe(slotButton);
+    expect(slotButton.textContent).toBe('삭제');
   });
 
-  it('도구 막대 안 자식 순서는 앱 이름 → [+ 인스턴스]이고 앱 이름 글자는 Mini-Figma다', () => {
+  it('도구 막대 안 자식 순서는 앱 이름 → [실행 취소]이고 앱 이름 글자는 Mini-Figma다 ([+ 인스턴스]는 속성 패널로 옮김)', () => {
     const toolbar = byId('toolbar');
-    expect(Array.from(toolbar.children).map(testId).slice(0, 2)).toEqual(['app-name', 'add-instance']);
+    expect(Array.from(toolbar.children).map(testId).slice(0, 2)).toEqual(['app-name', 'back-button']);
     expect(byId('app-name').textContent).toBe('Mini-Figma');
     expect(toolbar.localName).toBe('header');
-    expect(addButton().getAttribute('type')).toBe('button');
   });
 
-  it('도구 막대의 [+ 인스턴스]도 번호 nextId를 같은 규칙으로 쓴다 (b4 → 다음은 b5)', async () => {
-    await click(addButton());
+  it('[+ 인스턴스]도 번호 nextId를 같은 규칙으로 쓴다 (b4 → 다음은 b5)', async () => {
+    await clickAdd();
     expect(slot(2)).toBe(5);
-    await click(addButton());
+    await clickAdd();
     expect((slot(0) as typeof INITIAL_DOC).instances.map((it) => it.id)).toEqual(['b1', 'b2', 'b3', 'b4', 'b5']);
   });
   const deleteButton = (): HTMLElement => byId('delete-instance');
 
-  it('P-16 도구 막대의 [+ 인스턴스] 한 번 = 캔버스 { INSERT: 1 } · 레이어 { INSERT: 1 }, 렌더 1번, 끝에 b4, 선택은 그대로 (동작은 MF-22 그대로)', async () => {
+  it('P-16 메인을 고른 뒤 [+ 인스턴스] 한 번 = 캔버스 { INSERT: 1 } · 레이어 { INSERT: 1 }, 렌더 1번, 끝에 b4, 선택은 메인 그대로 (동작은 MF-22 그대로)', async () => {
+    await click(buttonOf('main'));
     const before = renders;
-    await click(addButton());
+    await clickAdd();
     expect(canvasCounts(instance.lastPatches)).toEqual({ INSERT: 1 });
     expect(layerCounts(instance.lastPatches)).toEqual({ INSERT: 1 });
     expect(toolbarCounts(instance.lastPatches), '편집은 도구 막대를 안 바꿈 (Undo 버튼 없음)').toEqual({});
     expect(renders - before).toBe(1);
     expect(buttons().map((b) => b.getAttribute('data-id'))).toEqual(['main', 'b1', 'b2', 'b3', 'b4']);
     expect(layerNames()).toEqual(['버튼', '취소', '삭제', '버튼']);
-    expect(slot(1)).toBeNull();
+    expect(slot(1), '추가해도 선택은 그대로 = 메인').toBe('main');
   });
 
   it('새 인스턴스는 override가 없다 (doc에 { id: b4 }만 있고 메인을 따른다)', async () => {
-    await click(addButton());
+    await clickAdd();
     const doc = slot(0) as typeof INITIAL_DOC;
     expect(doc.instances[3]).toEqual({ id: 'b4' });
     expect(Object.keys(doc.instances[3])).toEqual(['id']);
@@ -861,9 +878,9 @@ describe('인스턴스 추가 · 삭제 (Dev-9)', () => {
   it('지운 번호를 다시 쓰지 않는다: b3를 지우고 추가하면 b4, 또 추가하면 b5 (nextId는 doc 밖의 칸)', async () => {
     await click(buttonOf('b3'));
     await click(deleteButton());
-    await click(addButton());
+    await clickAdd();
     expect((slot(0) as typeof INITIAL_DOC).instances.map((it) => it.id)).toEqual(['b1', 'b2', 'b4']);
-    await click(addButton());
+    await clickAdd();
     expect((slot(0) as typeof INITIAL_DOC).instances.map((it) => it.id)).toEqual(['b1', 'b2', 'b4', 'b5']);
     expect(slot(2)).toBe(6);
   });
@@ -996,7 +1013,7 @@ describe('키보드 · State History (Dev-11 + task_006)', () => {
     await click(buttonOf('b2'));
     await typeInto('prop-label', '가');
     await typeInto('prop-label', '가나');
-    await click(byId('add-instance'));
+    await clickAdd();
     await click(layerRow('b1').querySelector('[data-testid="layer-down"]') as HTMLElement);
     await click(buttonOf('main'));
     await choose('prop-size', 'L');
@@ -1216,18 +1233,18 @@ describe('키보드 · State History (Dev-11 + task_006)', () => {
   });
 
   it('Q17-3 b4 추가 → 삭제 → 다시 추가 = b5 (지운 번호를 다시 쓰지 않음, nextId는 doc 밖의 칸). 또 삭제 → 추가 = b6', async () => {
-    await click(byId('add-instance'));
+    await clickAdd();
     expect(docIds()).toEqual(['b1', 'b2', 'b3', 'b4']);
     expect(slot(2)).toBe(5);
     await click(buttonOf('b4'));
     await press('Delete');
     expect(docIds()).toEqual(['b1', 'b2', 'b3']);
     expect(slot(2), 'nextId는 삭제가 안 건드림').toBe(5);
-    await click(byId('add-instance'));
+    await clickAdd();
     expect(docIds()).toEqual(['b1', 'b2', 'b3', 'b5']);
     await click(buttonOf('b5'));
     await press('Delete');
-    await click(byId('add-instance'));
+    await clickAdd();
     expect(docIds()).toEqual(['b1', 'b2', 'b3', 'b6']);
     expect(root.querySelector('[data-id="b4"]')).toBeNull();
   });
@@ -1284,7 +1301,7 @@ describe('실제 영역 (patch-preview, PP-01 ~ 10 · Dev-7)', () => {
     expect(realArea().querySelectorAll('[data-testid="layer-item"], [data-testid="prop-row"], [data-testid="toolbar"], [data-testid="add-instance"]')).toHaveLength(0);
   });
 
-  it('real-area는 inert이고, [실행 취소] [다시 실행]는 disabled 속성이 있고 [Patch]는 켜짐이다. 세 버튼은 도구 막대에 앱 이름 · [+ 인스턴스] [실행 취소] · [다시 실행] · [Patch] 순서이고 [↶] [↷]는 없다 (PP-07 변경)', () => {
+  it('real-area는 inert이고, [실행 취소] [다시 실행]는 disabled 속성이 있고 [Patch]는 켜짐이다. 세 버튼은 도구 막대에 앱 이름 · [실행 취소] · [다시 실행] · [Patch] 순서이고 [↶] [↷]는 없다 (PP-07 변경)', () => {
     expect(realArea().hasAttribute('inert')).toBe(true);
     expect(patchButton().hasAttribute('disabled')).toBe(false);
     expect(backButton().hasAttribute('disabled')).toBe(true);
@@ -1292,8 +1309,8 @@ describe('실제 영역 (patch-preview, PP-01 ~ 10 · Dev-7)', () => {
     expect(byId('real-title').textContent).toBe('실제 영역');
     expect(byId('test-area-title').textContent).toBe('테스트 영역');
     const bar = byId('toolbar');
-    expect(Array.from(bar.children).map(testId)).toEqual(['app-name', 'add-instance', 'back-button', 'forward-button', 'patch-button']);
-    expect(Array.from(bar.children).map((c) => c.textContent)).toEqual(['Mini-Figma', '+ 인스턴스', '실행 취소', '다시 실행', 'Patch']);
+    expect(Array.from(bar.children).map(testId)).toEqual(['app-name', 'back-button', 'forward-button', 'patch-button']);
+    expect(Array.from(bar.children).map((c) => c.textContent)).toEqual(['Mini-Figma', '실행 취소', '다시 실행', 'Patch']);
     expect(patchButton().className).toBe('btn-primary');
     expect(backButton().className).toBe('btn-secondary');
     expect(forwardButton().className).toBe('btn-secondary');
@@ -1318,7 +1335,7 @@ describe('실제 영역 (patch-preview, PP-01 ~ 10 · Dev-7)', () => {
     const preview = vault.preview;
     await click(buttonOf('b2'));
     await pick('#cf202f');
-    await click(byId('add-instance'));
+    await clickAdd();
     expect((instance.hooks[3] as MemoHook).value).toBe(vault);
     expect(vault.preview).toBe(preview);
   });
@@ -1334,7 +1351,7 @@ describe('실제 영역 (patch-preview, PP-01 ~ 10 · Dev-7)', () => {
     await typeInto('prop-label', '확인');
     await choose('prop-size', 'L');
     await pick('#05b169');
-    await click(byId('add-instance'));
+    await clickAdd();
     records.push(...observer.takeRecords());
     observer.disconnect();
     expect(records).toHaveLength(0);
@@ -1553,7 +1570,7 @@ describe('실제 영역 (patch-preview, PP-01 ~ 10 · Dev-7)', () => {
     expect(slot(1)).toBe('main');
     await click(forwardButton());
     // b4를 추가해 Patch한 뒤 b4를 고르고 [실행 취소]
-    await click(byId('add-instance'));
+    await clickAdd();
     await click(patchButton());
     await click(buttonOf('b4'));
     expect(slot(1)).toBe('b4');
@@ -1568,13 +1585,13 @@ describe('실제 영역 (patch-preview, PP-01 ~ 10 · Dev-7)', () => {
   });
 
   it('U-3 nextId: slot(2)가 이동 전후 같은 숫자, 다음 [+ 인스턴스] = b5 (번호 재사용 없음)', async () => {
-    await click(byId('add-instance'));
+    await clickAdd();
     await click(patchButton());
     expect(slot(2)).toBe(5);
     await click(backButton());
     expect(slot(2)).toBe(5);
     expect(docIds()).toEqual(['b1', 'b2', 'b3']);
-    await click(byId('add-instance'));
+    await clickAdd();
     expect(docIds()).toEqual(['b1', 'b2', 'b3', 'b5']);
     expect(slot(2)).toBe(6);
   });
@@ -1633,7 +1650,7 @@ describe('실제 영역 (patch-preview, PP-01 ~ 10 · Dev-7)', () => {
 
   it('U-7 렌더 횟수: [실행 취소] 한 번 = setDoc · setSelectedId · setNav 배칭으로 렌더 1번, 도구 막대 patch는 버튼 꺼짐 속성(SET_ATTR)뿐', async () => {
     await editLabelAndPatch('확인');
-    await click(byId('add-instance'));
+    await clickAdd();
     await click(patchButton());
     await click(backButton()); // index 1
     const before = renders;
@@ -1689,7 +1706,7 @@ describe('실제 영역 (patch-preview, PP-01 ~ 10 · Dev-7)', () => {
 
   it('A42 한도 50: [+ 인스턴스] → [Patch] 55번 → [실행 취소]를 계속: 사본 · 두 영역 버튼 수가 맞고 정확히 49번째에 꺼진다, [다시 실행] 49번 = 끝', async () => {
     for (let i = 0; i < 55; i++) {
-      await click(byId('add-instance'));
+      await clickAdd();
       await click(patchButton());
     }
     expect(nav()).toEqual({ index: 49, size: 50 });

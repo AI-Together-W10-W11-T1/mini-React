@@ -1,5 +1,5 @@
 import type { Page } from '@playwright/test';
-import { test, expect, URL, selectOnCanvas, selectInLayer, noHorizontalScroll, pickColor, textOf, rgb, buttonSel, layerSel, selectedOnCanvas, selectedInLayer } from './mini-figma-helpers';
+import { test, expect, URL, clickAdd, selectOnCanvas, selectInLayer, noHorizontalScroll, pickColor, textOf, rgb, buttonSel, layerSel, selectedOnCanvas, selectedInLayer } from './mini-figma-helpers';
 
 // [AI Note]: QA-40 ~ 42 (디자인 개편: 어두운 카드 · 점무늬 · 알약 · 글꼴 · 도구 막대 배치) · QA-A26 (좁은 화면 도구 막대) · QA-A29 (밝은 색 위 선택 표시).
 // 값은 computed style로 읽는다 — CSS 변수 이름이 아니라 실제 화면에 적용된 값이 문서 값(#0a0b0d · #16181c · #a8acb3 · #0052ff)인지 증명한다.
@@ -48,8 +48,8 @@ test('QA-40 어두운 바탕 · 한 단계 밝은 카드 24px(desktop 사이드�
   // 「메인 따름」 글자는 없앴다 — 메인을 따르는 칸은 아무 표시가 없다
   await expect(page.getByTestId('prop-follow')).toHaveCount(0);
 
-  // 그림자 없음 (도구 막대 · 두 패널 · 캔버스 · [+ 인스턴스] · 칩 · 버튼)
-  for (const sel of [tid('toolbar'), tid('layer-panel'), tid('property-panel'), tid('canvas'), tid('add-instance'), tid('back-button'), tid('color-chip'), tid('figma-button')]) {
+  // 그림자 없음 (도구 막대 · 두 패널 · 캔버스 · [Patch] · 칩 · 버튼) — [+ 인스턴스]는 아래에서 메인을 고른 뒤 따로 본다
+  for (const sel of [tid('toolbar'), tid('layer-panel'), tid('property-panel'), tid('canvas'), tid('patch-button'), tid('back-button'), tid('color-chip'), tid('figma-button')]) {
     expect((await styleOf(page, sel, ['box-shadow']))['box-shadow'], `${sel} 그림자`).toBe('none');
   }
 
@@ -59,17 +59,20 @@ test('QA-40 어두운 바탕 · 한 단계 밝은 카드 24px(desktop 사이드�
   expect(cv['background-image']).toBe('none');
   expect(cv['background-color']).toBe('rgba(0, 0, 0, 0)');
   expect(cv['border-top-width']).toBe('0px');
-  // 실제 영역도 캔버스와 같은 모양 (점무늬 · 테두리 · 자체 배경 없음)
+  // 실제 영역 상자: 점무늬 · 테두리 없음, 배경색은 바탕색(--bg)
   const ra = await styleOf(page, tid('real-area'), ['background-image', 'background-color', 'border-top-width']);
   expect(ra['background-image'], '실제 영역 점무늬 없음').toBe('none');
-  expect(ra['background-color'], '실제 영역 자체 배경 없음').toBe('rgba(0, 0, 0, 0)');
+  expect(ra['background-color'], '실제 영역 배경 = 바탕색').toBe(CARD);
   expect(ra['border-top-width'], '실제 영역 테두리 없음').toBe('0px');
 
-  // 알약 버튼: [+ 인스턴스] 파랑 배경 · 흰 글자 · 100px, [실행 취소] [다시 실행]도 100px
-  const add = await styleOf(page, tid('add-instance'), ['background-color', 'border-radius', 'color']);
+  // 알약 버튼: [+ 인스턴스](메인을 골랐을 때 속성 패널 오른쪽 아래) 파랑 배경 · 흰 글자 · 100px · 그림자 없음, [실행 취소] [다시 실행]도 100px
+  await selectOnCanvas(page, 'main');
+  const add = await styleOf(page, tid('add-instance'), ['background-color', 'border-radius', 'color', 'box-shadow']);
+  expect(add['box-shadow']).toBe('none');
   expect(add['background-color']).toBe(BLUE);
   expect(add['border-radius']).toBe('100px');
   expect(add.color).toBe(WHITE);
+  await selectOnCanvas(page, 'b2'); // 아래 「고른 것 표시」는 b2를 고른 상태에서 본다
   for (const id of ['back-button', 'forward-button']) expect((await styleOf(page, tid(id), ['border-radius']))['border-radius'], id).toBe('100px');
 
   // 입력칸 12px
@@ -194,7 +197,7 @@ test('QA-A26 좁은 화면 도구 막대: 앱 이름 · 버튼 4개([+ 인스턴
   // 버튼 높이: mobile은 누르기 쉬운 40px 이상, desktop은 막대 안 여백을 위해 36px로 줄였다
   const minButtonHeight = testInfo.project.name === 'desktop' ? 36 : 40;
   const check = async (where: string): Promise<void> => {
-    for (const id of ['app-name', 'add-instance', 'back-button', 'forward-button', 'patch-button']) {
+    for (const id of ['app-name', 'back-button', 'forward-button', 'patch-button']) {
       const b = await page.getByTestId(id).boundingBox();
       if (b === null) throw new Error(`${where}: ${id}가 안 보인다`);
       expect(b.x, `${where}: ${id} 왼쪽`).toBeGreaterThanOrEqual(0);
@@ -205,7 +208,7 @@ test('QA-A26 좁은 화면 도구 막대: 앱 이름 · 버튼 4개([+ 인스턴
   };
   await check('처음');
 
-  for (let i = 0; i < 20; i += 1) await page.getByTestId('add-instance').click();
+  for (let i = 0; i < 20; i += 1) await clickAdd(page);
   await check('20번 추가 뒤');
   const first = await page.locator('[data-testid="app-root"] > .app').evaluate((app) => app.children[0].getAttribute('data-testid'));
   expect(first).toBe('toolbar');
@@ -282,7 +285,7 @@ test('QA-44 넘침: 인스턴스를 많이 추가해도 desktop 페이지는 세
   await selectOnCanvas(page, 'main');
   await page.getByTestId('prop-size').selectOption('L');
   const COUNT = 60;
-  for (let i = 0; i < COUNT; i += 1) await page.getByTestId('add-instance').click();
+  for (let i = 0; i < COUNT; i += 1) await clickAdd(page);
   await expect(page.getByTestId('layer-item')).toHaveCount(3 + COUNT);
   const lastId = `b${3 + COUNT}`;
 

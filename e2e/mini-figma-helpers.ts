@@ -109,6 +109,12 @@ export async function selectOnCanvas(page: Page, id: string): Promise<void> {
   await page.locator(buttonSel(id)).click();
 }
 
+/** [+ 인스턴스]를 누른다. 버튼은 메인을 골랐을 때만 속성 패널 오른쪽 아래에 있으므로, 없으면 메인을 먼저 고른다 */
+export async function clickAdd(page: Page): Promise<void> {
+  if ((await page.getByTestId('add-instance').count()) === 0) await selectOnCanvas(page, 'main');
+  await page.getByTestId('add-instance').click();
+}
+
 /** 레이어 창의 그 행을 눌러 고른다 (행 이름 쪽을 눌러서 [↑] [↓]가 안 눌리게 한다) */
 export async function selectInLayer(page: Page, id: string): Promise<void> {
   await page.locator(`${layerSel(id)} [data-testid="layer-name"]`).click();

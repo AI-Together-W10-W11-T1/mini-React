@@ -28,6 +28,7 @@ import {
   bgOf,
   colorsOf,
   pickColor,
+  clickAdd,
 } from './mini-figma-helpers';
 
 // [AI Note]: 공격적 시나리오 모음 (QA-A1 ~ A19). 앞 Dev에서 채울 수 있는 것은 그 Dev에서 썼다 (qa_todo 「Dev」 열): A1 · A2 = Dev-7, A3 ~ A5 = Dev-8, A16 = Dev-10,
@@ -351,7 +352,7 @@ test('QA-A11 정해진 키 밖 · 수정키 조합은 아무 일도 안 한다 (
 
 test('QA-A18 삭제한 뒤 다시 추가하면 번호가 이어진다: b4 추가 → 삭제 → 추가는 b5, 또 삭제 → 추가는 b6 (지운 번호를 다시 쓰지 않음)', async ({ page }) => {
   await page.goto(URL);
-  const add = page.getByTestId('add-instance');
+  const add = { click: () => clickAdd(page) }; // [+ 인스턴스]는 메인을 골랐을 때 속성 패널에만 있다
 
   await add.click();
   expect(await layerOrder(page)).toEqual(['b1', 'b2', 'b3', 'b4']);
@@ -378,7 +379,7 @@ test('QA-A18 삭제한 뒤 다시 추가하면 번호가 이어진다: b4 추가
 test('QA-A12 연타: [+ 인스턴스] 20번 연달아 → b4~b23이 순서대로 줄바꿈되어 가로 스크롤 없이 생기고, [↓] 5번 연타는 맨 아래에서 멈추며, Delete 3번 연타는 b2 하나만 지운다', async ({ page }) => {
   await page.goto(URL);
   await holdNodes(page, { btn1: buttonSel('b1'), btn2: buttonSel('b2'), btn3: buttonSel('b3'), row1: layerSel('b1') });
-  const add = page.getByTestId('add-instance');
+  const add = { click: () => clickAdd(page) }; // [+ 인스턴스]는 메인을 골랐을 때 속성 패널에만 있다
 
   // ① [+ 인스턴스] 20번
   for (let i = 0; i < 20; i += 1) await add.click();
@@ -420,7 +421,7 @@ test('QA-A13 새로고침: 고치고 추가 · 삭제 · 순서까지 한 뒤 re
   await selectOnCanvas(page, 'main');
   await page.getByTestId('prop-label').fill('고침');
   await pickColor(page, '#05b169');
-  await page.getByTestId('add-instance').click();
+  await clickAdd(page);
   await moveInLayer(page, 'b1', 'down');
   await selectOnCanvas(page, 'b2');
   await page.getByTestId('delete-instance').click();
@@ -443,7 +444,7 @@ test('QA-A13 새로고침: 고치고 추가 · 삭제 · 순서까지 한 뒤 re
   await pressForward(page);
   expect(await canvasOrder(page)).toEqual(['b1', 'b2', 'b3']);
   // 번호도 처음부터 (저장 안 함): 추가하면 b4
-  await page.getByTestId('add-instance').click();
+  await clickAdd(page);
   expect(await canvasOrder(page)).toEqual(['b1', 'b2', 'b3', 'b4']);
 });
 

@@ -17,6 +17,7 @@ import {
   followingFields,
   overriddenFields,
   moveInLayer,
+  clickAdd,
 } from './mini-figma-helpers';
 
 // [AI Note]: QA-14 ~ QA-16 (인스턴스 추가 · 삭제 · 메인 삭제 불가, Dev-9) · QA-17 · QA-18 (순서 바꾸기, Dev-10).
@@ -36,7 +37,7 @@ test('QA-14 [+ 인스턴스]를 누르면 캔버스 · 레이어 끝에 b4가 ov
   const canvasWatch = await watchApp(page, 'canvas');
   const layerWatch = await watchApp(page, 'layer-panel');
 
-  await page.getByTestId('add-instance').click();
+  await clickAdd(page);
 
   // 캔버스 · 레이어 모두 끝에 b4
   expect(await canvasOrder(page)).toEqual(['b1', 'b2', 'b3', 'b4']);
@@ -97,7 +98,7 @@ test('QA-15 b2를 고르고 [삭제]하면 캔버스 · 레이어에서 사라�
   expect(await selectedInLayer(page)).toEqual([]);
 
   // 이어서 추가: 번호를 다시 쓰지 않고 b4
-  await page.getByTestId('add-instance').click();
+  await clickAdd(page);
   expect(await canvasOrder(page)).toEqual(['b1', 'b3', 'b4']);
   expect(await layerOrder(page)).toEqual(['b1', 'b3', 'b4']);
 });

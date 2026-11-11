@@ -44,7 +44,7 @@
       .btn-primary:active { background: var(--accent-active); border-color: var(--accent-active); }
       .btn-secondary, .delete-instance, .layer-move, .prop-reset { border: 1px solid #5b616e; background: transparent; color: var(--ink); }
       .btn-secondary:disabled { border-color: var(--line); color: var(--muted); cursor: not-allowed; }
-      .delete-instance { min-height: 44px; margin-top: 12px; padding: 0 20px; }
+      .delete-instance { min-height: 44px; padding: 0 20px; }
 
       /* 레이어 창 */
       .layer-list { display: flex; flex-direction: column; gap: 4px; margin: 8px 0 0; padding: 0; list-style: none; } /* 행 사이 4px — 고른 행의 파랑 테두리가 이웃 행에 붙지 않게 */
@@ -55,8 +55,12 @@
 
       /* 캔버스: 테두리 · 점무늬 · 자체 배경 없이 카드 바탕 그대로. 메인 버튼 상자 + 인스턴스 버튼 줄. 인스턴스가 많아지면 줄바꿈 (mobile 가로 스크롤 방지, Q17-5) */
       .canvas { min-height: 320px; padding: 24px; background: transparent; border: 0; border-radius: 0; } /* 테두리 · 자체 배경 없음 — 페이지 바탕이 그대로 보인다 */
-      .canvas-main { margin-bottom: 16px; padding-bottom: 16px; border-bottom: 1px dashed var(--line); }
+      .canvas-main { margin-bottom: 32px; } /* 컴포넌트 묶음과 인스턴스 묶음 사이 */
       .canvas-instances { display: flex; flex-wrap: wrap; gap: 12px; }
+      /* 묶음 이름: 점선 대신 각 묶음 위에 「컴포넌트」 · 「인스턴스」 글자. CSS 글자(::before)라 DOM · diff 경로는 그대로이고, 같은 클래스를 쓰는 실제 영역 사본에도 똑같이 붙는다 */
+      .canvas-main::before, .canvas-instances::before { display: block; margin-bottom: 8px; padding-left: 5px; color: var(--ink-soft); font-size: 0.75rem; font-weight: 600; line-height: 1.33; }
+      .canvas-main::before { content: '컴포넌트'; }
+      .canvas-instances::before { content: '인스턴스'; flex: 0 0 100%; margin-bottom: -4px; } /* 줄바꿈 줄의 첫 칸을 통째로 차지, 아래 간격 = 12px gap − 4px = 8px */
 
       /* 버튼(디자인 대상 컴포넌트): 크기 S/M/L은 클래스, 색(배경 · 글자색)은 인라인 style (FD-23). 알약 모양. 버튼은 flex 항목이라 max-width: 100% + 라벨 overflow-wrap: anywhere로
          공백 없는 긴 글자도 영역 안에서 줄바꿈된다 (word-break: break-word만으로는 flex 항목의 최소 너비가 안 줄어 가로 스크롤이 남음, QA-A2) */
@@ -73,19 +77,22 @@
       .canvas > .area-title { margin: 0 -24px 16px; padding: 0 24px 12px; border-bottom: 1px solid var(--line); }
 
       /* 실제 영역 구역: 카드(.app > * 규칙 재사용) = 머리글(제목만) + 상자. [Patch] · [실행 취소] · [다시 실행]는 도구 막대로 옮겼다(PP-07 변경).
-         상자 모양은 캔버스와 같다(점무늬 · 테두리 · 자체 배경 없음, 24px 안쪽 여백, 제목 아래 선으로 구분). 깜빡임 층은 상자와 같은 크기로 겹치고 마우스를 안 받는다. */
+         상자 = 바탕색(--bg) · 24px 모서리 · 24px 안쪽 여백, 점무늬 · 테두리 없음 (제목 아래 선으로 구분). 깜빡임 층은 상자와 같은 크기로 겹치고 마우스를 안 받는다. */
       .real-section { display: flex; flex-direction: column; gap: 12px; }
       .real-header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin: 0 -20px; padding: 0 20px 12px; border-bottom: 1px solid var(--line); } /* 캔버스 제목처럼 아래 선이 카드 가로 전체 */
       .real-header .panel-title { margin: 0; }
       .real-frame { position: relative; display: flex; flex: 1 1 auto; min-height: 0; }
-      .real-area { flex: 1 1 auto; min-width: 0; min-height: 120px; padding: 24px; background: transparent; border: 0; border-radius: 0; } /* 캔버스와 같게: 테두리 · 점무늬 · 자체 배경 없음 */
+      .real-area { flex: 1 1 auto; min-width: 0; min-height: 120px; padding: 24px; background: var(--bg); border: 0; border-radius: 24px; } /* 점무늬 · 테두리 없음, 배경색은 바탕색(--bg) 상자 */
       .real-area .figma-button { cursor: default; }
-      .real-overlay { position: absolute; inset: 0; pointer-events: none; overflow: hidden; border-radius: 0; }
+      .real-overlay { position: absolute; inset: 0; pointer-events: none; overflow: hidden; border-radius: 24px; }
       /* 깜빡임 박스: 바뀐 노드 위에 잠깐 뜨고 옅어져 사라진다. 파랑 버튼 위에서도 보이게 흰 테두리 + 파랑 바깥선 + 연한 흰 바탕. 그림자 · 주황 없음 (Phase 1 overlay.ts가 .viz-box를 만든다) */
       .viz-box { position: absolute; box-sizing: border-box; border: 2px solid var(--ink); outline: 2px solid var(--accent); border-radius: 12px; background: rgba(255, 255, 255, 0.22); animation: viz-flash 0.7s ease-out forwards; }
       @keyframes viz-flash { 0% { opacity: 1; } 100% { opacity: 0; } }
 
       .property-empty { margin: 0; color: var(--ink-soft); }
+      /* 속성 패널 = 세로 줄. 맨 끝 버튼 자리(메인: [+ 인스턴스] / 인스턴스: [삭제])는 남은 높이를 밀어내 패널 오른쪽 아래에 붙는다 */
+      .property-panel { display: flex; flex-direction: column; }
+      .property-actions { display: flex; justify-content: flex-end; margin-top: auto; padding-top: 16px; }
       /* 속성 칸: 이름 + 입력 부품. 긴 글자도 칸 안에서 줄어들게 min-width: 0 */
       .prop-row { display: flex; align-items: center; gap: 8px; margin: 10px 0; }
       .prop-name { flex: 0 0 5.5rem; color: var(--ink-soft); font-size: 0.875rem; word-break: keep-all; }

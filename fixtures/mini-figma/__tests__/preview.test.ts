@@ -28,6 +28,11 @@ const click = async (el: Element): Promise<void> => {
   (el as HTMLElement).click();
   await tick();
 };
+/** [+ 인스턴스]는 메인을 골랐을 때만 속성 패널 오른쪽 아래에 있다 — 없으면 메인을 먼저 고르고 누른다 */
+const clickAdd = async (): Promise<void> => {
+  if (root.querySelector('[data-testid="add-instance"]') === null) await click(testArea().querySelector('[data-testid="figma-button"][data-id="main"]') as HTMLElement);
+  await click(byId('add-instance'));
+};
 const testButton = (id: string): HTMLElement => {
   const found = testArea().querySelector<HTMLElement>(`[data-testid="figma-button"][data-id="${id}"]`);
   if (found === null) throw new Error(`테스트 영역에 ${id} 버튼이 없다`);
@@ -213,7 +218,7 @@ describe('Patch 기대 표 (실제 영역 patch 종류 · 개수) — R-1 ~ R-13
   });
 
   it('R-9 [+ 인스턴스] → { INSERT: 1 }, 경로 [1,3]', async () => {
-    await click(byId('add-instance'));
+    await clickAdd();
     preview.patch();
     const only = seen[0];
     expect(only.kind === 'INSERT' && only.path).toEqual([1, 3]);
@@ -328,7 +333,7 @@ describe('뒤로 · 앞으로 (PP-06)', () => {
 
   it('한도 50: [+ 인스턴스] → Patch를 55번 하면 back()은 정확히 49번 참 · 50번째 거짓, 맨 끝은 처음(b1~b3)이 아니라 b1~b9 모습', async () => {
     for (let i = 0; i < 55; i++) {
-      await click(byId('add-instance'));
+      await clickAdd();
       expect(preview.patch()).toBe(true);
     }
     let backs = 0;

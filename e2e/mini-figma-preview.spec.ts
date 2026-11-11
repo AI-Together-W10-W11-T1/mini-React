@@ -1,4 +1,4 @@
-import { test, expect, URL, selectOnCanvas, moveInLayer, pickColor, pressBack, pressForward, realBgOf, watchSel, watchApp, noHorizontalScroll, areaSnapshot, realLabels, realButtonSel, watchFlash, boxInside, boxOverlap, boxSame, overlayCounts, navState, setMainLabel, titleText, buttonSel, blurFocus, layerOrder, canvasOrder, selectedOnCanvas, selectedInLayer, overriddenFields, inRow, rgb } from './mini-figma-helpers';
+import { test, expect, URL, clickAdd, selectOnCanvas, moveInLayer, pickColor, pressBack, pressForward, realBgOf, watchSel, watchApp, noHorizontalScroll, areaSnapshot, realLabels, realButtonSel, watchFlash, boxInside, boxOverlap, boxSame, overlayCounts, navState, setMainLabel, titleText, buttonSel, blurFocus, layerOrder, canvasOrder, selectedOnCanvas, selectedInLayer, overriddenFields, inRow, rgb } from './mini-figma-helpers';
 import type { ButtonLook } from './mini-figma-helpers';
 import { holdNodes as holdReal, sameNode as sameReal } from './phase1-helpers';
 
@@ -97,15 +97,15 @@ test('QA-47 처음 모습: 실제 영역 = 테스트 영역(버튼 4개), 테스
   expect(await real.locator('.selected').count()).toBe(0);
   expect(await real.evaluate((el) => el.hasAttribute('inert'))).toBe(true);
 
-  // 버튼 3개: 켜짐 · 꺼짐 + 모양. PP-07 변경: [실행 취소] [다시 실행] [Patch]가 도구 막대에 있고 순서는 앱 이름 · [+ 인스턴스] · [실행 취소] · [다시 실행] · [Patch], [↶] [↷]는 없다. 실제 영역 머리글에는 제목만
-  expect(await page.getByTestId('toolbar').evaluate((el) => Array.from(el.children).map((c) => c.getAttribute('data-testid')))).toEqual(['app-name', 'add-instance', 'back-button', 'forward-button', 'patch-button']);
+  // 버튼 3개: 켜짐 · 꺼짐 + 모양. PP-07 변경: [실행 취소] [다시 실행] [Patch]가 도구 막대에 있고 순서는 앱 이름 · [실행 취소] · [다시 실행] · [Patch]([+ 인스턴스]는 속성 패널로 옮김), [↶] [↷]는 없다. 실제 영역 머리글에는 제목만
+  expect(await page.getByTestId('toolbar').evaluate((el) => Array.from(el.children).map((c) => c.getAttribute('data-testid')))).toEqual(['app-name', 'back-button', 'forward-button', 'patch-button']);
   await expect(page.getByTestId('undo-button')).toHaveCount(0);
   await expect(page.getByTestId('redo-button')).toHaveCount(0);
   expect(await page.locator('.real-header button').count()).toBe(0);
   expect(await page.locator('.real-header').evaluate((el) => Array.from(el.children).map((c) => c.getAttribute('data-testid')))).toEqual(['real-title']);
   // 좁아 줄바꿈돼도 도구 막대 버튼이 화면 밖으로 안 나간다
   const viewportWidth = page.viewportSize()?.width ?? 0;
-  for (const id of ['app-name', 'add-instance', 'back-button', 'forward-button', 'patch-button']) {
+  for (const id of ['app-name', 'back-button', 'forward-button', 'patch-button']) {
     const b = await page.getByTestId(id).boundingBox();
     if (b === null) throw new Error(`${id}가 안 보인다`);
     expect(b.x, `${id} 왼쪽`).toBeGreaterThanOrEqual(0);
@@ -124,9 +124,11 @@ test('QA-47 처음 모습: 실제 영역 = 테스트 영역(버튼 4개), 테스
     expect(s.radius, `${id} 모서리`).toBe('100px');
     expect(s.shadow, `${id} 그림자`).toBe('none');
   }
-  // 파랑 알약(.btn-primary)은 [+ 인스턴스] · [Patch] 둘뿐
-  const primary = await page.locator('.btn-primary').evaluateAll((els) => els.map((el) => el.getAttribute('data-testid')));
-  expect(primary.sort()).toEqual(['add-instance', 'patch-button']);
+  // 파랑 알약(.btn-primary)은 아무것도 안 골랐을 때 [Patch] 하나, 메인을 고르면 속성 패널의 [+ 인스턴스]가 더해진다
+  const primary = () => page.locator('.btn-primary').evaluateAll((els) => els.map((el) => el.getAttribute('data-testid')));
+  expect(await primary()).toEqual(['patch-button']);
+  await selectOnCanvas(page, 'main');
+  expect((await primary()).sort()).toEqual(['add-instance', 'patch-button']);
 });
 
 test('QA-48 라벨 `확인` → [Patch] 전에는 실제 영역이 그대로고, [Patch]하면 글자만 바뀌고(characterData 2) 메인 · b1 위에서 박스가 2개 깜빡인다', async ({ page }) => {
@@ -209,7 +211,7 @@ test('QA-50 인스턴스 추가 → 아이콘 켜기 → 끄기 → 삭제를 [P
   const rows = await watchSel(page, 'rows', '[data-testid="real-canvas-instances"]');
 
   // 인스턴스 추가
-  await page.getByTestId('add-instance').click();
+  await clickAdd(page);
   await patch(page);
   await expectAreasSame(page, '추가 뒤');
   await expect(page.getByTestId('real-figma-button')).toHaveCount(5);
@@ -612,7 +614,7 @@ test('QA-A35 구조 바꾸기를 섞어서(추가 → 순서 바꾸기 → 삭�
   expect(snaps[0].map((b) => b.id)).toEqual(['main', 'b1', 'b2', 'b3']);
 
   // 1) [+ 인스턴스] → [Patch]
-  await page.getByTestId('add-instance').click();
+  await clickAdd(page);
   await patch(page);
   await expectAreasSame(page, '추가 뒤');
   snaps.push(await areaSnapshot(page, 'real'));
@@ -771,7 +773,7 @@ test('QA-56 · 57 · 62 Patch 안 한 편집은 이동하면 버려지고(실행
 test('QA-58 · 59 인스턴스 b4를 추가해 [Patch]한 뒤 고르고 [실행 취소] = b4가 두 영역 · 레이어에서 사라지고 선택이 풀리며 [다시 실행]해도 선택은 풀린 채, 번호는 재사용되지 않는다(b5 · b6)', async ({ page }) => {
   await page.goto(URL);
   const initial = await areaSnapshot(page, 'real');
-  await page.getByTestId('add-instance').click();
+  await clickAdd(page);
   await patch(page);
   const withB4 = await areaSnapshot(page, 'real');
   expect(withB4.map((b) => b.id)).toEqual(['main', 'b1', 'b2', 'b3', 'b4']);
@@ -799,12 +801,12 @@ test('QA-58 · 59 인스턴스 b4를 추가해 [Patch]한 뒤 고르고 [실행 
 
   // QA-59: [실행 취소] 뒤 [+ 인스턴스] = b5 (b4 번호 재사용 안 함), [다시 실행]은 Patch 안 한 b5를 버리고 b4 모습, 다시 [+ 인스턴스] = b6
   await back(page);
-  await page.getByTestId('add-instance').click();
+  await clickAdd(page);
   expect(await canvasOrder(page)).toEqual(['b1', 'b2', 'b3', 'b5']);
   await forward(page);
   expect(await canvasOrder(page)).toEqual(['b1', 'b2', 'b3', 'b4']);
   await expectBoth(page, withB4, 'QA-59 [다시 실행]');
-  await page.getByTestId('add-instance').click();
+  await clickAdd(page);
   expect(await canvasOrder(page)).toEqual(['b1', 'b2', 'b3', 'b4', 'b6']);
 });
 
@@ -945,7 +947,7 @@ test('QA-A37 인스턴스를 60번 더하고 긴 라벨(`A`×200)로 [Patch]해�
   await selectOnCanvas(page, 'main');
   await page.getByTestId('prop-size').selectOption('L');
   const COUNT = 60;
-  for (let i = 0; i < COUNT; i += 1) await page.getByTestId('add-instance').click();
+  for (let i = 0; i < COUNT; i += 1) await clickAdd(page);
   await expect(page.getByTestId('figma-button')).toHaveCount(4 + COUNT);
   await patch(page);
   await expect(page.getByTestId('real-figma-button')).toHaveCount(4 + COUNT);
