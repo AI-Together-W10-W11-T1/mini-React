@@ -12,3 +12,7 @@
 2026-11-11T14:42 | stage=2 | agent=master | round=- | signal=DECISION | 사용자 "응": README Reflow 문장 변경 확인, NB-1~4 작업자 수정, NB-5 · 6 기록만
 2026-11-11T14:44 | stage=2 | agent=mr-worker | round=- | signal=UNKNOWN | Dev-3 | by=hook
 2026-11-11T14:44 | stage=2 | agent=master | round=- | signal=VERIFY | NB-1~4 반영 a87f1cf (이름 · 문서만), vitest 801 · playwright 172(작업자) → 3단계 QA
+2026-11-11T14:48 | stage=3 | agent=mr-qa | round=- | signal=UNKNOWN | - | by=hook
+2026-11-11T14:48 | stage=3 | agent=master | round=- | signal=PASS_PENDING_HUMAN | QA 172 passed (desktop 86 · mobile 86) · vitest 801 · tsc 0, 캡처 4종 사용자에게 보냄, 서버 남음 5199 PID 12420 종료 승인 대기
+2026-11-11T14:50 | stage=3 | agent=master | round=- | signal=PASS | 사용자 캡처 확인, 5199 PID 12420 승인 후 종료 → 3단계 통과
+2026-11-11T14:50 | stage=마무리 | agent=master | round=- | signal=PR_DRAFT | 07_pr_body.md, main 병합 승인 대기 (2.5단계 체크포인트는 묻기 전)
