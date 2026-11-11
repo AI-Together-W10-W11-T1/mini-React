@@ -25,6 +25,7 @@ import {
   rgb,
   bgOf,
   colorsOf,
+  pickColor,
 } from './mini-figma-helpers';
 
 // [AI Note]: 공격적 시나리오 모음 (QA-A1 ~ A19). 앞 Dev에서 채울 수 있는 것은 그 Dev에서 썼다 (qa_todo 「Dev」 열): A1 · A2 = Dev-7, A3 ~ A5 = Dev-8, A16 = Dev-10,
@@ -132,7 +133,7 @@ test('QA-A5 ↻ 뒤 메인 변경: b3가 메인을 다시 따라가고 `undefine
   await selectOnCanvas(page, 'b3');
   await page.locator(inRow('color', 'prop-reset')).click();
   await selectOnCanvas(page, 'main');
-  await page.getByTestId('prop-color').selectOption({ label: '초록' });
+  await pickColor(page, '#05b169');
 
   // b3는 ↻로 메인을 다시 따라가므로 메인의 새 색(#05b169)을 그대로 쓴다
   expect(await bgOf(page, 'b3')).toBe(rgb('#05b169'));
@@ -231,7 +232,7 @@ test('QA-A8 라벨 글자 칸 안의 키는 앱 동작이 없고, 선택 상자 
   await page.goto(URL);
   // Undo 한 단계: 메인 색 빨강 (앱 Undo가 돌면 이 색이 파랑으로 돌아간다)
   await selectOnCanvas(page, 'main');
-  await page.getByTestId('prop-color').selectOption({ label: '빨강' });
+  await pickColor(page, '#cf202f');
   await selectOnCanvas(page, 'b2');
 
   const appUntouched = async (where: string): Promise<void> => {
@@ -335,7 +336,7 @@ test('QA-A10 옛 state를 보는 키 핸들러 · 리스너 정리: Delete는 �
 
   // ② 메인 색 빨강 → 크기 L → Ctrl+Z(한 번): 되돌아가는 것은 가장 최근 단계(크기), 색은 남음
   await selectOnCanvas(page, 'main');
-  await page.getByTestId('prop-color').selectOption({ label: '빨강' });
+  await pickColor(page, '#cf202f');
   await page.getByTestId('prop-size').selectOption('L');
   await pressUndo(page);
   expect((await mainClass(page)).split(' ')).toContain('btn-M');
@@ -363,7 +364,7 @@ test('QA-A10 옛 state를 보는 키 핸들러 · 리스너 정리: Delete는 �
 test('QA-A11 정해진 키 밖 · 수정키 조합은 아무 일도 안 한다 (Ctrl+Y · Escape · z · Alt+Z · Shift+Delete · Ctrl+Backspace · Alt+Backspace · Meta+Backspace), 수정키 없는 Delete는 b2를 지운다', async ({ page }) => {
   await page.goto(URL);
   await selectOnCanvas(page, 'main');
-  await page.getByTestId('prop-color').selectOption({ label: '빨강' });
+  await pickColor(page, '#cf202f');
   await blurFocus(page);
 
   const unchanged = async (where: string, selected: string): Promise<void> => {
@@ -498,7 +499,7 @@ test('QA-A13 새로고침: 고치고 추가 · 삭제 · 순서까지 한 뒤 re
   await page.goto(URL);
   await selectOnCanvas(page, 'main');
   await page.getByTestId('prop-label').fill('고침');
-  await page.getByTestId('prop-color').selectOption({ label: '초록' });
+  await pickColor(page, '#05b169');
   await page.getByTestId('add-instance').click();
   await moveInLayer(page, 'b1', 'down');
   await selectOnCanvas(page, 'b2');

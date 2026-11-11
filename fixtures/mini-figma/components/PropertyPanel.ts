@@ -2,6 +2,7 @@ import { h } from '@mini-react/react';
 import type { Props, VNode } from '@mini-react/shared';
 import { instanceName, isOverridden, mergeProps } from '../model';
 import type { Field, IconKind, Instance, MainProps, Size } from '../model';
+import { ColorPalette } from './ColorPalette';
 
 interface PropertyPanelProps {
   main: MainProps;
@@ -17,8 +18,6 @@ interface PropertyPanelProps {
 
 const SIZE_OPTIONS: readonly (readonly [Size, string])[] = [['S', 'S'], ['M', 'M'], ['L', 'L']];
 const ICON_OPTIONS: readonly (readonly [IconKind, string])[] = [['star', '★'], ['heart', '♥']];
-// [AI Note]: 임시(Dev-2): 색 칸은 아직 선택 상자다. 값만 `#rrggbb`로 바뀌고 글자(파랑 · 빨강 · 초록)는 그대로 — Dev-3에서 팔레트 판으로 교체되며 지워진다.
-const COLOR_OPTIONS: readonly (readonly [string, string])[] = [['#0052ff', '파랑'], ['#cf202f', '빨강'], ['#05b169', '초록']];
 
 /** 인스턴스를 골랐을 때만 쓰는 정보: 어느 칸이 override인가 + ↻ 누르기 */
 interface OverrideInfo {
@@ -90,7 +89,8 @@ function propRows(values: MainProps, onEdit: PropertyPanelProps['onEdit'], overr
       override,
     ),
     select('icon', 'prop-icon', '아이콘 종류', values.icon, ICON_OPTIONS),
-    select('color', 'prop-color', '색', values.color, COLOR_OPTIONS),
+    // [AI Note]: 색 칸 = 팔레트 판(칩 8개 + 직접 고르기). 고른 색 `#rrggbb`를 그대로 onEdit('color', hex)로 올린다 — 묶음 { target, field: 'color' }은 다른 칸과 같은 규칙 (FD-21 · 22 · 25).
+    propRow('color', '색', h(ColorPalette, { value: values.color, onPick: (hex: string) => onEdit('color', hex) }), override),
   ];
 }
 

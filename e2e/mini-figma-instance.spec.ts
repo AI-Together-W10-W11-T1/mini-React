@@ -18,6 +18,7 @@ import {
   followingFields,
   rgb,
   bgOf,
+  pickColor,
 } from './mini-figma-helpers';
 import type { PropField } from './mini-figma-helpers';
 
@@ -78,7 +79,7 @@ test('QA-10 b1을 고르고 라벨을 `확인`으로 바꾸면 b1만 바뀌고(o
   expect(await overriddenFields(page)).toEqual(['label', 'size']);
 
   // 색 초록(#05b169): b1만 배경이 초록, 메인 · b2는 #0052ff, b3는 #cf202f 그대로
-  await page.getByTestId('prop-color').selectOption({ label: '초록' });
+  await pickColor(page, '#05b169');
   expect(await bgOf(page, 'b1')).toBe(rgb('#05b169'));
   expect(await bgOf(page, 'main')).toBe(rgb('#0052ff'));
   expect(await bgOf(page, 'b2')).toBe(rgb('#0052ff'));

@@ -89,6 +89,16 @@ export async function colorsOf(page: Page): Promise<string[]> {
 // 동작
 // ---------------------------------------------------------------------------
 
+/** 색 칩 하나를 누른다 (속성 패널 팔레트 판, `data-color` = `#rrggbb`) */
+export async function pickColor(page: Page, hex: string): Promise<void> {
+  await page.locator(`[data-testid="color-chip"][data-color="${hex}"]`).click();
+}
+
+/** 색 입력칸(`<input type="color">`)에 값을 넣는다 — Playwright `fill`은 `input` + `change`를 보낸다 */
+export async function pickColorInput(page: Page, hex: string): Promise<void> {
+  await page.getByTestId('prop-color').fill(hex);
+}
+
 /** 캔버스의 그 버튼을 눌러 고른다 */
 export async function selectOnCanvas(page: Page, id: string): Promise<void> {
   await page.locator(buttonSel(id)).click();
