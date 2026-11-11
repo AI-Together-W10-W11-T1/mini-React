@@ -127,13 +127,24 @@ e2e/mini-figma-helpers.ts        실제 영역 도우미 추가 / 기존 render 
   - 알고리즘: 해당 없음 (CSS만)
   - 완료 근거로 남길 것: QA 먼저 실패 → 통과, `design.test.ts` 건수, desktop · mobile 육안 확인(정식 캡처는 QA 단계), 커밋 해시
 
-- [ ] **Dev-7** (`mini-figma`): 공격 · 경계 마무리 + 회귀 [PP 전체 · QA-A30 ~ A37]
-  - **A 단계 진행 (체크 안 함 — QA-A30 ~ A32와 새 e2e는 B 단계)**: 회귀 명령만 실행 — `npx vitest run` 43 files · 1163 passed, `npx tsc --noEmit` 오류 0, `npx playwright test` 324 passed(desktop · mobile 전체, Phase 1 · 2 · mini-figma 포함), `git diff --stat main -- packages/` 출력 없음(0줄). 기존 단언 갱신 커밋 92587e4
+- [x] **Dev-7** (`mini-figma`): 공격 · 경계 마무리 + 회귀 + 사용자 변경(도구 막대 · 앱 Undo 제거) [PP 전체 · QA-46 ~ 54 · QA-A30 ~ A32]
+  - **완료 근거 (Evidence)**:
+    - **새 단위 테스트**: `previewVNode.test.ts` 16건 · `previewNav.test.ts` 11건(엔진 `History`와 같은 연산 대조 + 무작위 2000번 + 한도 50) · `preview.test.ts` 25건(patch 기대 표 R-1 ~ 13 · 뒤로 · 앞으로 · 한도 50(55번 Patch → back 정확히 49번) · 깜빡임 연결 · 테스트 영역 불변) · `app.test.ts` 「실제 영역」 describe 12건(상자 노드 같은 참조 + 변경 0 · Hook 7칸 · [Patch] 뒤 doc · selectedId 같은 객체 · 같은 틱 연타 · 단축키와 버튼이 같은 기록) · `design.test.ts` `.viz-box` 4건(주황 없음 · 그림자 없음)
+    - **새 e2e** `e2e/mini-figma-preview.spec.ts` 12건 × desktop · mobile = 24건: QA-46 ~ 54 + A30 · A31 · A32 (A33 ~ A37은 사용자 「빠르게」로 제외, A36 한도 50은 단위 테스트가 맡음). QA-52 · 54 · A31에는 단축키 경로(Ctrl+Z = [뒤로])도 포함. 도우미 `areaSnapshot` · `watchFlash` · `navState` · `realBgOf` 등 (`mini-figma-helpers.ts`)
+    - **구현을 일부러 깨서 테스트가 실패하는지 확인한 뒤 되돌림** (되돌린 뒤 `git diff`로 앱 파일 변경 0 확인): ① `previewVNode.ts`에서 `selected` 빼기 끔 → `previewVNode.test.ts` + `preview.test.ts` 15건 실패, e2e QA-48 · 49 · 51 실패 ② `App.ts`에서 `setNav(...)` 호출 제거(nav 갱신 끔) → `app.test.ts` 6건 실패, e2e QA-50 · 52 · 53 · 54 · A30 · A31 · A32 실패 ③ `setNav(navBack(nav))`(낡은 nav 읽기, 함수형 setter 아님) → `app.test.ts` 「연타 정확성」 1건 실패 ④ `createOverlay(…, () => false)`(깜빡임 끔) → `preview.test.ts` 깜빡임 2건 + e2e QA-48 · 49 실패 ⑤ 키 핸들러에서 `preventDefault` 제거 → `app.test.ts` 키 5건 실패
+    - **테스트가 찾은 계획 오류 (앱 버그 아님)**: 실제 영역은 DOM에서 읽어 key가 없어 **위치 비교**라서 아이콘 켜기 · 끄기는 `{ INSERT: 4 }` · `{ REMOVE: 4 }`가 아니라 `{ SET_ATTR: 12, SET_TEXT: 4, INSERT: 4 }` · `{ SET_ATTR: 12, SET_TEXT: 4, REMOVE: 4 }`이고(0번 글자 span이 아이콘으로 바뀌고 글자 span은 1번에 새로 생김, 화면 결과는 테스트 영역과 같음), QA-50의 「글자 span 노드 같은 참조」 단언은 성립하지 않아 모습 비교로 바꿨다. `qa_todo.md` R-6 · R-7 표와 `B2_PATH` `[0,2,2,1,1]` 오기(정답 `[0,2,2,1]`)를 고침. 앱 코드 버그는 발견 못 함
+    - **jsdom 한계**: `Range.getBoundingClientRect`가 없어 깜빡임 위치 재기가 불리면 예외 → 테스트 파일(`preview.test.ts` · `app.test.ts`)에서만 0 크기 대역을 둠. 위치 · 크기 단언은 e2e(`watchFlash`)가 맡음
+    - **사용자 변경 반영 (앱 코드, 커밋 3개)**: 60f0fb3 [Patch] 도구 막대로(중간 상태) → 8110e51 도구 막대 = 앱 이름 · [+ 인스턴스] · [뒤로] · [앞으로] · [Patch], [↶] [↷] 제거, 실제 영역 머리글은 제목만 (`Toolbar.ts` · `PreviewPanel.ts` · `App.ts`) → 6d44b13 앱 Undo 제거(`history` 칸 · `undo.ts` · `undo.test.ts` 삭제), Hook 8칸 → **7칸**(doc · selectedId · nextId · useMemo 보관함 · useEffect 초기화 · useState nav · useEffect keydown), `keys.ts` 동작 `undo/redo` → `back/forward`, Ctrl/Cmd+Z = [뒤로] · +Shift = [앞으로] (Q18 규칙 그대로: 라벨 글자 칸 안 무시 · 막지 않음, 그 밖 `preventDefault`(처음 · 끝이어도), Alt 무시)
+    - **지우거나 바꾼 기존 테스트 (전 → 후 · 이유)** — 앱 편집 Undo가 없어졌으므로 Undo 자체를 시험하던 것은 삭제, 뜻이 남는 것은 State History로 전환:
+      - 단위 `app.test.ts`: 「Undo/Redo 버튼 (Dev-6)」 describe 11건 통째 삭제(P-23 · 24 · 28 · 한도 · 버튼 켜짐 · 키와 같은 함수 등 모두 Undo 버튼 전용) / P-18 · P-19 · 「한 키 입력 = 한 단계」 · QA-29 단위판 · 「Undo로 고른 것이 사라지면」 · 「다른 것이 끼어들거나…」 · 「Undo 한도」 삭제 / 「메인 편집은 applyEdit…history」 · 「인스턴스 편집 · ↻ 묶음」 · 「칩 연달아 묶음」 삭제(history 묶음 전용) / **전환**: Ctrl+Z · Meta+Z → 실제 영역 [뒤로] · +Shift [앞으로], 라벨 글자 칸 안 키 무시(nav · 실제 영역 그대로), 선택 상자 · 체크박스 · 색 입력칸 Ctrl+Z → [뒤로] + `preventDefault`, 입력칸 밖 `defaultPrevented`(처음 · 끝에서도 true), Q17-3 「추가 → Undo → 추가 = b5」 → 「추가 → 삭제 → 추가 = b5 · b6」, P-20 「없으면 렌더 0」 → 「처음에서 Ctrl+Z · Ctrl+Shift+Z는 렌더 0 · nav 같은 객체 · 막기는 함」 / `slot(n)` 번호 이동(history 칸 빠짐: nextId `slot(3)` → `slot(2)`), `toolbarCounts` 도구 막대 열 기대값 `{ SET_ATTR: 1 }` · `{ SET_ATTR: 2 }`(첫 수정 · Undo로 [↶] 켜짐) **전부 `{}`**(편집은 도구 막대를 안 바꿈. [Patch]로 기록이 처음 쌓일 때만 [뒤로] 켜짐 SET_ATTR 1줄), 「편집은 doc · history를 같이」류의 `past` 단언 삭제
+      - 단위 `keys.test.ts`: `'undo'` → `'back'`, `'redo'` → `'forward'` (규칙 표 100건 그대로 통과) / `rootOnlyHooks.test.ts`: 순수 모듈 목록에서 `undo.ts` 제거 / `undo.test.ts` 파일 삭제(Undo 모델 자체가 사라짐)
+      - e2e: `mini-figma-undo.spec.ts` 통째 삭제(QA-19 ~ 25 · 29 · 30) / `mini-figma-toolbar.spec.ts`: QA-32 · 33 · A20(2건) · A21 삭제(Undo 버튼 전용), QA-31 → 도구 막대 순서 · [뒤로] [앞으로] 꺼짐 · [Patch] 켜짐 · [↶] [↷] 없음, QA-34 끝의 `[↶] 켜짐` 단언 제거 / `mini-figma-attack.spec.ts`: A9 · A19 · A15 · A17 · A27 삭제(Undo 한도 · 묶음 · 선택 · 새로고침 Undo), A6 → Delete로 선택이 풀림만, A8 → 선택 상자 · 체크박스 Ctrl+Z가 실제 영역 [뒤로](+ 라벨 칸 안은 안 움직임), A10 → 키 핸들러가 옛 state를 안 읽음 · 리스너 1개(Ctrl+Z가 실제 영역 가장 최근 [Patch] 단계), A18 → 「삭제 후 추가 = b5 · b6」, A13 · A14 → Undo 단언만 제거 / `mini-figma-palette.spec.ts`: QA-37 · A22 · A24의 Undo 단언 제거, A25 삭제, A28 → 색 입력칸에서 Ctrl+Z · Shift+Z = 실제 영역 [뒤로] · [앞으로] / `mini-figma-render.spec.ts`(QA-1) · `mini-figma-design.spec.ts`(QA-40 · A26): [↶] [↷] → [뒤로] [앞으로] · [Patch] 기준
+    - **회귀 명령 (최종)**: `npx vitest run` 45 files · **1178 passed** (이 전 1231 − 삭제 Undo 테스트 + 새 테스트), `npx tsc --noEmit` 오류 0, `npx playwright test` **308 passed** (desktop · mobile, Phase 1 · 2 · mini-figma 전체 포함), `git diff --stat main -- packages/` 출력 없음(0줄)
+    - **mobile 375px 도구 막대**: QA-47 · QA-A26 이 mobile에서 통과 — 도구 막대 버튼 5개가 화면 밖으로 안 나가고(줄바꿈) 가로 스크롤 없음
+    - 포트 5199: Playwright가 `reuseExistingServer: false`로 띄우고 끝에 내리므로 남은 LISTEN 서버 없음 (확인: `netstat`에 LISTEN 행 없음)
+    - 커밋: 60f0fb3 · 8110e51 · 6d44b13 (feat) · c369905 (test 단위) · 0a6bd0e (test e2e)
   - 의존: Dev-6
-  - 바깥 루프: QA-A30 ~ A37을 쓰고 desktop · mobile 모두에서 도는지 확인. 필요한 도우미만 `mini-figma-helpers.ts`에 더한다. 앱 코드는 시나리오가 버그를 찾을 때만 고치고 Dev에 기록
-  - 회귀 · 환경: `npx vitest run` 전체 · `npx tsc --noEmit` · `npx playwright test` 전체(Phase 1 · 2 · mini-figma 포함) · `git diff --stat main -- packages/` 비어 있음
   - 알고리즘: 해당 없음
-  - 완료 근거로 남길 것: 위 네 명령의 출력(통과 수), 커밋 해시
 
 <!-- 완료 예시
 - [x] **Dev-3** (`mini-figma`): 실제 영역 연결 모듈

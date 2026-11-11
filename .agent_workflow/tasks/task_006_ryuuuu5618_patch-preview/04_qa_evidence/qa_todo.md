@@ -34,7 +34,7 @@
 | `app.test.ts` 시작 화면 | `Array.from(area().children).map(testId)` = 4개 | 5개 (`real-section` 추가). `[0,1,2,3]` 접두 지킴 줄은 그대로 |
 | `app.test.ts` Hook 개수 (Dev-6 Undo/Redo 버튼 테스트 이름 포함) | `instance.hooks` 길이 5 · 「useState 4칸 + useEffect 1칸」 | 길이 **8** · `slot(0..3)` 그대로, 뒤 3칸 = 보관함(`useMemo`) · 초기화 `useEffect` · `nav`(`useState`, `slot(7)`) |
 | `app.test.ts` 화면에 patch 없음 (MF-05) | `root.textContent`에 `patch` 없음 | `patch-button` 글자를 뺀 나머지에 `patch` 없음 + `log-` testid 없음 |
-| `app.test.ts` `B2_PATH` (P-10 · 12 · 13 · 14) | `[0,2,1,1]` | `[0,2,2,1,1]` (캔버스 제목 한 칸). patch 종류 · 개수 단언은 그대로 |
+| `app.test.ts` `B2_PATH` (P-10 · 12 · 13 · 14) | `[0,2,1,1]` | `[0,2,2,1]` (캔버스 제목 한 칸 — B 단계에서 `[0,2,2,1,1]` 오기를 바로잡음). patch 종류 · 개수 단언은 그대로 |
 | `rootOnlyHooks.test.ts` | 컴포넌트 7개 · 순수 모듈 `model` `undo` `keys` `color` | 컴포넌트 **8개**(`PreviewPanel.ts`), 순수 모듈 + `previewVNode` · `previewNav`, `preview.ts` Hook 없음 |
 | 그 밖 (QA-3 ~ 41 · 45 · A1 ~ A29, P-1 ~ 28 접두 · 개수) | — | 단언 변화 없음 (회귀로 그대로 통과) |
 
@@ -50,8 +50,8 @@
 | R-4 | 메인 크기 `L` | `{ SET_ATTR: 4 }` (class) | D-02 |
 | R-5 | 메인 색 `#05b169` | `{ SET_STYLE: 6 }` (메인 · b1 · b2 × 배경 + 글자색 흰 → 먹) | D-02 |
 | R-5b | 메인 색 `#cf202f` | `{ SET_STYLE: 3 }` (배경만 — b3는 이미 같은 값). 한 줄: `background-color` · before `#0052ff` · after `#cf202f` | D-02 |
-| R-6 | 메인 아이콘 켜기 | `{ INSERT: 4 }` (각 경로 마지막 = 0) | D-03 |
-| R-7 | (R-6 Patch 뒤) 아이콘 끄기 | `{ REMOVE: 4 }` | D-04 |
+| R-6 | 메인 아이콘 켜기 | `{ SET_ATTR: 12, SET_TEXT: 4, INSERT: 4 }` (key가 없어 위치 비교: 0번 글자 span이 아이콘으로 바뀌고 글자 span은 1번에 새로 생김. B 단계 실제 출력으로 정정, 전 `{ INSERT: 4 }`) | D-03 |
+| R-7 | (R-6 Patch 뒤) 아이콘 끄기 | `{ SET_ATTR: 12, SET_TEXT: 4, REMOVE: 4 }` (B 단계 정정, 전 `{ REMOVE: 4 }`) | D-04 |
 | R-8 | (R-6 Patch 뒤) 종류 `♥` | `{ SET_TEXT: 4 }` | D-01 |
 | R-9 | [+ 인스턴스] | `{ INSERT: 1 }` — 경로 `[1,3]` | D-03 |
 | R-10 | b3 삭제 | `{ REMOVE: 1 }` | D-04 |
