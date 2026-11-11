@@ -16,6 +16,8 @@ import {
   inRow,
   overriddenFields,
   followingFields,
+  rgb,
+  bgOf,
 } from './mini-figma-helpers';
 import type { PropField } from './mini-figma-helpers';
 
@@ -75,12 +77,12 @@ test('QA-10 b1을 고르고 라벨을 `확인`으로 바꾸면 b1만 바뀌고(o
   for (const id of ['main', 'b2', 'b3']) expect((await classOf(page, id)).split(' ')).toContain('btn-M');
   expect(await overriddenFields(page)).toEqual(['label', 'size']);
 
-  // 색 초록: b1만 btn-green
+  // 색 초록(#05b169): b1만 배경이 초록, 메인 · b2는 #0052ff, b3는 #cf202f 그대로
   await page.getByTestId('prop-color').selectOption({ label: '초록' });
-  expect((await classOf(page, 'b1')).split(' ')).toContain('btn-green');
-  expect((await classOf(page, 'main')).split(' ')).toContain('btn-blue');
-  expect((await classOf(page, 'b2')).split(' ')).toContain('btn-blue');
-  expect((await classOf(page, 'b3')).split(' ')).toContain('btn-red');
+  expect(await bgOf(page, 'b1')).toBe(rgb('#05b169'));
+  expect(await bgOf(page, 'main')).toBe(rgb('#0052ff'));
+  expect(await bgOf(page, 'b2')).toBe(rgb('#0052ff'));
+  expect(await bgOf(page, 'b3')).toBe(rgb('#cf202f'));
   expect(await allSame(page, ALL_BUTTONS)).toBe(true);
 });
 
@@ -135,7 +137,7 @@ test('QA-13 b2 · b3 · b1을 차례로 고르면 override 칸만 색 구분 + �
   await expect(page.getByTestId('prop-reset')).toHaveCount(1);
   await expect(page.getByTestId('prop-label')).toHaveValue('취소');
   await expect(page.getByTestId('prop-size')).toHaveValue('M');
-  await expect(page.getByTestId('prop-color')).toHaveValue('blue');
+  await expect(page.getByTestId('prop-color')).toHaveValue('#0052ff');
 
   // b3 = { label: '삭제', color: 'red' } (MF-16: 라벨도 override)
   await selectOnCanvas(page, 'b3');
@@ -143,7 +145,7 @@ test('QA-13 b2 · b3 · b1을 차례로 고르면 override 칸만 색 구분 + �
   expect(await followingFields(page)).toEqual(['size', 'hasIcon', 'icon']);
   await expect(page.getByTestId('prop-reset')).toHaveCount(2);
   await expect(page.getByTestId('prop-label')).toHaveValue('삭제');
-  await expect(page.getByTestId('prop-color')).toHaveValue('red');
+  await expect(page.getByTestId('prop-color')).toHaveValue('#cf202f');
 
   // b1 = {}: 5칸 모두 「메인 따름」, ↻ 0개, 값은 메인 값
   await selectOnCanvas(page, 'b1');

@@ -17,6 +17,9 @@ import {
   blurFocus,
   pressUndo,
   pressRedo,
+  rgb,
+  bgOf,
+  colorsOf,
 } from './mini-figma-helpers';
 
 // [AI Note]: QA-19 ~ QA-25 (키보드 Undo · Redo · Delete, Dev-11). 이 스펙의 테스트는 desktop · mobile 두 프로젝트에서 모두 돈다.
@@ -25,13 +28,6 @@ import {
 /** 캔버스 버튼 하나의 class 글 */
 async function classOf(page: Page, id: string): Promise<string[]> {
   return ((await page.locator(buttonSel(id)).getAttribute('class')) ?? '').split(' ');
-}
-
-/** 메인 · b1 · b2 · b3 버튼의 색 클래스 (btn-blue · btn-red · btn-green) */
-async function colorsOf(page: Page): Promise<string[]> {
-  const out: string[] = [];
-  for (const id of ['main', 'b1', 'b2', 'b3']) out.push((await classOf(page, id)).find((c) => c.startsWith('btn-') && ['btn-blue', 'btn-red', 'btn-green'].includes(c)) ?? '');
-  return out;
 }
 
 async function pressMetaUndo(page: Page): Promise<void> {
@@ -49,7 +45,7 @@ async function makeMainRed(page: Page): Promise<void> {
   await page.goto(URL);
   await selectOnCanvas(page, 'main');
   await page.getByTestId('prop-color').selectOption({ label: '빨강' });
-  expect(await colorsOf(page)).toEqual(['btn-red', 'btn-red', 'btn-red', 'btn-red']);
+  expect(await colorsOf(page)).toEqual([rgb('#cf202f'), rgb('#cf202f'), rgb('#cf202f'), rgb('#cf202f')]);
 }
 
 test('QA-19 메인 색을 빨강으로 바꾼 뒤 Ctrl+Z는 파랑으로, Ctrl+Shift+Z는 다시 빨강으로 되돌리고 고르기는 그대로다', async ({ page }) => {
@@ -57,14 +53,14 @@ test('QA-19 메인 색을 빨강으로 바꾼 뒤 Ctrl+Z는 파랑으로, Ctrl+S
   // b3는 처음부터 빨강(override)이라 메인 색을 바꿔도 그대로, 비교는 메인 · b1 · b2
   await pressUndo(page);
 
-  expect((await colorsOf(page)).slice(0, 3)).toEqual(['btn-blue', 'btn-blue', 'btn-blue']);
-  await expect(page.getByTestId('prop-color')).toHaveValue('blue');
+  expect((await colorsOf(page)).slice(0, 3)).toEqual([rgb('#0052ff'), rgb('#0052ff'), rgb('#0052ff')]);
+  await expect(page.getByTestId('prop-color')).toHaveValue('#0052ff');
   expect(await selectedOnCanvas(page)).toEqual(['main']);
 
   await pressRedo(page);
 
-  expect((await colorsOf(page)).slice(0, 3)).toEqual(['btn-red', 'btn-red', 'btn-red']);
-  await expect(page.getByTestId('prop-color')).toHaveValue('red');
+  expect((await colorsOf(page)).slice(0, 3)).toEqual([rgb('#cf202f'), rgb('#cf202f'), rgb('#cf202f')]);
+  await expect(page.getByTestId('prop-color')).toHaveValue('#cf202f');
   expect(await selectedOnCanvas(page)).toEqual(['main']);
 });
 
@@ -72,12 +68,12 @@ test('QA-20 Meta+Z · Meta+Shift+Z(맥의 Cmd)도 QA-19와 같다', async ({ pag
   await makeMainRed(page);
 
   await pressMetaUndo(page);
-  expect((await colorsOf(page)).slice(0, 3)).toEqual(['btn-blue', 'btn-blue', 'btn-blue']);
-  await expect(page.getByTestId('prop-color')).toHaveValue('blue');
+  expect((await colorsOf(page)).slice(0, 3)).toEqual([rgb('#0052ff'), rgb('#0052ff'), rgb('#0052ff')]);
+  await expect(page.getByTestId('prop-color')).toHaveValue('#0052ff');
 
   await pressMetaRedo(page);
-  expect((await colorsOf(page)).slice(0, 3)).toEqual(['btn-red', 'btn-red', 'btn-red']);
-  await expect(page.getByTestId('prop-color')).toHaveValue('red');
+  expect((await colorsOf(page)).slice(0, 3)).toEqual([rgb('#cf202f'), rgb('#cf202f'), rgb('#cf202f')]);
+  await expect(page.getByTestId('prop-color')).toHaveValue('#cf202f');
   expect(await selectedOnCanvas(page)).toEqual(['main']);
 });
 
@@ -162,22 +158,20 @@ test('QA-23 새 수정을 하면 다시 하기가 버려진다 (Undo 두 번 →
 
   await pressUndo(page);
   await pressUndo(page);
-  const afterUndo = await classOf(page, 'main');
-  expect(afterUndo).toContain('btn-M');
-  expect(afterUndo).toContain('btn-blue');
+  expect(await classOf(page, 'main')).toContain('btn-M');
+  expect(await bgOf(page, 'main')).toBe(rgb('#0052ff'));
 
   await page.getByTestId('prop-label').fill('새');
   await pressRedo(page);
 
   // 다시 하기가 버려져서 색 파랑 · 크기 M 그대로, 라벨 `새`
-  const main = await classOf(page, 'main');
-  expect(main).toContain('btn-blue');
-  expect(main).toContain('btn-M');
+  expect(await bgOf(page, 'main')).toBe(rgb('#0052ff'));
+  expect(await classOf(page, 'main')).toContain('btn-M');
   expect((await canvasLabels(page))[0]).toBe('새');
 
   await pressUndo(page);
   expect((await canvasLabels(page))[0]).toBe('버튼');
-  expect(await classOf(page, 'main')).toContain('btn-blue');
+  expect(await bgOf(page, 'main')).toBe(rgb('#0052ff'));
 });
 
 test('QA-24 추가를 Undo하면 b4가 사라지고 선택이 풀리며, 고르기는 기록에 없어서 다음 Undo는 색 수정 한 단계만 되돌린다', async ({ page }) => {
@@ -196,13 +190,13 @@ test('QA-24 추가를 Undo하면 b4가 사라지고 선택이 풀리며, 고르�
   // b2 색을 바꾼 뒤 b1 · b3를 차례로 고르고(고르기만) Undo
   await selectOnCanvas(page, 'b2');
   await page.getByTestId('prop-color').selectOption({ label: '초록' });
-  expect(await classOf(page, 'b2')).toContain('btn-green');
+  expect(await bgOf(page, 'b2')).toBe(rgb('#05b169'));
   await selectOnCanvas(page, 'b1');
   await selectOnCanvas(page, 'b3');
 
   await pressUndo(page);
 
-  expect(await classOf(page, 'b2')).toContain('btn-blue');
+  expect(await bgOf(page, 'b2')).toBe(rgb('#0052ff'));
   // 고르기는 기록에 없으므로 고른 것은 b3 그대로 (b1으로 돌아가지 않음)
   expect(await selectedOnCanvas(page)).toEqual(['b3']);
   expect(await selectedInLayer(page)).toEqual(['b3']);
@@ -239,19 +233,19 @@ test('QA-29 메인 라벨 `새` 입력 후 색을 빨강으로 바꾸고 Ctrl+Z�
   await page.getByTestId('prop-label').fill('새');
   await page.getByTestId('prop-color').selectOption({ label: '빨강' });
   expect((await canvasLabels(page))[0]).toBe('새');
-  expect(await classOf(page, 'main')).toContain('btn-red');
+  expect(await bgOf(page, 'main')).toBe(rgb('#cf202f'));
   // [AI Note]: 위에서 다른 것을 다시 고르지 않는다 — 라벨 입력칸 값이 프로그램으로 다시 쓰이지 않아 브라우저 기본 글자 되돌리기 기록이 남은 채로 Ctrl+Z가 겹치는지 보려는 것
 
   await pressUndo(page);
   expect((await canvasLabels(page))[0], '색만 되돌아가고 글자는 그대로').toBe('새');
-  expect(await classOf(page, 'main')).toContain('btn-blue');
+  expect(await bgOf(page, 'main')).toBe(rgb('#0052ff'));
 
   await pressRedo(page);
-  expect(await classOf(page, 'main')).toContain('btn-red');
+  expect(await bgOf(page, 'main')).toBe(rgb('#cf202f'));
   expect((await canvasLabels(page))[0]).toBe('새');
 
   await pressUndo(page);
-  expect(await classOf(page, 'main')).toContain('btn-blue');
+  expect(await bgOf(page, 'main')).toBe(rgb('#0052ff'));
   expect((await canvasLabels(page))[0], '한 단계만').toBe('새');
 
   await pressUndo(page);

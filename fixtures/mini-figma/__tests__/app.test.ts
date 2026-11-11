@@ -5,6 +5,7 @@ import type { FunctionComponent } from '@mini-react/react-reconciler';
 import type { Patch, Path, StateHook, VNode } from '@mini-react/shared';
 import { App } from '../App';
 import { INITIAL_DOC } from '../model';
+import { textColorFor } from '../color';
 import { EMPTY_UNDO } from '../undo';
 import type { UndoState } from '../undo';
 
@@ -98,6 +99,18 @@ const slot = (index: number): unknown => (instance.hooks[index] as StateHook).va
 const layerNames = (): string[] =>
   Array.from(root.querySelectorAll('[data-testid="layer-item"] [data-testid="layer-name"]')).map((el) => el.textContent ?? '');
 
+/** `#rrggbb` → jsdom이 style에서 돌려주는 `rgb(r, g, b)` 글 */
+const rgb = (hex: string): string => {
+  const n = parseInt(hex.slice(1), 16);
+  return `rgb(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255})`;
+};
+/** 버튼의 배경색 · 글자색 (색은 클래스가 아니라 인라인 style, FD-23) */
+const bgOf = (id: string): string => buttonOf(id).style.getPropertyValue('background-color');
+const fgOf = (id: string): string => buttonOf(id).style.getPropertyValue('color');
+const bgs = (): string[] => ['main', 'b1', 'b2', 'b3'].map(bgOf);
+/** 한 patch 목록에서 캔버스 접두 안 SET_STYLE 줄만 */
+const canvasStyles = (patches: readonly Patch[]): Patch[] => patches.filter((p) => p.kind === 'SET_STYLE' && startsWith(p.path, CANVAS_PREFIX));
+
 /** document의 addEventListener · removeEventListener 호출 기록 (render() 전에 걸어야 처음 등록까지 잡힌다 — 1회차 NON-BLOCKING 7) */
 let addSpy: MockInstance;
 let removeSpy: MockInstance;
@@ -161,10 +174,13 @@ describe('시작 화면 (MF-16 · MF-04)', () => {
     expect(labels()).toEqual(['버튼', '버튼', '취소', '삭제']);
   });
 
-  it('Button에 메인 값(크기 M · 파랑 · 아이콘 없음)이 들어가고 b3만 색이 빨강이다', () => {
+  it('Button에 메인 값(크기 M · 파랑 · 아이콘 없음)이 들어가고 b3만 색이 빨강이다 — 색은 style(배경 · 글자색)로 칠하고 클래스에 색 이름이 없다 (FD-23 · 24)', () => {
     const classes = buttons().map((b) => b.className);
     for (const c of classes) expect(c.split(' ')).toContain('btn-M');
-    expect(classes.map((c) => c.split(' ').find((x) => x.startsWith('btn-') && x !== 'btn-M'))).toEqual(['btn-blue', 'btn-blue', 'btn-blue', 'btn-red']);
+    for (const c of classes) expect(c).not.toMatch(/btn-(blue|red|green)/);
+    expect(bgs()).toEqual([rgb('#0052ff'), rgb('#0052ff'), rgb('#0052ff'), rgb('#cf202f')]);
+    expect(bgs()).toEqual(['rgb(0, 82, 255)', 'rgb(0, 82, 255)', 'rgb(0, 82, 255)', 'rgb(207, 32, 47)']);
+    for (const id of ['main', 'b1', 'b2', 'b3']) expect(fgOf(id), `${id} 글자색`).toBe('rgb(255, 255, 255)');
     expect(root.querySelectorAll('[data-testid="btn-icon"]')).toHaveLength(0);
   });
 
@@ -273,7 +289,7 @@ describe('메인 속성 편집 (MF-14 · MF-15 · P2-10 · D-01 ~ D-04) — patc
     expect((byId('prop-size') as HTMLSelectElement).value).toBe('M');
     expect((byId('prop-hasicon') as HTMLInputElement).checked).toBe(false);
     expect((byId('prop-icon') as HTMLSelectElement).value).toBe('star');
-    expect((byId('prop-color') as HTMLSelectElement).value).toBe('blue');
+    expect((byId('prop-color') as HTMLSelectElement).value).toBe('#0052ff');
   });
 
   it('P-3 라벨 한 글자(`버튼!`): 캔버스 { SET_TEXT: 2 }(메인 · b1, b2 · b3는 override) · 레이어 { SET_TEXT: 1 }(b1 행 이름). 렌더 한 번', async () => {
@@ -301,11 +317,41 @@ describe('메인 속성 편집 (MF-14 · MF-15 · P2-10 · D-01 ~ D-04) — patc
     expect(buttons().every((b) => b.classList.contains('btn-L'))).toBe(true);
   });
 
-  it('P-5 색 초록: 캔버스 { SET_ATTR: 3 }(메인 · b1 · b2, b3는 빨강 override) · 레이어 { }', async () => {
-    await choose('prop-color', 'green');
-    expect(canvasCounts(instance.lastPatches)).toEqual({ SET_ATTR: 3 });
+  it('P-5 색 #05b169(초록): 캔버스 { SET_STYLE: 6 }(메인 · b1 · b2 × (배경 + 글자색 흰 → 먹), b3는 빨강 override) · 레이어 { }', async () => {
+    await choose('prop-color', '#05b169');
+    expect(canvasCounts(instance.lastPatches)).toEqual({ SET_STYLE: 6 });
     expect(layerCounts(instance.lastPatches)).toEqual({});
-    expect(buttons().map((b) => b.className.match(/btn-(blue|red|green)/)?.[0])).toEqual(['btn-green', 'btn-green', 'btn-green', 'btn-red']);
+    expect(bgs()).toEqual([rgb('#05b169'), rgb('#05b169'), rgb('#05b169'), rgb('#cf202f')]);
+    expect(['main', 'b1', 'b2', 'b3'].map(fgOf)).toEqual([rgb('#0a0b0d'), rgb('#0a0b0d'), rgb('#0a0b0d'), rgb('#ffffff')]);
+  });
+
+  it('P-5b 색 #cf202f(빨강): 캔버스 { SET_STYLE: 3 }(배경만 — 글자색은 흰 그대로, b3는 이미 #cf202f라 줄 없음) · 레이어 { }. 한 줄 필드는 property · before · after를 hex로 단언', async () => {
+    await choose('prop-color', '#cf202f');
+    expect(canvasCounts(instance.lastPatches)).toEqual({ SET_STYLE: 3 });
+    expect(layerCounts(instance.lastPatches)).toEqual({});
+    const styles = canvasStyles(instance.lastPatches);
+    expect(styles).toHaveLength(3);
+    for (const patch of styles) {
+      expect(patch.kind === 'SET_STYLE' && { property: patch.property, before: patch.before, after: patch.after }).toEqual({ property: 'background-color', before: '#0052ff', after: '#cf202f' });
+    }
+  });
+
+  it('색을 바꿔도 버튼 노드는 같은 참조이고 class 글이 그대로다', async () => {
+    const held = buttons();
+    const classes = held.map((b) => b.className);
+    await choose('prop-color', '#05b169');
+    expect(buttons()).toEqual(held);
+    expect(buttons().map((b) => b.className)).toEqual(classes);
+  });
+
+  it('글자색은 배경에 따라 textColorFor 규칙을 따른다 (메인 · b1 · b2)', async () => {
+    for (const hex of ['#05b169', '#cf202f', '#0052ff']) {
+      await choose('prop-color', hex);
+      for (const id of ['main', 'b1', 'b2']) {
+        expect(bgOf(id)).toBe(rgb(hex));
+        expect(fgOf(id)).toBe(rgb(textColorFor(hex)));
+      }
+    }
   });
 
   it('P-6 아이콘 켜기: 캔버스 { INSERT: 4 }(REPLACE · REMOVE · SET_TEXT 0, 각 INSERT 경로 마지막 = 0) · 레이어 { }. 글자 <span> 노드는 같은 참조', async () => {
@@ -362,7 +408,7 @@ describe('메인 속성 편집 (MF-14 · MF-15 · P2-10 · D-01 ~ D-04) — patc
 
   it('메인을 바꿔도 doc의 instances 배열은 같은 참조다', async () => {
     const before = (slot(0) as typeof INITIAL_DOC).instances;
-    await choose('prop-color', 'green');
+    await choose('prop-color', '#05b169');
     expect((slot(0) as typeof INITIAL_DOC).instances).toBe(before);
   });
 });
@@ -389,7 +435,7 @@ describe('인스턴스 속성 편집 · override 표시 · ↻ (MF-12 ~ 15 · MF
     await click(buttonOf('b3'));
     expect(overriddenRows()).toEqual(['label', 'color']);
     expect(followRows()).toEqual(['size', 'hasIcon', 'icon']);
-    expect((byId('prop-color') as HTMLSelectElement).value).toBe('red');
+    expect((byId('prop-color') as HTMLSelectElement).value).toBe('#cf202f');
 
     await click(buttonOf('b1'));
     expect(overriddenRows()).toEqual([]);
@@ -520,9 +566,9 @@ describe('인스턴스 속성 편집 · override 표시 · ↻ (MF-12 ~ 15 · MF
     expect(labels()).toEqual(['버튼', '버튼', '취소', '버튼']);
     // 메인을 바꾸면 b3도 따라감
     await click(buttonOf('main'));
-    await choose('prop-color', 'green');
+    await choose('prop-color', '#05b169');
     await typeInto('prop-label', '저장');
-    expect(buttonOf('b3').classList.contains('btn-green')).toBe(true);
+    expect(bgOf('b3')).toBe(rgb('#05b169'));
     expect(labels()).toEqual(['저장', '저장', '취소', '저장']);
   });
 
@@ -820,18 +866,18 @@ describe('키보드 · Undo/Redo (Dev-11)', () => {
     expect(slot(1)).toBeNull();
   });
 
-  it('P-19 메인 색 빨강(1단계) → Undo = 캔버스 { SET_ATTR: 3 }(메인 · b1 · b2) · 레이어 { }, Redo로 다시 빨강', async () => {
+  it('P-19 메인 색 빨강(1단계) → Undo = 캔버스 { SET_STYLE: 3 }(메인 · b1 · b2 배경만) · 레이어 { }, Redo도 { SET_STYLE: 3 }으로 다시 빨강', async () => {
     await click(buttonOf('main'));
-    await choose('prop-color', 'red');
+    await choose('prop-color', '#cf202f');
     const before = renders;
     await undoKey();
-    expect(canvasCounts(instance.lastPatches)).toEqual({ SET_ATTR: 3 });
+    expect(canvasCounts(instance.lastPatches)).toEqual({ SET_STYLE: 3 });
     expect(layerCounts(instance.lastPatches)).toEqual({});
     expect(renders - before).toBe(1);
-    expect(['main', 'b1', 'b2', 'b3'].map((id) => buttonOf(id).classList.contains('btn-blue'))).toEqual([true, true, true, false]);
+    expect(bgs()).toEqual([rgb('#0052ff'), rgb('#0052ff'), rgb('#0052ff'), rgb('#cf202f')]);
     await redoKey();
-    expect(canvasCounts(instance.lastPatches)).toEqual({ SET_ATTR: 3 });
-    expect(['main', 'b1', 'b2', 'b3'].map((id) => buttonOf(id).classList.contains('btn-red'))).toEqual([true, true, true, true]);
+    expect(canvasCounts(instance.lastPatches)).toEqual({ SET_STYLE: 3 });
+    expect(bgs()).toEqual([rgb('#cf202f'), rgb('#cf202f'), rgb('#cf202f'), rgb('#cf202f')]);
     expect(slot(1)).toBe('main'); // 고르기는 그대로
   });
 
@@ -850,7 +896,7 @@ describe('키보드 · Undo/Redo (Dev-11)', () => {
 
   it('한 키 입력 = 한 단계: 서로 다른 세 수정 뒤 Ctrl+Z 한 번은 마지막 묶음 하나만 되돌린다. 같은 칸을 연달아 고친 것은 한 번에 되돌아간다', async () => {
     await click(buttonOf('main'));
-    await choose('prop-color', 'red'); // 단계 1
+    await choose('prop-color', '#cf202f'); // 단계 1
     await choose('prop-size', 'L'); // 단계 2
     await typeInto('prop-label', '새'); // 단계 3
     await typeInto('prop-label', '새로'); // 단계 3에 묶임
@@ -858,13 +904,13 @@ describe('키보드 · Undo/Redo (Dev-11)', () => {
     await undoKey();
     expect(labels()[0]).toBe('버튼'); // 단계 3 두 글자가 한 번에
     expect(buttonOf('main').classList.contains('btn-L')).toBe(true);
-    expect(buttonOf('main').classList.contains('btn-red')).toBe(true);
+    expect(bgOf('main')).toBe(rgb('#cf202f'));
     expect((slot(2) as UndoState).past).toHaveLength(2);
   });
 
   it('라벨 글자 칸(글자 input) 안의 keydown은 앱 동작이 없고 막지도 않는다 (Q18 ③) — 렌더 0번 · doc · history 그대로 · defaultPrevented false', async () => {
     await click(buttonOf('b2'));
-    await choose('prop-color', 'green');
+    await choose('prop-color', '#05b169');
     const doc = slot(0);
     const history = slot(2);
     const before = renders;
@@ -886,7 +932,7 @@ describe('키보드 · Undo/Redo (Dev-11)', () => {
 
   it('선택 상자 · 체크박스 안의 Delete · Backspace는 무시하고 막지 않는다 (Q18) — 렌더 0번 · doc · history 그대로', async () => {
     await click(buttonOf('b2'));
-    await choose('prop-color', 'green');
+    await choose('prop-color', '#05b169');
     const doc = slot(0);
     const history = slot(2);
     const before = renders;
@@ -927,11 +973,11 @@ describe('키보드 · Undo/Redo (Dev-11)', () => {
 
   it('입력칸 밖(body)에서 cancelable Ctrl+Z · Ctrl+Shift+Z는 defaultPrevented true + 앱 Undo · Redo, 그 밖의 키(Delete · Escape · Ctrl+Y · Alt+Z)는 false (Q18 ①)', async () => {
     await click(buttonOf('main'));
-    await choose('prop-color', 'red');
+    await choose('prop-color', '#cf202f');
     expect(await press('z', { ctrlKey: true })).toBe(true);
-    expect(buttonOf('main').classList.contains('btn-blue')).toBe(true);
+    expect(bgOf('main')).toBe(rgb('#0052ff'));
     expect(await press('Z', { ctrlKey: true, shiftKey: true })).toBe(true);
-    expect(buttonOf('main').classList.contains('btn-red')).toBe(true);
+    expect(bgOf('main')).toBe(rgb('#cf202f'));
     // 되돌릴 것이 없어도 앱이 처리한 키이므로 막는다 (브라우저 기본 Undo가 남은 글자 기록에 적용되지 않게)
     await undoKey();
     expect(await undoKey()).toBe(true);
@@ -945,16 +991,16 @@ describe('키보드 · Undo/Redo (Dev-11)', () => {
   it('입력칸 밖 Undo는 앱 한 단계만 되돌린다 — 글자 입력 뒤 색을 바꾸고 Ctrl+Z 하면 색만 돌아가고 글자는 그대로 (QA-29 단위판)', async () => {
     await click(buttonOf('main'));
     await typeInto('prop-label', '새');
-    await choose('prop-color', 'red');
+    await choose('prop-color', '#cf202f');
     expect(await undoKey()).toBe(true);
     expect(labels()[0]).toBe('새');
-    expect(buttonOf('main').classList.contains('btn-blue')).toBe(true);
+    expect(bgOf('main')).toBe(rgb('#0052ff'));
     expect((slot(2) as UndoState).past).toHaveLength(1);
   });
 
   it('수정키 조합은 아무 일 없다 (Q17-4): Shift+Delete · Ctrl+Backspace · Alt+Delete · Meta+Backspace · Alt+Z · Ctrl+Alt+Z · Ctrl+Y · Escape · z', async () => {
     await click(buttonOf('b2'));
-    await choose('prop-color', 'green');
+    await choose('prop-color', '#05b169');
     const doc = slot(0);
     const before = renders;
     await press('Delete', { shiftKey: true });

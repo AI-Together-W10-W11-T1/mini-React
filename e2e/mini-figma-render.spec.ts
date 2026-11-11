@@ -1,4 +1,4 @@
-import { test, expect, URL, expectNoConsoleWarnings, noHorizontalScroll, canvasLabels, layerOrder } from './mini-figma-helpers';
+import { test, expect, URL, expectNoConsoleWarnings, noHorizontalScroll, canvasLabels, layerOrder, rgb, colorsOf, textOf } from './mini-figma-helpers';
 
 // [AI Note]: QA-1(시작 화면) · QA-2(세 영역 배치). 이 스펙의 테스트는 desktop · mobile 두 프로젝트에서 모두 돈다.
 
@@ -14,11 +14,13 @@ test('QA-1 처음 연다: 레이어 행 · 캔버스 버튼 · 글자 · 색 · 
   await expect(page.getByTestId('canvas-instances').getByTestId('figma-button')).toHaveCount(3);
   expect(await canvasLabels(page)).toEqual(['버튼', '버튼', '취소', '삭제']);
 
-  // 크기는 모두 M, 색은 b3만 빨강, 아이콘 없음
+  // 크기는 모두 M(클래스), 색은 값으로 칠한다(style): 배경 메인 · b1 · b2 = #0052ff, b3 = #cf202f, 글자는 4개 모두 흰색. 색 이름 클래스는 없다 (FD-23)
   const classes = await page.getByTestId('figma-button').evaluateAll((els) => els.map((el) => el.className));
   expect(classes).toHaveLength(4);
   for (const c of classes) expect(c).toContain('btn-M');
-  expect(classes.map((c) => /btn-(blue|red|green)/.exec(c)?.[0])).toEqual(['btn-blue', 'btn-blue', 'btn-blue', 'btn-red']);
+  for (const c of classes) expect(c).not.toMatch(/btn-(blue|red|green)/);
+  expect(await colorsOf(page)).toEqual([rgb('#0052ff'), rgb('#0052ff'), rgb('#0052ff'), rgb('#cf202f')]);
+  for (const id of ['main', 'b1', 'b2', 'b3']) expect(await textOf(page, id), `${id} 글자색`).toBe(rgb('#ffffff'));
   await expect(page.getByTestId('btn-icon')).toHaveCount(0);
 
   // 속성 패널은 빈 상태: <p data-testid="property-empty">, 머리 <h2>는 없음

@@ -11,9 +11,6 @@
         --label: #3b4252;
         --select: #f6ad55;
         --select-bg: #fffaf0;
-        --blue: #2b6cb0;
-        --red: #c53030;
-        --green: #2f855a;
       }
       * { box-sizing: border-box; }
       body { margin: 0; padding: 16px; font-family: system-ui, sans-serif; color: #1f2430; background: #fff; }
@@ -34,16 +31,13 @@
       .canvas-main { margin-bottom: 16px; padding-bottom: 16px; border-bottom: 1px dashed var(--line); }
       .canvas-instances { display: flex; flex-wrap: wrap; gap: 12px; }
 
-      /* 버튼: 크기 S/M/L · 색 blue/red/green은 클래스로 (인라인 style 안 씀, ④-9). 버튼은 flex 항목이라 max-width: 100% + 라벨 overflow-wrap: anywhere로
+      /* 버튼: 크기 S/M/L은 클래스, 색(배경 · 글자색)은 인라인 style (FD-23).  버튼은 flex 항목이라 max-width: 100% + 라벨 overflow-wrap: anywhere로
          공백 없는 긴 글자도 영역 안에서 줄바꿈된다 (word-break: break-word만으로는 flex 항목의 최소 너비가 안 줄어 가로 스크롤이 남음, QA-A2) */
-      .figma-button { display: inline-flex; align-items: center; gap: 6px; max-width: 100%; min-width: 0; border: 0; border-radius: 6px; color: #fff; font: inherit; cursor: pointer; text-align: left; }
+      .figma-button { display: inline-flex; align-items: center; gap: 6px; max-width: 100%; min-width: 0; border: 0; border-radius: 6px; font: inherit; cursor: pointer; text-align: left; }
       .btn-label { min-width: 0; overflow-wrap: anywhere; }
       .btn-S { padding: 4px 8px; font-size: 0.75rem; }
       .btn-M { padding: 8px 16px; font-size: 1rem; }
       .btn-L { padding: 12px 24px; font-size: 1.25rem; }
-      .btn-blue { background: var(--blue); }
-      .btn-red { background: var(--red); }
-      .btn-green { background: var(--green); }
       .figma-button.selected { outline: 3px solid var(--select); outline-offset: 2px; }
 
       .property-empty { margin: 0; color: var(--label); }

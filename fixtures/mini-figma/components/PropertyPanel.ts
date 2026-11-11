@@ -1,7 +1,7 @@
 import { h } from '@mini-react/react';
 import type { Props, VNode } from '@mini-react/shared';
 import { instanceName, isOverridden, mergeProps } from '../model';
-import type { Color, Field, IconKind, Instance, MainProps, Size } from '../model';
+import type { Field, IconKind, Instance, MainProps, Size } from '../model';
 
 interface PropertyPanelProps {
   main: MainProps;
@@ -17,7 +17,8 @@ interface PropertyPanelProps {
 
 const SIZE_OPTIONS: readonly (readonly [Size, string])[] = [['S', 'S'], ['M', 'M'], ['L', 'L']];
 const ICON_OPTIONS: readonly (readonly [IconKind, string])[] = [['star', '★'], ['heart', '♥']];
-const COLOR_OPTIONS: readonly (readonly [Color, string])[] = [['blue', '파랑'], ['red', '빨강'], ['green', '초록']];
+// [AI Note]: 임시(Dev-2): 색 칸은 아직 선택 상자다. 값만 `#rrggbb`로 바뀌고 글자(파랑 · 빨강 · 초록)는 그대로 — Dev-3에서 팔레트 판으로 교체되며 지워진다.
+const COLOR_OPTIONS: readonly (readonly [string, string])[] = [['#0052ff', '파랑'], ['#cf202f', '빨강'], ['#05b169', '초록']];
 
 /** 인스턴스를 골랐을 때만 쓰는 정보: 어느 칸이 override인가 + ↻ 누르기 */
 interface OverrideInfo {

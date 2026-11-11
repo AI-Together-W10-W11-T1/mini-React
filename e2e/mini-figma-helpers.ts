@@ -59,6 +59,33 @@ export async function titleText(page: Page): Promise<string> {
 }
 
 // ---------------------------------------------------------------------------
+// 색 읽기 (FD-23: 버튼은 클래스가 아니라 style로 칠한다 → 클래스 대신 computed style을 값으로 읽는다)
+// ---------------------------------------------------------------------------
+
+/** `#rrggbb` → `rgb(r, g, b)` (computed style이 돌려주는 글과 같은 모양) */
+export function rgb(hex: string): string {
+  const n = parseInt(hex.slice(1), 16);
+  return `rgb(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255})`;
+}
+
+/** 캔버스 버튼 하나의 배경색 (`rgb(r, g, b)`) */
+export function bgOf(page: Page, id: string): Promise<string> {
+  return page.locator(buttonSel(id)).evaluate((el) => getComputedStyle(el).backgroundColor);
+}
+
+/** 캔버스 버튼 하나의 글자색 (`rgb(r, g, b)`) */
+export function textOf(page: Page, id: string): Promise<string> {
+  return page.locator(buttonSel(id)).evaluate((el) => getComputedStyle(el).color);
+}
+
+/** 메인 · b1 · b2 · b3 버튼의 배경색 (위치 순) */
+export async function colorsOf(page: Page): Promise<string[]> {
+  const out: string[] = [];
+  for (const id of ['main', 'b1', 'b2', 'b3']) out.push(await bgOf(page, id));
+  return out;
+}
+
+// ---------------------------------------------------------------------------
 // 동작
 // ---------------------------------------------------------------------------
 

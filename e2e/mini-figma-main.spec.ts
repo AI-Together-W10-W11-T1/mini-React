@@ -1,5 +1,5 @@
 import type { Page } from '@playwright/test';
-import { test, expect, URL, holdNodes, sameNode, watchApp, selectOnCanvas, canvasLabels, buttonSel } from './mini-figma-helpers';
+import { test, expect, URL, holdNodes, sameNode, watchApp, selectOnCanvas, canvasLabels, buttonSel, rgb, bgOf, textOf } from './mini-figma-helpers';
 
 // [AI Note]: QA-5 ~ QA-9 (메인 속성 편집 5칸 + 아이콘). 이 스펙의 테스트는 desktop · mobile 두 프로젝트에서 모두 돈다.
 // 화면에는 patch 줄 수가 없으므로(MF-05) "바뀐 곳만 고침"은 같은 DOM 노드 + MutationObserver로 확인하고, patch 종류 · 개수는 app.test.ts가 본다.
@@ -68,15 +68,19 @@ test('QA-6 크기 선택을 `L`로 바꾸면 override 없는 4개 버튼이 모�
   expect(await allSame(page, ALL_BUTTONS)).toBe(true);
 });
 
-test('QA-7 메인 색을 `초록`으로 바꾸면 메인 · b1 · b2는 초록이고 b3는 빨강 그대로다 (이미 색을 바꿨으므로 메인이 바꿔도 영향 없음)', async ({ page }) => {
+test('QA-7 메인 색을 `초록`(#05b169)으로 바꾸면 메인 · b1 · b2는 초록(글자는 먹색)이고 b3는 빨강 그대로다 (이미 색을 바꿨으므로 메인이 바꿔도 영향 없음)', async ({ page }) => {
   await page.goto(URL);
   await selectOnCanvas(page, 'main');
   await holdNodes(page, ALL_BUTTONS);
 
   await page.getByTestId('prop-color').selectOption({ label: '초록' });
 
-  const classes = await buttonClasses(page);
-  expect(classes.map((c) => /btn-(blue|red|green)/.exec(c)?.[0])).toEqual(['btn-green', 'btn-green', 'btn-green', 'btn-red']);
+  for (const id of ['main', 'b1', 'b2']) {
+    expect(await bgOf(page, id), `${id} 배경`).toBe(rgb('#05b169'));
+    expect(await textOf(page, id), `${id} 글자 — 밝은 배경이라 먹색`).toBe(rgb('#0a0b0d'));
+  }
+  expect(await bgOf(page, 'b3')).toBe(rgb('#cf202f'));
+  expect(await textOf(page, 'b3')).toBe(rgb('#ffffff'));
   expect(await allSame(page, ALL_BUTTONS)).toBe(true);
 });
 
