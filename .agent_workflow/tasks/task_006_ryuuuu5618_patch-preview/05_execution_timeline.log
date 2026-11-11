@@ -1,2 +1,4 @@
 2026-11-11T22:41 | stage=0 | agent=master | round=- | signal=START | task_006 patch-preview (feature/figma-design 위)
 2026-11-11T22:43 | stage=0 | agent=master | round=- | signal=APPROVE | 명세 PP-01~10 (추천안 일괄 수용), 서버 PID 50900 종료
+2026-11-11T22:57 | stage=1 | agent=mr-worker | round=- | signal=UNKNOWN | - | by=hook
+2026-11-11T23:00 | stage=1 | agent=master | round=- | signal=TESTCASE_OK | 빠르게 범위 · A(구현 먼저) → B(테스트) 순서
