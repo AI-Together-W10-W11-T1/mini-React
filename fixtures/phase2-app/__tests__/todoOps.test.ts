@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { addTodo, removeTodo, toggleTodo } from '../todoOps';
+import { addTodo, moveTodo, removeTodo, toggleTodo } from '../todoOps';
 import type { TodoList } from '../todoOps';
 
 const empty: TodoList = { items: [], nextId: 1 };
@@ -91,5 +91,49 @@ describe('removeTodo — 삭제 (D-04) · 지운 번호를 다시 쓰지 않음'
 
   it('없는 id는 같은 목록 객체를 그대로 돌려준다', () => {
     expect(removeTodo(base, 'todo-99')).toBe(base);
+  });
+});
+
+describe('moveTodo — [위로] · [아래로] (Key 이동 MOVE의 재료, §5)', () => {
+  const base = deepFreeze<TodoList>({
+    items: [
+      { id: 'todo-1', text: 'a', done: false },
+      { id: 'todo-2', text: 'b', done: true },
+      { id: 'todo-3', text: 'c', done: false },
+    ],
+    nextId: 4,
+  });
+  const ids = (list: TodoList): string[] => list.items.map((t) => t.id);
+
+  it('[위로](-1)는 한 칸 앞으로, [아래로](+1)는 한 칸 뒤로 옮긴다', () => {
+    expect(ids(moveTodo(base, 'todo-3', -1))).toEqual(['todo-1', 'todo-3', 'todo-2']);
+    expect(ids(moveTodo(base, 'todo-1', 1))).toEqual(['todo-2', 'todo-1', 'todo-3']);
+    expect(ids(moveTodo(base, 'todo-2', -1))).toEqual(['todo-2', 'todo-1', 'todo-3']);
+    expect(ids(moveTodo(base, 'todo-2', 1))).toEqual(['todo-1', 'todo-3', 'todo-2']);
+  });
+
+  it('항목 객체는 그대로(같은 참조)이고 입력 목록을 고치지 않으며 nextId도 그대로다', () => {
+    const next = moveTodo(base, 'todo-3', -1);
+    expect(next.items[1]).toBe(base.items[2]);
+    expect(next.items[2]).toBe(base.items[1]);
+    expect(next.items[0]).toBe(base.items[0]);
+    expect(ids(base)).toEqual(['todo-1', 'todo-2', 'todo-3']);
+    expect(next.nextId).toBe(4);
+    expect(next.items).not.toBe(base.items);
+  });
+
+  it('경계(맨 위의 [위로] · 맨 아래의 [아래로])는 같은 목록 객체를 그대로 돌려준다 (같은 값 → 렌더 0번)', () => {
+    expect(moveTodo(base, 'todo-1', -1)).toBe(base);
+    expect(moveTodo(base, 'todo-3', 1)).toBe(base);
+  });
+
+  it('항목이 하나뿐이면 둘 다 같은 목록 객체다', () => {
+    const one = deepFreeze<TodoList>({ items: [{ id: 'todo-1', text: 'a', done: false }], nextId: 2 });
+    expect(moveTodo(one, 'todo-1', -1)).toBe(one);
+    expect(moveTodo(one, 'todo-1', 1)).toBe(one);
+  });
+
+  it('없는 id는 같은 목록 객체를 그대로 돌려준다', () => {
+    expect(moveTodo(base, 'todo-99', -1)).toBe(base);
   });
 });

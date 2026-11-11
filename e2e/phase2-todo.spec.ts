@@ -114,3 +114,44 @@ test('QA-13 카운터 · 이름 · 목록 · 할 일 입력창이 서로 섞이�
   expect(await itemTexts(page)).toEqual(['사과']);
   await expect(page.getByTestId('todo-input')).toHaveValue('배');
 });
+
+test('QA-11 `다`의 [위로] · [아래로]: 순서만 바뀌고 세 `<li>` · `<ul>` · `<li>` 안 글자 노드가 모두 같은 참조이며 DOM 변경은 `<ul>`의 childList뿐이다 (Key MOVE)', async ({ page }) => {
+  await page.goto(URL);
+  await addTodo(page, '가');
+  await addTodo(page, '나');
+  await addTodo(page, '다');
+  const daText = { sel: inItem('todo-3', 'todo-text'), child: 0 };
+  await holdNodes(page, {
+    ga: itemSel('todo-1'),
+    na: itemSel('todo-2'),
+    da: itemSel('todo-3'),
+    ul: '[data-testid="todo-list"]',
+    daText,
+  });
+  const watcher = await watchApp(page);
+
+  await page.locator(inItem('todo-3', 'todo-up')).click();
+
+  expect(await itemTexts(page)).toEqual(['가', '다', '나']);
+  for (const [name, id] of [['ga', 'todo-1'], ['na', 'todo-2'], ['da', 'todo-3']] as const) {
+    expect(await sameNode(page, name, itemSel(id)), `${name}는 같은 <li>`).toBe(true);
+  }
+  expect(await sameNode(page, 'ul', '[data-testid="todo-list"]')).toBe(true);
+  expect(await sameNode(page, 'daText', daText)).toBe(true);
+  let m = (await watcher.take()).body;
+  expect(m.characterData).toBe(0);
+  expect(m.attributes).toBe(0);
+  expect(m.childList).toBeGreaterThan(0);
+  expect(m.targets.every((t) => t === 'childList:ul')).toBe(true);
+
+  await page.locator(inItem('todo-3', 'todo-down')).click();
+
+  expect(await itemTexts(page)).toEqual(['가', '나', '다']);
+  for (const [name, id] of [['ga', 'todo-1'], ['na', 'todo-2'], ['da', 'todo-3']] as const) {
+    expect(await sameNode(page, name, itemSel(id)), `${name}는 여전히 같은 <li>`).toBe(true);
+  }
+  expect(await sameNode(page, 'daText', daText)).toBe(true);
+  m = (await watcher.take()).body;
+  expect(m.characterData + m.attributes).toBe(0);
+  expect(m.targets.every((t) => t === 'childList:ul')).toBe(true);
+});

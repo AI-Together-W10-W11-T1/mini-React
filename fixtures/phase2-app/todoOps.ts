@@ -30,3 +30,17 @@ export function removeTodo(list: TodoList, id: string): TodoList {
   if (!list.items.some((t) => t.id === id)) return list;
   return { items: list.items.filter((t) => t.id !== id), nextId: list.nextId };
 }
+
+/**
+ * 그 항목을 한 칸 옮긴다. delta = -1([위로]) · +1([아래로]).
+ * 경계(맨 위의 [위로] · 맨 아래의 [아래로])이거나 없는 id면 같은 목록 객체를 그대로 돌려준다 (같은 값 → 다시 그리지 않음).
+ * 항목 객체는 그대로 두고 순서만 바꾸므로, 화면에서는 같은 key의 `<li>`가 새로 만들어지지 않고 이동(MOVE)한다.
+ */
+export function moveTodo(list: TodoList, id: string, delta: -1 | 1): TodoList {
+  const from = list.items.findIndex((t) => t.id === id);
+  const to = from + delta;
+  if (from === -1 || to < 0 || to >= list.items.length) return list;
+  const items = [...list.items];
+  [items[from], items[to]] = [items[to], items[from]];
+  return { items, nextId: list.nextId };
+}

@@ -4,7 +4,7 @@ import { CounterPanel } from './components/CounterPanel';
 import { GreetingPanel } from './components/GreetingPanel';
 import { TodoPanel } from './components/TodoPanel';
 import { counts } from './counts';
-import { addTodo, removeTodo, toggleTodo } from './todoOps';
+import { addTodo, moveTodo, removeTodo, toggleTodo } from './todoOps';
 import type { TodoList } from './todoOps';
 
 const EMPTY_LIST: TodoList = { items: [], nextId: 1 };
@@ -64,6 +64,8 @@ export function App(): VNode {
         onDraftInput: (event: Event) => setDraft((event.target as HTMLInputElement).value),
         onAdd,
         onToggle: (id: string) => setTodoList((list) => toggleTodo(list, id)),
+        // [위로] · [아래로]: 순서만 바꾼 새 목록. 경계면 같은 목록이라 다시 그리지 않는다
+        onMove: (id: string, delta: -1 | 1) => setTodoList((list) => moveTodo(list, id, delta)),
         onRemove: (id: string) => setTodoList((list) => removeTodo(list, id)),
       }),
     ),

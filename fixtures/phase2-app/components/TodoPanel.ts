@@ -11,6 +11,7 @@ interface TodoPanelProps {
   onDraftInput: (event: Event) => void;
   onAdd: () => void;
   onToggle: (id: string) => void;
+  onMove: (id: string, delta: -1 | 1) => void;
   onRemove: (id: string) => void;
 }
 
@@ -18,7 +19,7 @@ interface TodoPanelProps {
 // 항목마다 `h(TodoRow, { key: id })`로 key를 준다 (id는 루트가 만든 `todo-N`, 지운 번호 재사용 안 함).
 // 요약 글(전체 n개 · 완료 m개)은 루트의 useMemo 결과를 props로 받아 보여 주기만 한다.
 export function TodoPanel(props: Props): VNode {
-  const { items, total, done, draft, onDraftInput, onAdd, onToggle, onRemove } = props as unknown as TodoPanelProps;
+  const { items, total, done, draft, onDraftInput, onAdd, onToggle, onMove, onRemove } = props as unknown as TodoPanelProps;
   return h(
     'section',
     { class: 'panel', 'data-testid': 'todo-panel' },
@@ -42,6 +43,8 @@ export function TodoPanel(props: Props): VNode {
               text: todo.text,
               done: todo.done,
               onToggle: () => onToggle(todo.id),
+              onUp: () => onMove(todo.id, -1),
+              onDown: () => onMove(todo.id, 1),
               onRemove: () => onRemove(todo.id),
             }),
           ),

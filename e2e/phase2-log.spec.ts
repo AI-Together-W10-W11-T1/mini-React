@@ -19,13 +19,16 @@ test('QA-12 목록이 안 바뀌면 memo를 다시 계산하지 않고(a), 목�
   await expect(summary).toHaveText('전체 2개 · 완료 0개');
   await page.getByTestId('todo-input').fill('');
 
-  // (b) 체크 · 삭제: 한 동작마다 1씩, 요약이 맞다
+  // (b) 체크 · [위로] · 삭제: 한 동작마다 1씩, 요약이 맞다
   m = await memoCount(page);
   await page.locator(inItem('todo-1', 'todo-check')).click();
   expect(await memoCount(page)).toBe(m + 1);
   await expect(summary).toHaveText('전체 2개 · 완료 1개');
-  await page.locator(inItem('todo-2', 'todo-remove')).click();
+  await page.locator(inItem('todo-2', 'todo-up')).click();
   expect(await memoCount(page)).toBe(m + 2);
+  await expect(summary).toHaveText('전체 2개 · 완료 1개');
+  await page.locator(inItem('todo-2', 'todo-remove')).click();
+  expect(await memoCount(page)).toBe(m + 3);
   await expect(summary).toHaveText('전체 1개 · 완료 1개');
 
   // (c) [추가] 한 번에 memo 횟수가 정확히 1 늘고(렌더 2번 중 목록이 바뀐 한 번만 다시 계산) 요약이 맞다
