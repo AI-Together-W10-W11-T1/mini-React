@@ -1,1 +1,4 @@
 2026-11-12T01:22 | stage=0 | agent=master | round=- | signal=SPEC | task_007 시작 (feature/variables from main 8d412da), 가벼운, 인터뷰 = 사용자 위임 → 추천안으로 명세 VR-01~08. 다음 = 기획(mr-worker) → 테스트 케이스 확인
+2026-11-12T01:24 | stage=1 | agent=master | round=- | signal=TEST_CASES_PREAPPROVED | 사용자 "진행시켜" (기획 진행 중) → 테스트 케이스 확인을 미리 받은 것으로 기록, 기획 끝나면 바로 개발
+2026-11-12T01:29 | stage=1 | agent=mr-worker | round=- | signal=UNKNOWN | - | by=hook
+2026-11-12T01:29 | stage=1 | agent=master | round=- | signal=PLAN_OK | 기획 PASS (Dev-1~5, QA-63~76 · A43~58 + 단위). 애매한 점 2개 = 추천안 확정(VR-04 · 05). 사용자 미커밋(App.ts · LayerPanel.ts · index.html 레이어 접기) → Dev-1 · 2(model · color · Canvas)만 먼저, Dev-3~5는 사용자 커밋 뒤
