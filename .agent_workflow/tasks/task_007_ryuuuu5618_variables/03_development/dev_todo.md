@@ -9,7 +9,7 @@
 
 ## 시작 전 확인 (작업자)
 
-- `git status`: 지금 작업 트리에 **사용자 미커밋 수정**이 있다 (`App.ts` · `components/LayerPanel.ts` · `index.html` — 레이어 접기 `[▾]`, `App`에 `layersOpen` Hook 칸 추가 중). 사용자 파일이므로 **커밋 · 되돌리기 하지 않는다**. 이 기획의 Hook 개수 말은 「새 칸을 더하지 않는다」이다 (변수는 `doc` 안이라 새 Hook 없음). 사용자 수정이 먼저 커밋돼 있으면 그 개수(7 또는 8)가 기준이고, 아니면 내 커밋에 안 섞이게 `git add`를 파일별로 한다
+- **(작업자 정정, 2026-11-12)** 사용자 레이어 접기가 a62dda5로 이미 커밋돼 **App Hook은 8칸**이다 (`[7]` layersOpen, 앞 칸 번호 그대로). 이 task는 새 칸을 더하지 않는다(변수는 `doc` 안). 변수 구역은 `LayerPanel`의 **맨 끝 자식**(`ul` 밖)이라 레이어 접기에 안 접힌다. 기획 경로 · 단언은 a62dda5 때문에 어긋난 것이 없었다 (`layer-panel` 자식 = 제목 · 메인 행 · ul + 변수 구역, `div.app` 자식 5개 · 접두 `[0,0]` ~ `[0,4]` 그대로). `rootOnlyHooks` 컴포넌트 목록은 8 → 9개
 - 사용자가 다른 창에서 `index.html` · 컴포넌트를 고칠 수 있으니 Dev마다 시작 때 `git status`를 다시 본다
 
 ## 공통 주의 (코드로 확인한 것)
@@ -98,8 +98,9 @@ e2e/mini-figma-helpers.ts        변수 도우미 (variableSel · setVariableVal
   - 깨진 기존 단언 고침: `app.test.ts` doc 키(#1), `model.test.ts` 동결 리터럴 6곳(#4), `previewDocs.test.ts` `docN`(#5)
   - 알고리즘: 명세 §5 「연결 저장 방식」(`color` 칸에 `'var:<id>'`), VR-03 「없는 id는 메인 색 → `#0052ff`」
   - 완료 근거로 남길 것: 테스트 파일 · 건수, `npx vitest run fixtures/mini-figma` 통과 수, `npx tsc --noEmit`, 커밋 해시
+  - **완료 근거 (Evidence)**: `fixtures/mini-figma/model.ts` (`Variable` · `INITIAL_VARIABLES` · `Doc.variables` · `setVariableValue`, 기존 doc 함수 6개가 `{ ...doc, … }`로 `variables` 이어받기) · `color.ts` (`varRef` · `isVarRef` · `varIdOf` · `resolveColor`), 테스트 `model.test.ts` V-1 ~ 5 · A56 + `color.test.ts` RC-1 ~ 8 (먼저 20건 실패 확인 → 통과). 깨진 기존 단언(doc 키 · 동결 리터럴 6곳 · `previewDocs` `docN`) 같은 커밋에서 고침. `npx vitest run fixtures/mini-figma` 412 passed, `npx tsc --noEmit` 오류 0, 커밋 39d34b7
 
-- [ ] **Dev-2** (`mini-figma`): 그릴 때 푼 색을 쓴다 — Canvas가 `resolveColor`로 hex를 만들어 `Button`에 넘김 [VR-03 · 06 · 08]
+- [x] **Dev-2** (`mini-figma`): 그릴 때 푼 색을 쓴다 — Canvas가 `resolveColor`로 hex를 만들어 `Button`에 넘김 [VR-03 · 06 · 08]
   - 의존: Dev-1
   - 대상 파일: `components/Canvas.ts` (`variables` prop, `draw()`의 `color: resolveColor(merged.color, variables, main.color)`, 메인은 `fallback` 없이), `App.ts` (`h(Canvas, { …, variables: doc.variables })`). `Button.ts`는 안 바꾼다
   - 테스트(먼저 실패 확인): `fixtures/mini-figma/__tests__/canvas.test.ts` (신규 — 엔진으로 `Canvas`만 그리는 작은 하니스, `previewVNode.test.ts`의 그리기 방식)
@@ -109,8 +110,9 @@ e2e/mini-figma-helpers.ts        변수 도우미 (variableSel · setVariableVal
     - `app.test.ts`: 처음 화면 버튼 4개 색이 그대로(VR-08), `slot(0)` 그대로
   - 알고리즘: 공통 주의 2 · 3 · 4 (풀기는 Canvas, 연결 정보는 doc에만)
   - 완료 근거로 남길 것: `canvas.test.ts` 건수 · `npx vitest run fixtures/mini-figma` · `npx tsc --noEmit` · 커밋 해시
+  - **완료 근거 (Evidence)**: `components/Canvas.ts`의 `draw()`가 `resolveColor(merged.color, variables, id === 'main' ? undefined : main.color)`로 hex를 만들어 `Button`에 넘김, `App.ts`가 `variables: doc.variables` 전달 (`Button.ts` 변경 없음). `__tests__/canvas.test.ts` 신규 10건 (먼저 8건 실패 확인 → 통과: 푼 색 · 글자색 · 없는 id · VP-1 ~ 4 · 6 · 11 캔버스 줄). `npx vitest run fixtures/mini-figma` 422 passed, tsc 오류 0, 커밋 a88d280
 
-- [ ] **Dev-3** (`mini-figma`): 변수 패널 — 레이어 아래 「변수」 3줄, 값을 바꾸면 `setDoc` 한 번 [VR-04 · 06]
+- [x] **Dev-3** (`mini-figma`): 변수 패널 — 레이어 아래 「변수」 3줄, 값을 바꾸면 `setDoc` 한 번 [VR-04 · 06]
   - 의존: Dev-1 · Dev-2. **ATDD**: QA-63 · 76 · A43 · A44 · A46를 `e2e/mini-figma-variables.spec.ts`에 먼저 쓰고 desktop 실패 확인
   - 대상 파일: `components/VariablePanel.ts` (신규, 순수 — 공통 주의 5 · 6), `components/LayerPanel.ts` (`variables` · `onVariableChange` prop, 끝 자식으로 `h(VariablePanel, …)`. **사용자 WIP 레이어 접기와 같은 파일 — 사용자 수정 위에 얹고 그 부분은 안 건드림**), `App.ts` (`onVariableChange` = `applyEdit(setVariableValue(doc, id, value))`, `h(LayerPanel, { …, variables: doc.variables, onVariableChange })`), `index.html` (변수 구역 CSS: 제목 · 줄 · 칩 원 · 입력칸 · hex 고정폭, mobile 가로 안 넘침, 터치 목표 ≥ 32px, 그림자 없음 · 디자인 변수 재사용)
   - 줄 구조: `li key=v.id` > `span.variable-chip`(style `background-color`) · `span.variable-name` · `input type=color`(`value`, `aria-label` = 「Primary 값」) · `span.variable-hex`. 이벤트는 `onInput`만
@@ -120,8 +122,9 @@ e2e/mini-figma-helpers.ts        변수 도우미 (variableSel · setVariableVal
     - `rootOnlyHooks.test.ts`: 컴포넌트 목록에 `VariablePanel.ts` (#3)
   - 알고리즘: 명세 VR-04 · VR-06 · Batching 결정(한 동작 = 렌더 1번)
   - 완료 근거로 남길 것: e2e 통과 수(desktop · mobile) · vitest · tsc · 커밋 해시
+  - **완료 근거 (Evidence)**: `components/VariablePanel.ts` 신규(순수, `li key=id` 3줄), `LayerPanel.ts` 맨 끝 자식으로 `h(VariablePanel, …)`, `App.ts` `onVariableChange`(Hook 칸 그대로 8칸), `index.html` 변수 구역 CSS. ATDD: `e2e/mini-figma-variables.spec.ts` QA-63 · QA-76 · A46을 먼저 써서 desktop 3건 실패 확인 → 구현 후 `npx playwright test e2e/mini-figma-variables.spec.ts` 6 passed(desktop · mobile), 기존 design · layers · render 스펙 32 passed. 단위 `app.test.ts` 변수 구역 5건(VP-10 · 11 · 12 포함) + `rootOnlyHooks.test.ts` 컴포넌트 9개. vitest 428 passed, tsc 오류 0, 커밋 374f911 (A43 · A44는 연결이 필요해 Dev-4 스펙에서 씀)
 
-- [ ] **Dev-4** (`mini-figma`): 연결 UI — 속성 패널 색 구역의 「변수」 선택 상자 · 연결 중 표시 · 연결 풀림 [VR-02 · 05 · 06]
+- [x] **Dev-4** (`mini-figma`): 연결 UI — 속성 패널 색 구역의 「변수」 선택 상자 · 연결 중 표시 · 연결 풀림 [VR-02 · 05 · 06]
   - 의존: Dev-3. **ATDD**: QA-64 ~ 71 · A47 ~ A51 · A54 · A58을 먼저 써서 실패 확인
   - 대상 파일: `components/ColorPalette.ts` (props에 `variables` · `fallback` 추가, `<select data-testid="prop-variable">`: 옵션 `''` 「없음」 + 변수들, 연결 중이면 칩 전부 `aria-pressed 'false'` · 색 입력칸 `value` = 푼 hex · 값 글자 = 변수 이름. 변수 상자 고르기 = `onPick('var:<id>')`, 「없음」 = `onPick(지금 푼 hex)`), `components/PropertyPanel.ts` (`variables` prop → `ColorPalette`에 `variables` · `fallback: main.color` 전달), `App.ts` (`h(PropertyPanel, { …, variables })`), `index.html` (상자 CSS). 연결을 위한 새 콜백 · 새 Hook 없음 (공통 주의 7). ↻는 지금 코드 그대로 (`color` 키가 있으면 override)
   - 없는 id 연결(단위에서만 가능, UI로는 못 만듦)은 연결 안 된 것처럼 그린다: 변수 상자 `없음`, 이름 글자 대신 푼 hex
@@ -131,12 +134,23 @@ e2e/mini-figma-helpers.ts        변수 도우미 (variableSel · setVariableVal
     - 깨진 기존 단언 고침: 「색 칸에 `<select>`가 없다」 → 「`<select>`는 `prop-variable` 하나뿐」(#2)
   - 알고리즘: 명세 §5 「연결 저장 방식」, VR-05
   - 완료 근거로 남길 것: e2e 통과 수 · vitest · tsc · 커밋 해시
+  - **완료 근거 (Evidence)**: `components/ColorPalette.ts`(`link` · `variables` props, `<select data-testid="prop-variable">`, 연결 중 칩 전부 pressed false · 값 글자 = 변수 이름), `PropertyPanel.ts`(푼 hex `resolveColor` + `link` 전달, 인스턴스 fallback = 메인 색), `App.ts`, `index.html`. e2e QA-64 ~ 71 · A43 · A44 · A47 ~ A51 · A54 · A58(묶음 포함)을 먼저 써 둔 뒤 구현, 변수 스펙 desktop · mobile 30 passed. 단위 `app.test.ts` VP-1 ~ 9 · A57 12건 (먼저 12건 실패 확인), 기존 「색 칸 select 없다」 단언 → 「`prop-variable` 하나뿐」. vitest 440 passed, tsc 오류 0, 커밋 8001c3b
 
-- [ ] **Dev-5** (`mini-figma`): Patch · 되돌리기 · 공격 · 회귀 마무리 [VR-06 · 07 · 08]
+- [x] **Dev-5** (`mini-figma`): Patch · 되돌리기 · 공격 · 회귀 마무리 [VR-06 · 07 · 08]
   - 의존: Dev-4. **ATDD**: QA-72 ~ 75 · A45 · A52 · A53 · A55 · A56(단위 짝)을 먼저 써서 실패 확인
   - 대상 파일: `__tests__/preview.test.ts` (RV-1 ~ 4), `__tests__/previewDocs.test.ts` (PD-6: 변수가 든 doc 사본이 칸마다 같은 참조로 돌아옴 — `previewDocs.ts` 본문 변경 없음), `__tests__/app.test.ts` (U-8 ~ : [Patch] 뒤 `variables`가 든 `slot(0)`이 [실행 취소]로 처음 doc 같은 참조 · [다시 실행]으로 Patch 때 doc 같은 참조, 연결 · 값 둘 다 복원, 렌더 1번), `e2e/mini-figma-helpers.ts` 변수 도우미, `e2e/mini-figma-variables.spec.ts` 나머지. 필요하면 `index.html` 작은 CSS
   - 회귀: `npx vitest run` 전체 · `npx tsc --noEmit` · `npx playwright test` 전체(Phase 1 · 2 + mini-figma 전 스펙, desktop · mobile) · `git diff --stat main -- packages/` 비어 있음 · `rootOnlyHooks`(Hook은 `App`만, 자식은 props만)
   - 완료 근거로 남길 것: 각 명령 결과 (건수), `git diff --stat main -- packages/` 빈 출력, 커밋 해시
+  - **완료 근거 (Evidence)**: e2e QA-72 ~ 75 · A45 · A52 · A53 · A55 (`mini-figma-variables.spec.ts`, 변수 스펙 전체 44 passed), 단위 `preview.test.ts` RV-1 ~ 4 · `previewDocs.test.ts` PD-6 · `app.test.ts` U-8(+ 편집 버림 · 무변경 Patch), `mini-figma-palette.spec.ts` QA-35 단언 정정. 깨뜨려 보기 3건: ① `resolveColor`가 `var:`를 안 풂 → QA-66 실패 ② 칩 클릭이 연결을 안 풂 → QA-68 실패 ③ `setVariableValue`가 같은 값도 새 Doc → A44 실패(렌더 예약 1번) — 각각 되돌리고 `git status` 깨끗 확인. 깨끗한 HEAD(622116d) 사본에서 `npx vitest run` 47 files 1249 passed · `npx tsc --noEmit` 오류 0 · `npx playwright test` 376 passed(desktop · mobile) · `git diff --stat main -- packages/` 빈 출력. 커밋 622116d
+
+## 작업자 정정 (개발 중 발견)
+
+- **qa_todo QA-70 · dev_todo VP-8**: 「`#f4b000`은 팔레트에 없으니 pressed 0개」는 틀렸다. `#f4b000`은 PALETTE 4번째 칩이다 → 「없음」으로 풀면 그 칩이 pressed. 단위 VP-8 · e2e QA-70 단언을 `['#f4b000']`로 썼다
+- **qa_todo 「바뀌는 기존 단언」에 빠진 e2e 1건**: `mini-figma-palette.spec.ts` QA-35 「색 칸에는 `<select>`가 없다」 → 「색 칸의 `<select>`는 `prop-variable` 하나」 (Dev-5 커밋에서 고침)
+- **A44 e2e**: 같은 값이어도 새 doc이 되면 다시 그려질 뿐 DOM 변경은 0이라 DOM 관찰만으로는 못 가린다 → 렌더 예약(`queueMicrotask` 호출 수) 0번을 함께 단언 (대조로 다른 값이면 > 0). 단위 VP-10(렌더 횟수)도 같은 것을 잡는다
+- **VP-2 · 3**: VP-3(글자색 안 바뀜) 단언은 `#0066ff`를 처음 값에서 직접 바꿀 때 SET_STYLE 3. `#f4b000` 뒤에 `#0066ff`면 글자색(먹 → 흰)도 바뀌어 6줄 (단위는 둘 다 따로 단언)
+- **VP-9 속성 패널 줄 수**: 표는 「개발에서 확인」으로 남겼는데 단언은 캔버스 SET_STYLE 1 · 상자 값 `primary` · 값 글자 `Primary` · ↻ 사라짐으로 두고 속성 패널 줄 수는 세지 않았다
+- **레이어 창 안 스크롤(QA-44)** · **mobile 변수 줄 한 줄**: 변수 줄을 `[칩 | 이름 · hex 두 줄 | 색 입력칸]` 3칸 grid로 만들어 180px 폭에서도 안 넘친다. design 스펙(QA-40 ~ 45)은 그대로 통과
 
 ## 구현 때 확인 (기획에서 못 정한 것)
 
