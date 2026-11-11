@@ -261,7 +261,7 @@ describe('Patch 기대 표 (실제 영역 patch 종류 · 개수) — R-1 ~ R-13
 });
 
 describe('뒤로 · 앞으로 (PP-06)', () => {
-  it('Patch 2번 → back · back · forward · forward 매 단계 실제 영역이 그 기록 모습, 경계 이동은 false, 테스트 영역은 그대로', async () => {
+  it('Patch 2번 → back · back · forward · forward 매 단계 실제 영역이 그 기록 모습, 경계 이동은 false, 테스트 영역은 그대로 (모듈 단위)', async () => {
     const initial = realLook();
     await selectMain();
     await typeInto('prop-label', '확인');

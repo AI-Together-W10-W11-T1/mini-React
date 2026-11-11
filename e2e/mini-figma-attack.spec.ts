@@ -230,6 +230,7 @@ test('QA-A8 라벨 글자 칸 안의 키는 앱 동작이 없고, 선택 상자 
   expect(await realBgOf(page, 'main')).toBe(rgb('#cf202f'));
   await selectOnCanvas(page, 'b2');
 
+  // [AI Note]: PP-06 변경(Dev-8) — [실행 취소]하면 테스트 영역도 파랑이 된다. appUntouched = 두 영역 모두 빨강이고 버튼 · 행 · 선택 · b2 글자는 그대로
   const appUntouched = async (where: string): Promise<void> => {
     expect(await mainBg(page), `${where}: 테스트 영역 메인 색`).toBe(rgb('#cf202f'));
     expect(await realBgOf(page, 'main'), `${where}: 실제 영역 메인 색`).toBe(rgb('#cf202f'));
@@ -239,14 +240,14 @@ test('QA-A8 라벨 글자 칸 안의 키는 앱 동작이 없고, 선택 상자 
     expect((await canvasLabels(page))[2], `${where}: b2 글자`).toBe('취소');
   };
 
-  // [AI Note]: 선택 상자 · 체크박스 안에서 Delete · Backspace는 무시, Ctrl+Z는 실제 영역 [실행 취소](실제 영역 메인 파랑), Ctrl+Shift+Z는 [다시 실행](빨강). 테스트 영역은 계속 빨강
+  // [AI Note]: 선택 상자 · 체크박스 안에서 Delete · Backspace는 무시, Ctrl+Z는 [실행 취소](두 영역 메인 파랑), Ctrl+Shift+Z는 [다시 실행](두 영역 빨강)
   const selectAndCheckbox = async (testId: string, where: string): Promise<void> => {
     await page.getByTestId(testId).focus();
     for (const key of ['Delete', 'Backspace']) await page.keyboard.press(key);
     await appUntouched(where);
     await page.keyboard.press('Control+KeyZ');
     expect(await realBgOf(page, 'main'), `${where}: Ctrl+Z → 실제 영역 [실행 취소]`).toBe(rgb('#0052ff'));
-    expect(await mainBg(page), `${where}: 테스트 영역은 그대로`).toBe(rgb('#cf202f'));
+    expect(await mainBg(page), `${where}: 테스트 영역 메인 색도 파랑 (PP-06 변경)`).toBe(rgb('#0052ff'));
     await expect(page.getByTestId('figma-button'), `${where}: 버튼`).toHaveCount(4);
     expect(await selectedOnCanvas(page), `${where}: 선택`).toEqual(['b2']);
     expect((await canvasLabels(page))[2], `${where}: b2 글자`).toBe('취소');
@@ -299,7 +300,8 @@ test('QA-A10 옛 state를 보는 키 핸들러 · 리스너 정리: Delete는 �
   await pressBack(page);
   expect((await realClassOf(page, 'main')).split(' ')).toContain('btn-M');
   expect(await realBgOf(page, 'main')).toBe(rgb('#cf202f'));
-  expect((await mainClass(page)).split(' '), '테스트 영역은 그대로 L').toContain('btn-L');
+  expect((await mainClass(page)).split(' '), '테스트 영역 메인도 btn-M (PP-06 변경, 색은 빨강 유지)').toContain('btn-M');
+  expect(await mainBg(page)).toBe(rgb('#cf202f'));
 
   // ③ 상태를 20번 넘게 바꾼다 (고르기 · 수정 섞어서): 등록 − 해제는 그대로
   for (let i = 0; i < 6; i += 1) {
@@ -314,6 +316,9 @@ test('QA-A10 옛 state를 보는 키 핸들러 · 리스너 정리: Delete는 �
   // 보조 확인: Ctrl+Shift+Z 한 번 = [다시 실행] 한 단계 (옛 렌더의 nav를 안 읽고 정확히 끝으로)
   await pressForward(page);
   expect((await realClassOf(page, 'main')).split(' ')).toContain('btn-L');
+  // PP-06 변경: Patch 안 한 편집(③의 20번 넘는 수정)은 버려지고 테스트 영역도 btn-L, b1 글자는 Patch 때 값
+  expect((await mainClass(page)).split(' '), '테스트 영역 메인도 btn-L').toContain('btn-L');
+  expect((await canvasLabels(page))[1], 'Patch 안 한 b1 글자 수정은 버려짐').toBe('버튼');
   expect(await keydownListenerCount(page)).toBe(baseline);
 });
 

@@ -7,6 +7,7 @@ import { App } from '../App';
 import { INITIAL_DOC } from '../model';
 import { PALETTE, textColorFor } from '../color';
 import { INITIAL_NAV } from '../previewNav';
+import { initialTrack } from '../previewDocs';
 import type { PreviewNav } from '../previewNav';
 
 // [AI Note]: mini-figma 앱 단위 테스트 (jsdom, render(App, root)). 화면에는 patch 목록 · 렌더 횟수를 그리지 않으므로(MF-05)
@@ -1055,7 +1056,7 @@ describe('키보드 · State History (Dev-11 + task_006)', () => {
     expect(ids()).toEqual(['b1', 'b2', 'b3']);
   });
 
-  it('Ctrl+Z · Meta+Z = 실제 영역 [실행 취소], Ctrl+Shift+Z(`Z`로 와도) · Meta+Shift+Z = [다시 실행] — 테스트 영역 · doc은 그대로 (task_006)', async () => {
+  it('Ctrl+Z · Meta+Z = 실제 영역 [실행 취소], Ctrl+Shift+Z(`Z`로 와도) · Meta+Shift+Z = [다시 실행] — 테스트 영역 · doc도 그 칸으로 (task_006 · PP-06 변경)', async () => {
     await click(buttonOf('main'));
     await choose('prop-size', 'L');
     await patchNow();
@@ -1063,13 +1064,17 @@ describe('키보드 · State History (Dev-11 + task_006)', () => {
     const doc = slot(0);
     await press('z', { metaKey: true });
     expect(realOf('main').classList.contains('btn-M')).toBe(true);
+    expect(buttonOf('main').classList.contains('btn-M'), '테스트 영역도 M').toBe(true);
+    expect(slot(0), '처음 칸 doc').toBe(INITIAL_DOC);
     await press('Z', { ctrlKey: true, shiftKey: true });
     expect(realOf('main').classList.contains('btn-L')).toBe(true);
+    expect(buttonOf('main').classList.contains('btn-L')).toBe(true);
+    expect(slot(0), 'Patch 때 doc 같은 참조').toBe(doc);
     await press('z', { metaKey: true });
     expect(realOf('main').classList.contains('btn-M')).toBe(true);
+    expect(buttonOf('main').classList.contains('btn-M')).toBe(true);
     await press('Z', { metaKey: true, shiftKey: true });
     expect(realOf('main').classList.contains('btn-L')).toBe(true);
-    // 테스트 영역 · 앱 문서는 키로 안 움직인다
     expect(buttonOf('main').classList.contains('btn-L')).toBe(true);
     expect(slot(0)).toBe(doc);
   });
@@ -1122,12 +1127,14 @@ describe('키보드 · State History (Dev-11 + task_006)', () => {
     expect(await press('z', { ctrlKey: true }, byId('prop-size'))).toBe(true);
     expect(realOf('b2').classList.contains('btn-L')).toBe(false);
     expect(realOf('b2').classList.contains('btn-M')).toBe(true);
+    expect(buttonOf('b2').classList.contains('btn-M'), '테스트 영역도 M').toBe(true);
     expect(await press('Z', { ctrlKey: true, shiftKey: true }, byId('prop-size'))).toBe(true);
     expect(realOf('b2').classList.contains('btn-L')).toBe(true);
+    expect(buttonOf('b2').classList.contains('btn-L')).toBe(true);
     expect(await press('z', { metaKey: true }, byId('prop-icon'))).toBe(true);
     expect(realOf('b2').classList.contains('btn-M')).toBe(true);
-    // 테스트 영역은 그대로 L
-    expect(buttonOf('b2').classList.contains('btn-L')).toBe(true);
+    // PP-06 변경: 테스트 영역도 마지막(z) 뒤 M
+    expect(buttonOf('b2').classList.contains('btn-M')).toBe(true);
   });
 
   it('색 입력칸(prop-color) 안의 Ctrl+Z · Ctrl+Shift+Z = 실제 영역 [실행 취소] · [다시 실행] + preventDefault, Delete · Backspace는 무시하고 막지 않는다 (④-3, Q18 ② 확장)', async () => {
@@ -1144,10 +1151,11 @@ describe('키보드 · State History (Dev-11 + task_006)', () => {
     expect(ids()).toEqual(['b1', 'b2', 'b3']);
     expect(await press('z', { ctrlKey: true }, byId('prop-color'))).toBe(true);
     expect(realBg('b2')).toBe(rgb('#0052ff'));
+    expect(bgOf('b2'), '테스트 영역 b2도 파랑 (PP-06 변경)').toBe(rgb('#0052ff'));
     expect(await press('Z', { ctrlKey: true, shiftKey: true }, byId('prop-color'))).toBe(true);
     expect(realBg('b2')).toBe(rgb('#05b169'));
     expect(slot(1)).toBe('b2');
-    expect(bgOf('b2'), '테스트 영역은 그대로').toBe(rgb('#05b169'));
+    expect(bgOf('b2'), '[다시 실행] 뒤 초록').toBe(rgb('#05b169'));
   });
 
   it('체크박스 안의 Ctrl+Z · Ctrl+Shift+Z = 실제 영역 [실행 취소] · [다시 실행] + preventDefault (Q18 ②)', async () => {
@@ -1155,10 +1163,14 @@ describe('키보드 · State History (Dev-11 + task_006)', () => {
     await toggle('prop-hasicon', true);
     await patchNow();
     expect(realIcons()).toBe(1);
+    const testIcons = (): number => root.querySelectorAll('[data-testid="btn-icon"]').length;
+    expect(testIcons()).toBe(1);
     expect(await press('z', { ctrlKey: true }, byId('prop-hasicon'))).toBe(true);
     expect(realIcons()).toBe(0);
+    expect(testIcons(), '테스트 영역 아이콘도 0 (PP-06 변경)').toBe(0);
     expect(await press('Z', { ctrlKey: true, shiftKey: true }, byId('prop-hasicon'))).toBe(true);
     expect(realIcons()).toBe(1);
+    expect(testIcons()).toBe(1);
   });
 
   it('입력칸 밖(body)에서 cancelable Ctrl+Z · Ctrl+Shift+Z는 defaultPrevented true + 실제 영역 [실행 취소] · [다시 실행], 그 밖의 키(Delete · Escape · Ctrl+Y · Alt+Z)는 false (Q18 ①)', async () => {
@@ -1299,8 +1311,9 @@ describe('실제 영역 (patch-preview, PP-01 ~ 10 · Dev-7)', () => {
     expect(slot(1)).toBeNull();
     expect(slot(2)).toBe(4);
     expect(slot(5)).toBe(INITIAL_NAV);
-    const vault = (instance.hooks[3] as MemoHook).value as { preview: unknown };
+    const vault = (instance.hooks[3] as MemoHook).value as { preview: unknown; track: unknown };
     expect(vault.preview).not.toBeNull();
+    expect(vault.track, '보관함 track = 처음 칸만 (PP-06 변경, 새 Hook 칸 없음)').toEqual(initialTrack(INITIAL_DOC));
     // 여러 번 다시 그려도 같은 보관함 · 같은 preview
     const preview = vault.preview;
     await click(buttonOf('b2'));
@@ -1362,6 +1375,7 @@ describe('실제 영역 (patch-preview, PP-01 ~ 10 · Dev-7)', () => {
     await click(backButton());
     expect(nav()).toEqual({ index: 0, size: 2 });
     expect(realLabels()).toEqual(['버튼', '버튼', '취소', '삭제']);
+    expect(labels(), '테스트 영역도 처음 글자').toEqual(['버튼', '버튼', '취소', '삭제']);
     expect(backButton().hasAttribute('disabled')).toBe(true);
     expect(forwardButton().hasAttribute('disabled')).toBe(false);
     before = renders;
@@ -1370,6 +1384,7 @@ describe('실제 영역 (patch-preview, PP-01 ~ 10 · Dev-7)', () => {
     expect(realLabels()).toEqual(['버튼', '버튼', '취소', '삭제']);
     await click(forwardButton());
     expect(realLabels()).toEqual(['확인', '확인', '취소', '삭제']);
+    expect(labels(), '[다시 실행] 뒤 테스트 영역 글자 확인').toEqual(['확인', '확인', '취소', '삭제']);
     expect(forwardButton().hasAttribute('disabled')).toBe(true);
   });
 
@@ -1407,24 +1422,43 @@ describe('실제 영역 (patch-preview, PP-01 ~ 10 · Dev-7)', () => {
     expect(realButtons().map((b) => b.className.includes('btn-M'))).toEqual([true, true, true, true]);
     expect(backButton().hasAttribute('disabled')).toBe(true);
     expect(forwardButton().hasAttribute('disabled')).toBe(false);
+    // PP-06 변경: 보관함 track을 렌더 클로저가 아니라 동기로 읽어 처음 칸까지 정확히 간다
+    expect(slot(0)).toBe(INITIAL_DOC);
+    expect(labels()).toEqual(['버튼', '버튼', '취소', '삭제']);
+    expect(buttons().map((b) => b.className.includes('btn-M'))).toEqual([true, true, true, true]);
   });
 
-  it('실행 취소한 뒤 [Patch]하면 앞쪽 기록을 버린다: nav size = index + 2, [다시 실행] 꺼짐', async () => {
+  it('실행 취소한 뒤 편집을 끼워 [Patch]하면 앞쪽 기록(과 doc 사본)을 버린다: nav size = index + 2, [다시 실행] 꺼짐 (PP-06 변경: 편집 없는 Patch는 무변경이라 기록이 안 쌓임)', async () => {
     await editLabelAndPatch('확인');
     await choose('prop-size', 'L');
     await click(patchButton());
+    const docB = slot(0);
     await click(backButton());
     expect(nav()).toEqual({ index: 1, size: 3 });
+    // 편집 없이 [Patch] = 무변경: 기록 그대로 (옛 단언은 깨짐)
+    await click(patchButton());
+    expect(nav()).toEqual({ index: 1, size: 3 });
+    expect(forwardButton().hasAttribute('disabled')).toBe(false);
+    // 편집(크기 S)을 끼운 뒤 [Patch] = 새 기록
+    await choose('prop-size', 'S');
     await click(patchButton());
     expect(nav()).toEqual({ index: 2, size: 3 });
     expect(forwardButton().hasAttribute('disabled')).toBe(true);
+    const docC = slot(0);
+    expect(docC).not.toBe(docB);
     await click(backButton());
     await click(backButton());
+    expect(slot(0), '처음 칸 doc').toBe(INITIAL_DOC);
     expect(realLabels()).toEqual(['버튼', '버튼', '취소', '삭제']);
     expect(backButton().hasAttribute('disabled')).toBe(true);
+    // 앞쪽의 원래 B(크기 L)는 어느 칸에도 없다
+    await click(forwardButton());
+    await click(forwardButton());
+    expect(slot(0)).toBe(docC);
+    expect(forwardButton().hasAttribute('disabled')).toBe(true);
   });
 
-  it('[Patch] · [실행 취소] · [다시 실행] 버튼과 단축키(Ctrl+Z · Ctrl+Shift+Z)는 같은 실제 영역 기록을 움직이고 doc · selectedId · 테스트 영역은 안 건드린다 (PP-06 · PP-10)', async () => {
+  it('[Patch] · [실행 취소] · [다시 실행] 버튼과 단축키(Ctrl+Z · Ctrl+Shift+Z)는 같은 기록을 움직이고 doc이 그 칸 사본으로 돌아가고 selectedId는 그대로다 (PP-06 변경 · PP-10)', async () => {
     await click(buttonOf('main'));
     await pick('#cf202f');
     await patchButton().click();
@@ -1445,6 +1479,7 @@ describe('실제 영역 (patch-preview, PP-01 ~ 10 · Dev-7)', () => {
     expect(await press(false)).toBe(true);
     expect(nav()).toEqual({ index: 0, size: 2 });
     expect(realBgs().slice(0, 3)).toEqual([rgb('#0052ff'), rgb('#0052ff'), rgb('#0052ff')]);
+    expect(bgs().slice(0, 3), '테스트 영역도 처음 색').toEqual(realBgs().slice(0, 3));
     expect(backButton().hasAttribute('disabled')).toBe(true);
     expect(forwardButton().hasAttribute('disabled')).toBe(false);
     // 버튼으로 다시 실행, 키로 다시 실행(끝이라 움직일 게 없음 = 막기만)
@@ -1455,7 +1490,7 @@ describe('실제 영역 (patch-preview, PP-01 ~ 10 · Dev-7)', () => {
     expect(await press(true)).toBe(true);
     expect(nav()).toBe(navAtEnd);
 
-    expect(slot(0)).toBe(doc);
+    expect(slot(0), '끝에서 Patch 때 doc 같은 참조').toBe(doc);
     expect(slot(1)).toBe(selected);
     expect(bgs()).toEqual(testBgs);
   });
@@ -1469,5 +1504,217 @@ describe('실제 영역 (patch-preview, PP-01 ~ 10 · Dev-7)', () => {
     expect(slot(0)).toBe(doc);
     expect(slot(1)).toBe('b1');
     expect(byId('property-title').textContent).toContain('버튼');
+  });
+
+  // -------------------------------------------------------------------------
+  // PP-06 변경 (Dev-8): [실행 취소] · [다시 실행]이 테스트 영역 doc도 그 칸 상태로 되돌린다 (U-1 ~ 7 · A41 · A42)
+  // -------------------------------------------------------------------------
+  const docIds = (): string[] => (slot(0) as typeof INITIAL_DOC).instances.map((it) => it.id);
+  const sameAreas = (): void => {
+    expect(labels()).toEqual(realLabels());
+    expect(buttons().map((b) => b.style.getPropertyValue('background-color'))).toEqual(realBgs());
+    expect(buttons()).toHaveLength(realButtons().length);
+  };
+  const keyZ = async (shiftKey: boolean): Promise<boolean> => {
+    const event = new KeyboardEvent('keydown', { key: 'z', ctrlKey: true, shiftKey, bubbles: true, cancelable: true });
+    document.body.dispatchEvent(event);
+    await Promise.resolve();
+    return event.defaultPrevented;
+  };
+
+  it('U-1 [Patch] 뒤 [실행 취소]: slot(0) = 처음 INITIAL_DOC 같은 참조, 테스트 영역 · 속성 패널이 그 doc 모습이고 실제 영역과 같다. [다시 실행]: slot(0) = Patch 때 doc 같은 참조', async () => {
+    await editLabelAndPatch('확인');
+    const docA = slot(0);
+    expect(docA).not.toBe(INITIAL_DOC);
+    await click(backButton());
+    expect(slot(0)).toBe(INITIAL_DOC);
+    expect(labels()).toEqual(['버튼', '버튼', '취소', '삭제']);
+    expect((byId('prop-label') as HTMLInputElement).value).toBe('버튼');
+    sameAreas();
+    await click(forwardButton());
+    expect(slot(0)).toBe(docA);
+    expect(labels()).toEqual(['확인', '확인', '취소', '삭제']);
+    expect((byId('prop-label') as HTMLInputElement).value).toBe('확인');
+    sameAreas();
+  });
+
+  it('U-2 selectedId: 되돌린 칸에도 있는 b2 · main은 그대로, 없는 b4는 null (다시 실행해도 자동으로 다시 고르지 않음)', async () => {
+    await click(buttonOf('b2'));
+    await pick('#05b169');
+    await click(patchButton());
+    await click(backButton());
+    expect(slot(1)).toBe('b2');
+    await click(forwardButton());
+    expect(slot(1)).toBe('b2');
+    await click(buttonOf('main'));
+    await choose('prop-size', 'L');
+    await click(patchButton());
+    await click(backButton());
+    expect(slot(1)).toBe('main');
+    await click(forwardButton());
+    // b4를 추가해 Patch한 뒤 b4를 고르고 [실행 취소]
+    await click(byId('add-instance'));
+    await click(patchButton());
+    await click(buttonOf('b4'));
+    expect(slot(1)).toBe('b4');
+    await click(backButton());
+    expect(slot(1), '되돌린 doc에 b4가 없다').toBeNull();
+    expect(root.querySelectorAll('.selected')).toHaveLength(0);
+    await click(forwardButton());
+    expect(slot(1), '다시 실행해도 자동으로 다시 고르지 않음').toBeNull();
+    // null은 그대로
+    await click(backButton());
+    expect(slot(1)).toBeNull();
+  });
+
+  it('U-3 nextId: slot(2)가 이동 전후 같은 숫자, 다음 [+ 인스턴스] = b5 (번호 재사용 없음)', async () => {
+    await click(byId('add-instance'));
+    await click(patchButton());
+    expect(slot(2)).toBe(5);
+    await click(backButton());
+    expect(slot(2)).toBe(5);
+    expect(docIds()).toEqual(['b1', 'b2', 'b3']);
+    await click(byId('add-instance'));
+    expect(docIds()).toEqual(['b1', 'b2', 'b3', 'b5']);
+    expect(slot(2)).toBe(6);
+  });
+
+  it('U-4 Patch 안 한 편집: [실행 취소] · [다시 실행]이 slot(0)을 사본으로 바꿔 편집이 사라진다', async () => {
+    await editLabelAndPatch('확인');
+    await typeInto('prop-label', '임시'); // Patch 안 함
+    expect(labels()[0]).toBe('임시');
+    await click(backButton());
+    expect(slot(0)).toBe(INITIAL_DOC);
+    expect(labels()).toEqual(['버튼', '버튼', '취소', '삭제']);
+    expect((byId('prop-label') as HTMLInputElement).value).toBe('버튼');
+    await typeInto('prop-label', '또임시');
+    await click(forwardButton());
+    expect(labels()).toEqual(['확인', '확인', '취소', '삭제']);
+    expect((byId('prop-label') as HTMLInputElement).value).toBe('확인');
+    sameAreas();
+  });
+
+  it('U-5 경계: 처음 · 끝 칸에서 편집만 한 상태로 [실행 취소] · [다시 실행] · Ctrl+Z · Ctrl+Shift+Z → slot(0) 같은 참조 · 렌더 0번 · 키는 preventDefault만', async () => {
+    await click(buttonOf('main'));
+    await typeInto('prop-label', '임시'); // 처음 칸 (기록 1칸)에서 편집만
+    let doc = slot(0);
+    let before = renders;
+    await click(backButton());
+    await click(forwardButton());
+    expect(await keyZ(false)).toBe(true);
+    expect(await keyZ(true)).toBe(true);
+    expect(renders - before).toBe(0);
+    expect(slot(0)).toBe(doc);
+    expect(labels()[0]).toBe('임시');
+    // 끝 칸
+    await click(patchButton());
+    await choose('prop-size', 'L');
+    doc = slot(0);
+    before = renders;
+    await click(forwardButton());
+    expect(await keyZ(true)).toBe(true);
+    expect(renders - before).toBe(0);
+    expect(slot(0)).toBe(doc);
+    expect(buttonOf('main').classList.contains('btn-L')).toBe(true);
+  });
+
+  it('U-6 무변경 Patch: [실행 취소] 뒤 편집 없이 [Patch] → slot(5) 같은 객체 · 렌더 0번 · [다시 실행] 켜짐 유지', async () => {
+    await editLabelAndPatch('확인');
+    await click(backButton());
+    const navBefore = slot(5);
+    const before = renders;
+    await click(patchButton());
+    await click(patchButton());
+    expect(slot(5)).toBe(navBefore);
+    expect(renders - before).toBe(0);
+    expect(forwardButton().hasAttribute('disabled')).toBe(false);
+    expect(slot(0)).toBe(INITIAL_DOC);
+  });
+
+  it('U-7 렌더 횟수: [실행 취소] 한 번 = setDoc · setSelectedId · setNav 배칭으로 렌더 1번, 도구 막대 patch는 버튼 꺼짐 속성(SET_ATTR)뿐', async () => {
+    await editLabelAndPatch('확인');
+    await click(byId('add-instance'));
+    await click(patchButton());
+    await click(backButton()); // index 1
+    const before = renders;
+    await click(backButton()); // index 0: 처음 칸이라 [실행 취소]가 꺼짐
+    expect(renders - before, '이동 한 번 = 렌더 1번').toBe(1);
+    expect(toolbarCounts(instance.lastPatches)).toEqual({ SET_ATTR: 1 });
+    // 선택이 풀리는 이동도 렌더 1번
+    await click(forwardButton());
+    await click(forwardButton());
+    await click(buttonOf('b4'));
+    expect(slot(1)).toBe('b4');
+    const before2 = renders;
+    await click(backButton());
+    expect(renders - before2).toBe(1);
+    expect(slot(1)).toBeNull();
+  });
+
+  it('A41 같은 틱 연타: Patch 3번 쌓고 [실행 취소]를 같은 틱에 두 번, 이어서 [다시 실행] 한 번 · 두 번 → 한 칸씩 정확히 (slot(0) 사본 같은 참조)', async () => {
+    await click(buttonOf('main'));
+    await typeInto('prop-label', '확인');
+    await click(patchButton());
+    const doc1 = slot(0);
+    await choose('prop-size', 'L');
+    await click(patchButton());
+    const doc2 = slot(0);
+    await pick('#cf202f');
+    await click(patchButton());
+    const doc3 = slot(0);
+    expect(nav()).toEqual({ index: 3, size: 4 });
+    backButton().click();
+    backButton().click();
+    await Promise.resolve();
+    expect(nav()).toEqual({ index: 1, size: 4 });
+    expect(slot(0)).toBe(doc1);
+    expect(labels()[0]).toBe('확인');
+    expect(buttonOf('main').classList.contains('btn-M')).toBe(true);
+    sameAreas();
+    expect(backButton().hasAttribute('disabled')).toBe(false);
+    expect(forwardButton().hasAttribute('disabled')).toBe(false);
+    forwardButton().click();
+    await Promise.resolve();
+    expect(nav()).toEqual({ index: 2, size: 4 });
+    expect(slot(0)).toBe(doc2);
+    sameAreas();
+    forwardButton().click();
+    forwardButton().click();
+    await Promise.resolve();
+    expect(nav()).toEqual({ index: 3, size: 4 });
+    expect(slot(0)).toBe(doc3);
+    expect(forwardButton().hasAttribute('disabled')).toBe(true);
+    sameAreas();
+  });
+
+  it('A42 한도 50: [+ 인스턴스] → [Patch] 55번 → [실행 취소]를 계속: 사본 · 두 영역 버튼 수가 맞고 정확히 49번째에 꺼진다, [다시 실행] 49번 = 끝', async () => {
+    for (let i = 0; i < 55; i++) {
+      await click(byId('add-instance'));
+      await click(patchButton());
+    }
+    expect(nav()).toEqual({ index: 49, size: 50 });
+    expect(docIds()).toHaveLength(58);
+    let undone = 0;
+    while (!backButton().hasAttribute('disabled')) {
+      await click(backButton());
+      undone++;
+      const instancesNow = (slot(0) as typeof INITIAL_DOC).instances.length;
+      expect(buttons().length - 1, `undo ${undone}: 테스트 영역`).toBe(instancesNow);
+      expect(realButtons().length - 1, `undo ${undone}: 실제 영역`).toBe(instancesNow);
+      expect(instancesNow).toBe(58 - undone);
+      if (undone > 60) throw new Error('끝나지 않음');
+    }
+    expect(undone).toBe(49);
+    // 가장 오래된 6칸이 빠졌으므로 맨 앞 = 인스턴스 3 + 6 = 9개
+    expect((slot(0) as typeof INITIAL_DOC).instances).toHaveLength(9);
+    const at = slot(0);
+    const before = renders;
+    await click(backButton());
+    expect(renders - before, '50번째 클릭은 아무 일 없음').toBe(0);
+    expect(slot(0)).toBe(at);
+    for (let i = 0; i < 49; i++) await click(forwardButton());
+    expect(forwardButton().hasAttribute('disabled')).toBe(true);
+    expect(docIds()).toHaveLength(58);
+    sameAreas();
   });
 });

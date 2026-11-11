@@ -10,8 +10,10 @@ import type { Doc, Field, MainProps } from './model';
 import { keyAction } from './keys';
 import { createPreview } from './preview';
 import type { Preview } from './preview';
-import { INITIAL_NAV, canBack, canForward, navBack, navForward, navPush } from './previewNav';
+import { INITIAL_NAV, canBack, canForward } from './previewNav';
 import type { PreviewNav } from './previewNav';
+import { initialTrack, trackBack, trackDoc, trackForward, trackPush } from './previewDocs';
+import type { DocTrack } from './previewDocs';
 
 // [AI Note]: 루트 컴포넌트. 모든 useState · useEffect · useMemo는 이 파일에서만 부른다 (MF-04 · P2-07 · P2-08).
 // 자식(Toolbar · LayerPanel · Canvas · PropertyPanel)은 props만 받는 순수 함수이고, 바꾸고 싶은 것은 루트가 내려 주는 콜백 props로 알린다 (Lifting State Up).
@@ -20,6 +22,7 @@ import type { PreviewNav } from './previewNav';
 //   selectedId = 'main' | 인스턴스 id | null (처음은 null, ④-2)
 //   nextId     = 새 인스턴스 번호 — 지운 번호를 다시 쓰지 않는다 (b4 추가 → 삭제 → 다시 추가 = b5, Q17-3)
 // patch-preview(task_006)에서 앱 편집 Undo/Redo(history 칸 · undo.ts)를 없앴다: Ctrl/Cmd+Z · Shift+Z는 이제 실제 영역 State History의 [실행 취소] · [다시 실행]다.
+// PP-06 변경: [실행 취소] · [다시 실행]은 실제 영역과 함께 테스트 영역(doc)도 그 칸 상태로 되돌린다 (PRD T-08, Phase 1과 같은 약속). 칸마다 그때의 doc 사본을 previewDocs의 DocTrack이 들고 있다.
 export function App(): VNode {
   const [doc, setDoc] = useState<Doc>(INITIAL_DOC);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -75,7 +78,8 @@ export function App(): VNode {
   //   [3] useMemo = 보관함: 한 번 만들어 계속 쓰는 같은 객체. 안에 createPreview 결과를 넣어 두는 자리이고 setter가 없어 바꿔도 렌더가 안 일어난다 (엔진에 useRef가 없어서 이렇게 한다)
   //   [4] useEffect([]) = 마운트 patch 직후 한 번: DOM에서 테스트 영역 · 실제 영역 상자 · 깜빡임 층을 찾아 createPreview를 만든다 (렌더 중에는 DOM이 아직 없다). cleanup = 보관함 비움
   //   [5] useState(nav) = 실행 취소 · 다시 실행 가능 여부 (App state, PP-09). 렌더 중 canBack · canForward로 계산해 Toolbar의 [실행 취소] [다시 실행]에 내려 준다
-  const vault = useMemo<{ preview: Preview | null }>(() => ({ preview: null }), []);
+  //       보관함에는 `track`(기록 칸마다의 doc 사본)도 함께 둔다 — 새 Hook 칸 없이 7칸 그대로. state가 아니라 상자에 두는 이유: 같은 틱 연타에서 렌더 클로저 값이 낡아도 핸들러가 늘 동기로 최신 칸을 읽고 쓰게 하려고 (Dev-5 함수형 setter 연타와 같은 목적)
+  const vault = useMemo<{ preview: Preview | null; track: DocTrack }>(() => ({ preview: null, track: initialTrack(INITIAL_DOC) }), []);
   useEffect(() => {
     const testArea = document.querySelector('[data-testid="canvas"]');
     const realArea = document.querySelector<HTMLElement>('[data-testid="real-area"]');
@@ -88,17 +92,36 @@ export function App(): VNode {
   }, []);
   const [nav, setNav] = useState<PreviewNav>(INITIAL_NAV);
 
-  // [AI Note]: [Patch] [실행 취소] [다시 실행] = 보관함의 createPreview 결과를 부르고, **기록이 실제로 움직였을 때만** nav를 바꾼다 (실제 영역 기록만 움직임, PP-06).
-  // doc · selectedId는 건드리지 않는다 — 테스트 영역 · 앱 상태는 그대로. 바뀐 게 없는 Patch · 경계 이동은 false라 setter를 안 부른다.
-  // nav는 함수형 setter로 바꾼다: 같은 틱에 연타해도 낡은 nav 값을 읽지 않고 쌓인 만큼 정확히 센다. 효과가 아직 안 돈 상태(보관함 비어 있음)면 아무것도 안 한다.
+  // [AI Note]: [Patch] = 실제 영역에 지금 테스트 영역 모습을 반영하고, **기록이 실제로 쌓였을 때만** 이 렌더의 doc(= Patch가 읽은 테스트 영역 DOM을 그린 바로 그 값)을 칸 사본으로 보관한다.
+  // 무변경 Patch(false)는 기록도 사본도 안 쌓는다. nav(state)는 버튼 꺼짐 계산용으로 보관함 track의 nav와 맞춘다 — 같은 객체면 렌더 0번.
   const onPreviewPatch = (): void => {
-    if (vault.preview?.patch()) setNav(navPush);
+    if (vault.preview?.patch()) {
+      vault.track = trackPush(vault.track, doc);
+      setNav(vault.track.nav);
+    }
+  };
+
+  // [AI Note]: [실행 취소] · [다시 실행] = 실제 영역 기록을 움직이고(PP-06), 성공하면 **테스트 영역 doc도 그 칸 사본으로 되돌린다** (PP-06 변경, T-08).
+  //   ① doc만 되돌림 (setDoc) — Patch 안 한 편집은 이 setDoc이 덮어써서 버려진다 (사용자 결정 ④)
+  //   ② selectedId는 그대로 두되, 되돌린 doc에 없는 인스턴스면 reconcileSelection이 null로 푼다 (MF-23). 함수형 setter라 같은 틱에 고른 것도 안 놓친다
+  //   ③ nextId는 setter 자체를 안 부른다 — 지운 번호를 다시 쓰지 않는다 (Q17-3)
+  // 경계(처음 · 끝)에서는 track이 같은 객체라 아무것도 안 한다 (꺼진 버튼 · 단축키로는 편집을 못 버림, 명세 「처음 · 끝에서는 꺼짐」 우선). setter 여러 개는 결정 9 B 배칭으로 렌더 1번.
+  const moveTo = (next: DocTrack): void => {
+    vault.track = next;
+    const target = trackDoc(next);
+    setDoc(target);
+    setSelectedId((prev) => reconcileSelection(prev, target));
+    setNav(next.nav);
   };
   const onPreviewBack = (): void => {
-    if (vault.preview?.back()) setNav(navBack);
+    const next = trackBack(vault.track);
+    if (next === vault.track || !vault.preview?.back()) return;
+    moveTo(next);
   };
   const onPreviewForward = (): void => {
-    if (vault.preview?.forward()) setNav(navForward);
+    const next = trackForward(vault.track);
+    if (next === vault.track || !vault.preview?.forward()) return;
+    moveTo(next);
   };
 
   // [AI Note]: 키보드 = 마운트 때 한 번이 아니라 "핸들러가 읽는 state가 바뀔 때마다" document에 다시 등록한다 (엔진 이벤트는 click · input뿐이라 keydown은 직접 등록, MF-34).

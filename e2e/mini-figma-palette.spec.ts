@@ -289,12 +289,13 @@ test('QA-A28 색 입력칸에 포커스가 있을 때: Delete · Backspace는 �
   expect((await watch.take()).body.total, 'Delete · Backspace = DOM 변경 0').toBe(0);
   await expect(input).toBeFocused();
 
-  // Ctrl+Z = 실제 영역 [실행 취소] (포커스를 안 빼고 누른다), Ctrl+Shift+Z = [다시 실행]. 테스트 영역은 그대로
+  // Ctrl+Z = [실행 취소] (포커스를 안 빼고 누른다), Ctrl+Shift+Z = [다시 실행]. PP-06 변경: 테스트 영역 b2도 파랑(메인을 따름) ↔ 초록
   await page.keyboard.press('Control+KeyZ');
   expect(await realBgOf(page, 'b2')).toBe(rgb('#0052ff'));
-  expect(await bgOf(page, 'b2')).toBe(rgb('#05b169'));
+  expect(await bgOf(page, 'b2')).toBe(rgb('#0052ff'));
   expect(await selectedOnCanvas(page)).toEqual(['b2']);
   await page.keyboard.press('Control+Shift+KeyZ');
   expect(await realBgOf(page, 'b2')).toBe(rgb('#05b169'));
+  expect(await bgOf(page, 'b2')).toBe(rgb('#05b169'));
   expect(await canvasOrder(page)).toEqual(['b1', 'b2', 'b3']);
 });
