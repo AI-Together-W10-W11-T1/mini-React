@@ -1,4 +1,4 @@
-import { test, expect, URL, holdNodes, sameNode, watchApp, renderCount, memoCount, addTodo, itemSel, inItem, itemTexts, itemIds } from './phase2-helpers';
+import { test, expect, URL, holdNodes, sameNode, watchApp, renderCount, memoCount, addTodo, itemSel, inItem, itemTexts, itemIds, counterText, patchCount, patchEventCount } from './phase2-helpers';
 
 // [AI Note]: 공격적 시나리오(QA-A1 ~ A9). 칸이 생기는 Dev마다 해당 부분을 채우고 Dev-22에서 마무리한다. 테스트 이름은 그대로다.
 
@@ -138,4 +138,46 @@ test('QA-A9 이동 뒤 핸들러: `다`의 [위로]를 두 번 → `다` [삭제
   await expect(page.getByTestId('todo-summary')).toHaveText('전체 2개 · 완료 1개');
   expect(await sameNode(page, 'ga', itemSel('todo-1'))).toBe(true);
   expect(await sameNode(page, 'na', itemSel('todo-2'))).toBe(true);
+});
+
+test('QA-A2 연타: [+1] 30번 · [+3] 10번 연타 뒤 카운터 60(30 + 10 × 3) · 렌더 61(중복 실행 없음) · 제목 `카운터 60 - Phase 2`, 이어서 `다`의 [위로] 5번 연타는 맨 위에서 멈추고 세 `<li>`는 같은 참조다', async ({ page }) => {
+  await page.goto(URL);
+
+  for (let i = 0; i < 30; i += 1) await page.getByTestId('counter-plus1').click();
+  for (let i = 0; i < 10; i += 1) await page.getByTestId('counter-plus3').click();
+
+  // 카운터 = [+1] 30번 + [+3] 10번 × 3 = 60 (qa_todo 표의 `40`은 계산 착오라 60으로 쓴다)
+  expect(await counterText(page)).toBe('60');
+  // 렌더 횟수 = 처음 1 + [+1] 30 + [+3] 10 × 3 = 61: 한 번 누르면 정확히 그만큼만 실행된다
+  expect(await renderCount(page)).toBe(61);
+  await expect(page).toHaveTitle('카운터 60 - Phase 2');
+
+  await addTodo(page, '가');
+  await addTodo(page, '나');
+  await addTodo(page, '다');
+  await holdNodes(page, { ga: itemSel('todo-1'), na: itemSel('todo-2'), da: itemSel('todo-3') });
+  for (let i = 0; i < 5; i += 1) await page.locator(inItem('todo-3', 'todo-up')).click();
+
+  expect(await itemTexts(page)).toEqual(['다', '가', '나']); // 맨 위에서 멈춘다
+  expect(await sameNode(page, 'ga', itemSel('todo-1'))).toBe(true);
+  expect(await sameNode(page, 'na', itemSel('todo-2'))).toBe(true);
+  expect(await sameNode(page, 'da', itemSel('todo-3'))).toBe(true);
+});
+
+test('QA-A6 항목이 많을 때: 20개를 추가해도 [+1]은 목록 영역 DOM 변경 0건 · `<li>` 20개 같은 참조 · DOM을 바꾸는 줄 2 · 이벤트 교체 줄 86이다', async ({ page }) => {
+  await page.goto(URL);
+  for (let i = 1; i <= 20; i += 1) await addTodo(page, `항목 ${i}`);
+  expect(await page.getByTestId('todo-item').count()).toBe(20);
+  const nodes: Record<string, string> = {};
+  for (let i = 1; i <= 20; i += 1) nodes[`li${i}`] = itemSel(`todo-${i}`);
+  await holdNodes(page, nodes);
+  const todoWatcher = await watchApp(page, 'todo-panel');
+
+  await page.getByTestId('counter-plus1').click();
+
+  expect(await counterText(page)).toBe('1');
+  expect((await todoWatcher.take()).body.total).toBe(0); // 목록 영역은 DOM 변경 0건
+  for (let i = 1; i <= 20; i += 1) expect(await sameNode(page, `li${i}`, itemSel(`todo-${i}`)), `li${i}는 같은 참조`).toBe(true);
+  expect((await patchCount(page)) - (await patchEventCount(page))).toBe(2); // 카운터 글자 · 렌더 횟수 글자
+  expect(await patchEventCount(page)).toBe(6 + 4 * 20); // 핸들러 달린 요소 수
 });

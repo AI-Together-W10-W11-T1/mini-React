@@ -1,4 +1,4 @@
-import { test, expect, URL, expectNoConsoleWarnings, noHorizontalScroll, renderCount, effectCount, memoCount, patchCount, patchEventCount, counterText } from './phase2-helpers';
+import { test, expect, URL, expectNoConsoleWarnings, noHorizontalScroll, addTodo, renderCount, effectCount, memoCount, patchCount, patchEventCount, counterText } from './phase2-helpers';
 
 // [AI Note]: QA-1(처음 화면)은 칸이 하나씩 생길 때마다(Dev-17 ① 카운터 → Dev-18 ② → Dev-19 ③ → Dev-21 ④) 확인을 늘렸고, 지금은 칸 네 개 전부 본다. 테스트 이름은 그대로다.
 
@@ -41,5 +41,26 @@ test('QA-1 페이지를 처음 연다: 칸 · 버튼 · 렌더/Patch 버튼 없�
     await expect(page.getByTestId('counter-value')).toBeInViewport();
   }
 
+  expectNoConsoleWarnings(page);
+});
+
+test('QA-A4 새로고침: 카운터 · 이름 · 목록 · 입력을 모두 바꾼 뒤 새로고침하면 전부 초기값(render 1 · effect 1 · memo 1)이고 탭 제목 · 콘솔도 처음 그대로다', async ({ page }) => {
+  await page.goto(URL);
+  await page.getByTestId('counter-plus3').click();
+  await page.getByTestId('name-input').fill('민수');
+  await addTodo(page, '사과');
+  await page.getByTestId('todo-input').fill('남은 글');
+  await expect(page).toHaveTitle('카운터 3 - Phase 2');
+
+  await page.reload();
+
+  expect(await counterText(page)).toBe('0');
+  await expect(page.getByTestId('name-input')).toHaveValue('');
+  await expect(page.getByTestId('greeting-text')).toHaveText('이름을 입력해 주세요');
+  await expect(page.getByTestId('todo-input')).toHaveValue('');
+  await expect(page.getByTestId('todo-empty')).toHaveText('할 일이 없어요');
+  await expect(page.getByTestId('todo-summary')).toHaveText('전체 0개 · 완료 0개');
+  expect([await renderCount(page), await effectCount(page), await memoCount(page), await patchCount(page), await patchEventCount(page)]).toEqual([1, 1, 1, 0, 0]);
+  await expect(page).toHaveTitle('카운터 0 - Phase 2');
   expectNoConsoleWarnings(page);
 });

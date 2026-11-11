@@ -50,20 +50,24 @@ export interface AppWatcher {
   take(): Promise<AppMutations>;
 }
 
-/** `app-root`에 MutationObserver를 심는다 */
-export async function watchApp(page: Page): Promise<AppWatcher> {
-  await page.evaluate((id) => {
-    const target = document.querySelector(`[data-testid="${id}"]`);
-    if (target === null) throw new Error(`data-testid="${id}"가 없다`);
-    const store = { observer: null as MutationObserver | null, records: [] as MutationRecord[] };
-    store.observer = new MutationObserver((list) => store.records.push(...list));
-    store.observer.observe(target, { subtree: true, childList: true, attributes: true, characterData: true });
-    (window as unknown as Record<string, unknown>).__appMut = store;
-  }, AREA);
+/** `app-root`(또는 `testId`로 고른 그 안의 칸)에 MutationObserver를 심는다 */
+export async function watchApp(page: Page, testId: string = AREA): Promise<AppWatcher> {
+  const slot = `__appMut_${testId}`;
+  await page.evaluate(
+    ({ id, key }) => {
+      const target = document.querySelector(`[data-testid="${id}"]`);
+      if (target === null) throw new Error(`data-testid="${id}"가 없다`);
+      const store = { observer: null as MutationObserver | null, records: [] as MutationRecord[] };
+      store.observer = new MutationObserver((list) => store.records.push(...list));
+      store.observer.observe(target, { subtree: true, childList: true, attributes: true, characterData: true });
+      (window as unknown as Record<string, unknown>)[key] = store;
+    },
+    { id: testId, key: slot },
+  );
   return {
     async take() {
-      return page.evaluate(() => {
-        const store = (window as unknown as { __appMut: { observer: MutationObserver; records: MutationRecord[] } }).__appMut;
+      return page.evaluate((key) => {
+        const store = (window as unknown as Record<string, { observer: MutationObserver; records: MutationRecord[] }>)[key];
         const records = [...store.records, ...store.observer.takeRecords()];
         store.records.length = 0;
         const empty = (): MutationCounts => ({ characterData: 0, attributes: 0, childList: 0, total: 0, targets: [] });
@@ -78,7 +82,7 @@ export async function watchApp(page: Page): Promise<AppWatcher> {
           side.targets.push(`${r.type}:${describe(r.target)}`);
         }
         return out;
-      });
+      }, slot);
     },
   };
 }
