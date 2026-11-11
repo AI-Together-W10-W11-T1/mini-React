@@ -20,7 +20,7 @@ import {
 } from './mini-figma-helpers';
 
 // [AI Note]: QA-19 ~ QA-25 (키보드 Undo · Redo · Delete, Dev-11). 이 스펙의 테스트는 desktop · mobile 두 프로젝트에서 모두 돈다.
-// Undo · Redo를 누르기 전에는 도우미(pressUndo · pressRedo)가 포커스를 입력칸 밖으로 뺀다 — 입력칸 안의 키는 앱이 무시하기 때문이다.
+// Undo · Redo를 누르기 전에는 도우미(pressUndo · pressRedo)가 포커스를 라벨 글자 칸 밖으로 뺀다 — 라벨 글자 칸 안의 키는 앱이 무시하기 때문이다.
 
 /** 캔버스 버튼 하나의 class 글 */
 async function classOf(page: Page, id: string): Promise<string[]> {
