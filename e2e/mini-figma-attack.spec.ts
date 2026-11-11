@@ -24,7 +24,9 @@ import {
   keydownListenerCount,
 } from './mini-figma-helpers';
 
-// [AI Note]: 공격적 시나리오 모음. 앞 Dev에서 채울 수 있는 것은 그 Dev에서 쓴다 (qa_todo 「Dev」 열): A1 · A2 = Dev-7, A3 ~ A5 = Dev-8.
+// [AI Note]: 공격적 시나리오 모음 (QA-A1 ~ A19). 앞 Dev에서 채울 수 있는 것은 그 Dev에서 썼다 (qa_todo 「Dev」 열): A1 · A2 = Dev-7, A3 ~ A5 = Dev-8, A16 = Dev-10,
+// A6 · A7 · A8 · A9 · A10 · A11 · A15 · A17 · A18 · A19 = Dev-11, A12 ~ A14 = Dev-12.
+// 입력칸 글자를 입력한 뒤 Ctrl+Z로 확인하는 시나리오(A2 · A14)는 다른 것을 골랐다 돌아와 브라우저의 글자 되돌리기 기록을 비운 뒤 누른다 — 앱 Undo의 결과임을 분명히 하려고.
 // 이 스펙의 테스트는 desktop · mobile 두 프로젝트에서 모두 돈다.
 
 test('QA-A1 특수문자 라벨: 마크업이 아니라 글자 그대로 그려지고 onerror가 실행되지 않는다', async ({ page }) => {
@@ -428,4 +430,104 @@ test('QA-A18 추가를 Undo한 뒤 다시 추가하면 번호가 이어진다: b
   await add.click();
   expect(await layerOrder(page)).toEqual(['b1', 'b2', 'b3', 'b6']);
   expect(await canvasOrder(page)).toEqual(['b1', 'b2', 'b3', 'b6']);
+});
+
+// ---------------------------------------------------------------------------
+// Dev-12: 연타 · 새로고침 · 입력 100자 (A12 · A13 · A14)
+// ---------------------------------------------------------------------------
+
+test('QA-A12 연타: [+ 인스턴스] 20번 연달아 → b4~b23이 순서대로 줄바꿈되어 가로 스크롤 없이 생기고, [↓] 5번 연타는 맨 아래에서 멈추며, Delete 3번 연타는 b2 하나만 지운다', async ({ page }) => {
+  await page.goto(URL);
+  await holdNodes(page, { btn1: buttonSel('b1'), btn2: buttonSel('b2'), btn3: buttonSel('b3'), row1: layerSel('b1') });
+  const add = page.getByTestId('add-instance');
+
+  // ① [+ 인스턴스] 20번
+  for (let i = 0; i < 20; i += 1) await add.click();
+  const expected = Array.from({ length: 23 }, (_, i) => `b${i + 1}`);
+  expect(await canvasOrder(page)).toEqual(expected);
+  expect(await layerOrder(page)).toEqual(expected);
+  for (const [name, sel] of [['btn1', buttonSel('b1')], ['btn2', buttonSel('b2')], ['btn3', buttonSel('b3')], ['row1', layerSel('b1')]] as const) {
+    expect(await sameNode(page, name, sel), `${name}은 같은 참조`).toBe(true);
+  }
+  // 캔버스 버튼 줄이 줄바꿈되어(flex-wrap) 가로 스크롤이 없고, 버튼 24개(메인 + 23) 모두 캔버스 오른쪽 끝을 넘지 않는다 (mobile 375 포함, Q17-5)
+  expect(await noHorizontalScroll(page)).toBe(true);
+  const canvas = await page.getByTestId('canvas').boundingBox();
+  if (canvas === null) throw new Error('캔버스가 안 보인다');
+  const rights = await page.getByTestId('figma-button').evaluateAll((els) => els.map((el) => el.getBoundingClientRect().right));
+  expect(rights).toHaveLength(24);
+  for (const right of rights) expect(right).toBeLessThanOrEqual(canvas.x + canvas.width + 0.5);
+
+  // ② 맨 아래 행(b23)의 [↓] 5번: 맨 아래에서 멈춘다 (아무 일 없음). b1 행 [↓] 5번: 한 칸씩 내려가 b1이 6번째로
+  for (let i = 0; i < 5; i += 1) await moveInLayer(page, 'b23', 'down');
+  expect(await canvasOrder(page)).toEqual(expected);
+  for (let i = 0; i < 5; i += 1) await moveInLayer(page, 'b1', 'down');
+  const moved = ['b2', 'b3', 'b4', 'b5', 'b6', 'b1', ...expected.slice(6)];
+  expect(await canvasOrder(page)).toEqual(moved);
+  expect(await layerOrder(page)).toEqual(moved);
+  expect(await sameNode(page, 'btn1', buttonSel('b1'))).toBe(true);
+  expect(await sameNode(page, 'row1', layerSel('b1'))).toBe(true);
+
+  // ③ b2를 고르고 Delete 3번: b2는 한 번만 지워지고 나머지 Delete는 무시된다 (다른 인스턴스가 지워지지 않음)
+  await selectOnCanvas(page, 'b2');
+  for (let i = 0; i < 3; i += 1) await page.keyboard.press('Delete');
+  expect(await canvasOrder(page)).toEqual(moved.slice(1));
+  expect(await layerOrder(page)).toEqual(moved.slice(1));
+  await expect(page.getByTestId('property-empty')).toHaveCount(1);
+  expect(await sameNode(page, 'btn3', buttonSel('b3'))).toBe(true);
+});
+
+test('QA-A13 새로고침: 고치고 추가 · 삭제 · 순서까지 한 뒤 reload하면 시작 데이터로 돌아오고 선택 · Undo 기록이 비어 있다', async ({ page }) => {
+  await page.goto(URL);
+  await selectOnCanvas(page, 'main');
+  await page.getByTestId('prop-label').fill('고침');
+  await page.getByTestId('prop-color').selectOption({ label: '초록' });
+  await page.getByTestId('add-instance').click();
+  await moveInLayer(page, 'b1', 'down');
+  await selectOnCanvas(page, 'b2');
+  await page.getByTestId('delete-instance').click();
+  expect(await canvasOrder(page)).toEqual(['b1', 'b3', 'b4']);
+
+  await page.reload();
+
+  // 시작 데이터(MF-16) 그대로, 선택 없음
+  expect(await canvasOrder(page)).toEqual(['b1', 'b2', 'b3']);
+  expect(await layerOrder(page)).toEqual(['b1', 'b2', 'b3']);
+  expect(await canvasLabels(page)).toEqual(['버튼', '버튼', '취소', '삭제']);
+  await expect(page.getByTestId('property-empty')).toHaveCount(1);
+  expect(await selectedOnCanvas(page)).toEqual([]);
+  // Undo 기록도 비어 있어 Ctrl+Z를 눌러도 아무 일 없다
+  await pressUndo(page);
+  expect(await canvasOrder(page)).toEqual(['b1', 'b2', 'b3']);
+  expect(await canvasLabels(page)).toEqual(['버튼', '버튼', '취소', '삭제']);
+  await pressRedo(page);
+  expect(await canvasOrder(page)).toEqual(['b1', 'b2', 'b3']);
+  // 번호도 처음부터 (저장 안 함): 추가하면 b4
+  await page.getByTestId('add-instance').click();
+  expect(await canvasOrder(page)).toEqual(['b1', 'b2', 'b3', 'b4']);
+});
+
+test('QA-A14 입력 100자: 한 글자씩 입력해도 입력칸 노드 · 포커스 · 커서가 유지되고 최종 글자가 그대로이며, Ctrl+Z 한 번에 `버튼`으로 돌아간다', async ({ page }) => {
+  await page.goto(URL);
+  await selectOnCanvas(page, 'main');
+  await holdNodes(page, { input: '[data-testid="prop-label"]' });
+  const input = page.getByTestId('prop-label');
+  const text = '가나다라마바사아자차'.repeat(10);
+  expect(text).toHaveLength(100);
+
+  await input.fill('');
+  await input.pressSequentially(text);
+
+  // 입력칸은 같은 노드이고 포커스를 유지하며, 커서가 끝에 계속 있었으므로 글자가 순서대로 쌓였다
+  expect(await sameNode(page, 'input', '[data-testid="prop-label"]')).toBe(true);
+  await expect(input).toBeFocused();
+  await expect(input).toHaveValue(text);
+  expect((await canvasLabels(page))[0]).toBe(text);
+  expect(await noHorizontalScroll(page)).toBe(true);
+
+  // 한 단계로 묶여 Ctrl+Z 한 번에 `버튼`. (다른 것을 골랐다 돌아와 브라우저의 글자 되돌리기 기록을 비운 뒤라 앱 Undo의 결과다)
+  await selectOnCanvas(page, 'b1');
+  await selectOnCanvas(page, 'main');
+  await pressUndo(page);
+  expect((await canvasLabels(page))[0]).toBe('버튼');
+  await expect(input).toHaveValue('버튼');
 });

@@ -82,7 +82,7 @@ export async function blurFocus(page: Page): Promise<void> {
   await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
 }
 
-/** Ctrl+Z (포커스를 먼저 뺀다). 키 연결은 Dev-11에서 들어온다 */
+/** Ctrl+Z (포커스를 먼저 뺀다 — 입력칸 안의 키는 앱이 무시하므로) */
 export async function pressUndo(page: Page): Promise<void> {
   await blurFocus(page);
   await page.keyboard.press('Control+KeyZ');
