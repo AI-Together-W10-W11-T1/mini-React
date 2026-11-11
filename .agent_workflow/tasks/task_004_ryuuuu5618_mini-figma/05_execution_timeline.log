@@ -8,3 +8,6 @@
 2026-11-11T18:11 | stage=1 | agent=mr-reviewer | round=2/3 | signal=UNKNOWN | Dev-1~12 | by=hook
 2026-11-11T18:12 | stage=1 | agent=master | round=2/3 | signal=APPROVE | 기획 2회차 APPROVE 저장, 테스트 케이스 확인 대기
 2026-11-11T18:13 | stage=1 | agent=master | round=- | signal=TESTCASE_OK | 테스트 케이스 확인 "응"
+2026-11-11T18:19 | stage=2 | agent=mr-worker | round=- | signal=UNKNOWN | Dev-1~4 | by=hook
+2026-11-11T18:21 | stage=2 | agent=mr-reviewer | round=1/3 | signal=UNKNOWN | Dev-1~4 | by=hook
+2026-11-11T18:22 | stage=2 | agent=master | round=1/3 | signal=APPROVE | 묶음 1 Dev-1~4 검수 APPROVE (NB 4)
