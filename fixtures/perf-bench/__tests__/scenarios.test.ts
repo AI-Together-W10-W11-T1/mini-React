@@ -2,8 +2,8 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { diff, resolveComponents } from '@mini-react/react-reconciler';
 import { h } from '@mini-react/react';
 import { BenchApp, describeTree, makeState } from '../benchApp';
-import { DEFAULT_ITEM_COUNT, STAGE_SCENARIOS, runStageScenario } from '../scenarios';
-import type { StageScenario } from '../scenarios';
+import { ALL_SCENARIOS, DEFAULT_ITEM_COUNT, ENGINE_SCENARIOS, STAGE_SCENARIOS, runEngineScenario, runScenarioById, runStageScenario } from '../scenarios';
+import type { EngineScenario, StageScenario } from '../scenarios';
 
 // [AI Note]: 시나리오가 "정해 둔 변경"만 정확히 일으키는지(기대한 patch 종류 · 개수), 집계 단위가 patch 목록과 맞는지,
 // 노드 수 · 항목 수가 결과에 들어가는지 본다. 시간 값은 기기마다 달라 단언하지 않는다 (형태 · 개수만).
@@ -167,5 +167,96 @@ describe('결과 형태 — 조건 · 반복 · 오류 (PRD §8.2)', () => {
     expect(row.run.metrics.total.n).toBe(0);
     expect(row.countError).toBe('changes boom');
     expect(row.dom).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Dev-26: B-06 연속 상태 변경 · B-07 개인 앱 대표 동작 (엔진 경로: setter · 이벤트 → 렌더 → diff → patch)
+// ---------------------------------------------------------------------------
+
+const engineById = (id: string): EngineScenario => {
+  const found = ENGINE_SCENARIOS.find((s) => s.id === id);
+  if (found === undefined) throw new Error(`엔진 시나리오 ${id} 없음`);
+  return found;
+};
+
+describe('B-06 연속 상태 변경 (엔진 경로, M-07)', () => {
+  it('시나리오 목록: 단계 시나리오 B-01 ~ B-05 + 엔진 시나리오 B-06 · B-07 = 7개', () => {
+    expect(ENGINE_SCENARIOS.map((s) => s.id)).toEqual(['B-06', 'B-07']);
+    expect(ALL_SCENARIOS.map((s) => s.id)).toEqual(['B-01', 'B-02', 'B-03', 'B-04', 'B-05', 'B-06', 'B-07']);
+  });
+
+  it('setter 10번 → 렌더 10번 · 최종 카운터 10 · 화면 = state (즉시 동기 정책)', () => {
+    const area = makeArea();
+    const row = runEngineScenario(area, engineById('B-06'), { warmup: 1, runs: 3 });
+    expect(row.countError).toBeNull();
+    expect(row.run.counts).toEqual({ setters: 10, renders: 10 });
+    expect(row.run.countsStable).toBe(true);
+    expect(row.stateMatches).toBe(true);
+    expect(row.run.errors).toBe(0);
+  });
+
+  it('단계별 시간(vnode · diff · patch)은 없고 전체 시간(total)만 있다 — 엔진 update() 한 덩어리', () => {
+    const row = runEngineScenario(makeArea(), engineById('B-06'), { warmup: 1, runs: 3 });
+    expect(row.phases).toBe(false);
+    expect(Object.keys(row.run.metrics)).toEqual(['total']);
+    expect(row.run.metrics.total.n).toBe(3);
+  });
+
+  it('DOM 작업: 글자 10줄(SET_TEXT)뿐, 추가 · 제거 노드 0, 노드는 전부 같은 참조 (onPatch는 집계 실행에서만 쓴다)', () => {
+    const row = runEngineScenario(makeArea(), engineById('B-06'), { warmup: 0, runs: 2 });
+    expect(row.dom).toMatchObject({ patchLines: 10, byKind: { SET_TEXT: 10 }, nodesAdded: 0, nodesRemoved: 0 });
+    expect(row.preserved).toEqual({ same: 507, targets: 507 });
+    expect(row.fixture).toMatchObject({ items: 100, nodes: 507, depth: 5 });
+  });
+});
+
+describe('B-07 개인 앱 대표 동작 (검증 페이지 App: [+1] · 입력 · 목록)', () => {
+  it('동작 13번(클릭 · 입력) → 렌더 16번이고 화면이 상태와 맞다 (카운터 3 · 이름 · 목록 순서 · 체크 · 요약)', () => {
+    const row = runEngineScenario(makeArea(), engineById('B-07'), { warmup: 1, runs: 3 });
+    expect(row.countError).toBeNull();
+    // [+1] 3번 = 3, 이름 입력 2번 = 2, [추가] 3번 = (입력 1 + 추가 2) × 3 = 9, [위로] 1 + 체크 1 = 2 → 렌더 16
+    expect(row.run.counts).toEqual({ actions: 13, renders: 16 });
+    expect(row.run.countsStable).toBe(true);
+    expect(row.stateMatches).toBe(true);
+    expect(row.run.errors).toBe(0);
+  });
+
+  it('입력창 · 카운터 등 보존 대상 7개가 모두 같은 참조로 남는다 (입력 안정성)', () => {
+    const row = runEngineScenario(makeArea(), engineById('B-07'), { warmup: 0, runs: 2 });
+    expect(row.preserved).toEqual({ same: 7, targets: 7 });
+  });
+
+  it('DOM 작업 집계는 patch 종류별 합이 patch 줄 수와 같고, 단계별 시간은 없다', () => {
+    const row = runEngineScenario(makeArea(), engineById('B-07'), { warmup: 0, runs: 2 });
+    const sum = Object.values(row.dom?.byKind ?? {}).reduce((a, b) => a + b, 0);
+    expect(sum).toBe(row.dom?.patchLines);
+    expect(row.dom?.patchLines).toBeGreaterThan(0);
+    expect(row.phases).toBe(false);
+  });
+
+  it('끝나면 영역을 비우고 탭 제목(document.title)을 원래대로 돌려 놓는다', () => {
+    const before = document.title;
+    const area = makeArea();
+    runEngineScenario(area, engineById('B-07'), { warmup: 1, runs: 2 });
+    expect(area.childNodes).toHaveLength(0);
+    expect(document.title).toBe(before);
+  });
+
+  it('처음 항목 수는 0이고 노드 수 · 깊이가 결과에 들어간다', () => {
+    const row = runEngineScenario(makeArea(), engineById('B-07'), { warmup: 0, runs: 1 });
+    expect(row.fixture.items).toBe(0);
+    expect(row.fixture.nodes).toBeGreaterThan(10);
+    expect(row.fixture.depth).toBeGreaterThan(3);
+  });
+});
+
+describe('runScenarioById — 화면이 부르는 하나의 입구', () => {
+  it('B-01 ~ B-07 아무 id나 같은 모양(BenchRow)을 돌려준다', () => {
+    for (const id of ['B-01', 'B-06'] as const) {
+      const row = runScenarioById(makeArea(), id, { warmup: 0, runs: 1, itemCount: 20 });
+      expect(row.id).toBe(id);
+      expect(row.run.runs).toBe(1);
+    }
   });
 });
