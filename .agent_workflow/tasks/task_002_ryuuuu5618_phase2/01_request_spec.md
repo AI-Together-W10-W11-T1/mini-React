@@ -60,7 +60,7 @@ Phase 2 전체(P2-01~24, T-09~16)를 Phase 1처럼 **엔진 + 검증 페이지**
 | 순서 | 확장 | 이번 task 범위 | 패키지 |
 | --- | --- | --- | --- |
 | 1 | 성능 대시보드 | `fixtures/perf-bench`: PRD §7 지표(M-01~M-07 중 측정 가능한 것) · §8.1 시나리오 B-01~B-07을 작은 공통 fixture로 반복 측정(준비 5회 · 측정 30회 이상, p50 · p95). 측정 조건(브라우저 · 기기 · 화면 크기 · 빌드 모드) 기록. 계측 패널의 DOM 변경은 측정에서 뺌. Batching 비교 시나리오는 제외 | `fixtures/perf-bench` (+ patch 관찰 콜백으로 DOM 작업 집계) |
-| 2 | Batching (**시간이 남으면**) | 알고리즘 결정 9를 A → B(`queueMicrotask`로 모아 한 번 렌더)로 승격. 할 때 `types_changelog.md`에 `[알고리즘]` 기록, 관련 테스트 다시 실행 | `scheduler` · `react-reconciler` |
+| 2 | Batching (**구현 안 함** — 2026-11-11 병합 뒤 사용자 결정 "배칭은 구현하지 말자") | 알고리즘 결정 9를 A → B(`queueMicrotask`로 모아 한 번 렌더)로 승격. 할 때 `types_changelog.md`에 `[알고리즘]` 기록, 관련 테스트 다시 실행 | `scheduler` · `react-reconciler` |
 
 ## 3. 구현 제외 범위
 - **피그마 같은 도형 편집기** — 미니 React 구현이 끝난 뒤 따로 만들 시연 앱 (사용자 결정)

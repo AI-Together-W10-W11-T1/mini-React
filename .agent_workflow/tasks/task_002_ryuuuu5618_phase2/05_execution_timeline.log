@@ -43,3 +43,4 @@
 2026-11-11T13:44 | stage=3 | agent=master | round=- | signal=PASS | 사용자 캡처 확인 완료, 5199 서버 승인 후 종료 → 3단계 통과
 2026-11-11T13:44 | stage=마무리 | agent=master | round=- | signal=PR_DRAFT | 4단계 위키는 가벼운 모드라 발표 전으로 미룸, 07_pr_body.md 초안, main 병합 승인 대기
 2026-11-11T13:48 | stage=마무리 | agent=master | round=- | signal=MERGED | 사용자 승인 후 main에 --no-ff 병합 55c18c9 (로컬, push 없음), main에서 vitest 776 · tsc 0 · playwright 154 확인. SVG는 구현 안 함(사용자 결정). task_002 끝
+2026-11-11T13:49 | stage=4 | agent=master | round=- | signal=START | Batching 구현 안 함(사용자 결정), README 표시 구간 추가, 4단계 위키 · README (task_001 · 002 함께) mr-wiki에 맡김
