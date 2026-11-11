@@ -72,6 +72,11 @@ export async function selectInLayer(page: Page, id: string): Promise<void> {
   await page.locator(`${layerSel(id)} [data-testid="layer-name"]`).click();
 }
 
+/** 레이어 행의 [↑] 또는 [↓]를 누른다 (행 고르기와는 별개 — 고르기가 안 바뀌어야 한다, ④-4) */
+export async function moveInLayer(page: Page, id: string, direction: 'up' | 'down'): Promise<void> {
+  await page.locator(`${layerSel(id)} [data-testid="layer-${direction}"]`).click();
+}
+
 /** 포커스를 입력칸 밖으로 뺀다. 늘 있는 요소를 쓰는 `activeElement.blur()` (선택이 없을 때 사라지는 property-title을 누르지 않는다) */
 export async function blurFocus(page: Page): Promise<void> {
   await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());

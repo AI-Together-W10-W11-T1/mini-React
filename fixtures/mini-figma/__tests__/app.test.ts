@@ -625,3 +625,84 @@ describe('인스턴스 추가 · 삭제 (Dev-9)', () => {
     expect((slot(0) as typeof INITIAL_DOC).instances.map((it) => it.id)).toEqual(['b2', 'b3']);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Dev-10: 순서 바꾸기 [↑] [↓] (P-15 · P-20, MF-25)
+// ---------------------------------------------------------------------------
+
+describe('순서 바꾸기 (Dev-10)', () => {
+  const moveButton = (id: string, direction: 'up' | 'down'): HTMLElement => {
+    const found = layerRow(id).querySelector<HTMLElement>(`[data-testid="layer-${direction}"]`);
+    if (found === null) throw new Error(`${id} 행에 [${direction}]가 없다`);
+    return found;
+  };
+  const order = (): (string | null)[] => buttons().slice(1).map((b) => b.getAttribute('data-id'));
+
+  it('P-15 b1 행 [↓] = 캔버스 { MOVE: 1 } · 레이어 { MOVE: 1 } (INSERT · REMOVE · REPLACE · SET_TEXT 0), 렌더 1번, 순서 b2 b1 b3', async () => {
+    const before = renders;
+    await click(moveButton('b1', 'down'));
+    expect(canvasCounts(instance.lastPatches)).toEqual({ MOVE: 1 });
+    expect(layerCounts(instance.lastPatches)).toEqual({ MOVE: 1 });
+    expect(renders - before).toBe(1);
+    expect(order()).toEqual(['b2', 'b1', 'b3']);
+    expect(layerNames()).toEqual(['취소', '버튼', '삭제']);
+  });
+
+  it('순서를 바꿔도 버튼 · 레이어 행 DOM 노드는 같은 참조다 (다시 만들지 않고 옮겨짐)', async () => {
+    const held = [buttonOf('b1'), buttonOf('b2'), buttonOf('b3'), layerRow('b1'), layerRow('b2'), layerRow('b3')];
+    await click(moveButton('b1', 'down'));
+    await click(moveButton('b3', 'up'));
+    expect(order()).toEqual(['b2', 'b3', 'b1']);
+    const now = [buttonOf('b1'), buttonOf('b2'), buttonOf('b3'), layerRow('b1'), layerRow('b2'), layerRow('b3')];
+    held.forEach((node, i) => expect(now[i]).toBe(node));
+  });
+
+  it('[↑] · [↓]는 행의 고르기를 같이 부르지 않는다 (stopPropagation): 선택이 그대로이고 selected 클래스가 안 옮겨 감', async () => {
+    await click(buttonOf('b2'));
+    await click(moveButton('b1', 'down'));
+    await click(moveButton('b3', 'up'));
+    expect(slot(1)).toBe('b2');
+    expect(root.querySelectorAll('.selected')).toHaveLength(2); // b2의 캔버스 버튼 · 레이어 행
+    expect(buttonOf('b2').classList.contains('selected')).toBe(true);
+    expect(layerRow('b2').classList.contains('selected')).toBe(true);
+  });
+
+  it('선택이 없을 때 [↓]를 눌러도 행이 골라지지 않는다', async () => {
+    await click(moveButton('b1', 'down'));
+    expect(slot(1)).toBeNull();
+  });
+
+  it('P-20 경계: 맨 위 [↑] · 맨 아래 [↓]는 눌러도 렌더 0번 · 기록 없음 · lastPatches 그대로이고 버튼은 그대로 있다 (disabled 아님)', async () => {
+    await click(moveButton('b1', 'down')); // 준비: 순서 b2 b1 b3 (패치 값은 이 렌더의 것)
+    const patchesBefore = instance.lastPatches;
+    const historyBefore = slot(2);
+    const docBefore = slot(0);
+    const before = renders;
+    await click(moveButton('b2', 'up')); // 맨 위
+    await click(moveButton('b3', 'down')); // 맨 아래
+    expect(renders - before).toBe(0);
+    expect(instance.lastPatches).toBe(patchesBefore);
+    expect(slot(2)).toBe(historyBefore);
+    expect(slot(0)).toBe(docBefore);
+    expect(order()).toEqual(['b2', 'b1', 'b3']);
+    expect(moveButton('b2', 'up').hasAttribute('disabled')).toBe(false);
+    expect(moveButton('b3', 'down').hasAttribute('disabled')).toBe(false);
+  });
+
+  it('인스턴스 행마다 [↑] [↓]가 있고 메인 행에는 없다. 순서 바꾸기는 새 단계 하나(묶음 끝)다', async () => {
+    expect(root.querySelectorAll('[data-testid="layer-up"]')).toHaveLength(3);
+    expect(root.querySelectorAll('[data-testid="layer-down"]')).toHaveLength(3);
+    expect(layerRow('main').querySelector('[data-testid="layer-up"], [data-testid="layer-down"]')).toBeNull();
+    await click(moveButton('b1', 'down'));
+    expect((slot(2) as UndoState).past).toHaveLength(1);
+    expect((slot(2) as UndoState).group).toBeNull();
+  });
+
+  it('메인 값을 바꾼 뒤에도 순서 바꾸기는 글자 변경 없이 MOVE만이다 (SET_TEXT 0)', async () => {
+    await click(buttonOf('main'));
+    await typeInto('prop-label', '저장');
+    await click(moveButton('b2', 'up'));
+    expect(canvasCounts(instance.lastPatches)).toEqual({ MOVE: 1 });
+    expect(order()).toEqual(['b2', 'b1', 'b3']);
+  });
+});

@@ -3,7 +3,7 @@ import type { VNode } from '@mini-react/shared';
 import { Canvas } from './components/Canvas';
 import { LayerPanel } from './components/LayerPanel';
 import { PropertyPanel } from './components/PropertyPanel';
-import { INITIAL_DOC, addInstance, reconcileSelection, removeInstance, resetInstanceField, setInstanceField, setMainField } from './model';
+import { INITIAL_DOC, addInstance, moveInstance, reconcileSelection, removeInstance, resetInstanceField, setInstanceField, setMainField } from './model';
 import type { Doc, Field, MainProps } from './model';
 import { EMPTY_UNDO, recordEdit } from './undo';
 import type { UndoGroup, UndoState } from './undo';
@@ -55,6 +55,10 @@ export function App(): VNode {
     setNextId(nextId + 1);
   };
 
+  // [AI Note]: [↑] [↓] = 배열에서 그 인스턴스의 자리만 바꾼다(moveInstance). 선택은 id라서 순서가 바뀌어도 그대로다 (MF-26).
+  // 경계(맨 위의 [↑] · 맨 아래의 [↓])는 같은 Doc → applyEdit가 렌더 · 기록 없이 돌려보낸다 (④-13). 새 단계 하나(묶음 끝).
+  const onMove = (id: string, delta: -1 | 1): void => applyEdit(moveInstance(doc, id, delta), null);
+
   // [AI Note]: 고른 인스턴스 삭제 = 문서 · 선택 · 기록을 이 렌더의 doc 하나에서 계산해 한 번에 바꾼다 (setter 3개 → 렌더 1번, 결정 9 B).
   // 메인 · 선택 없음 · 이미 없는 id는 아무것도 안 함 (removeInstance가 같은 Doc을 돌려줌 → 렌더 · 기록 없음, MF-24).
   // 지운 것이 고른 것이므로 reconcileSelection이 null로 정리한다 (MF-23).
@@ -69,7 +73,7 @@ export function App(): VNode {
   return h(
     'div',
     { class: 'app' },
-    h(LayerPanel, { main: doc.main, instances: doc.instances, selectedId, onSelect, onAdd }),
+    h(LayerPanel, { main: doc.main, instances: doc.instances, selectedId, onSelect, onAdd, onMove }),
     h(Canvas, { main: doc.main, instances: doc.instances, selectedId, onSelect }),
     h(PropertyPanel, { main: doc.main, instances: doc.instances, selectedId, onEdit, onReset, onDelete: deleteSelected }),
   );

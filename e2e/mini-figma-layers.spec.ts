@@ -13,11 +13,13 @@ import {
   selectedInLayer,
   buttonSel,
   layerSel,
+  canvasLabels,
   followingFields,
   overriddenFields,
+  moveInLayer,
 } from './mini-figma-helpers';
 
-// [AI Note]: QA-14 ~ QA-16 (인스턴스 추가 · 삭제 · 메인 삭제 불가, Dev-9). 순서 바꾸기(QA-17 · 18)는 Dev-10에서 이 파일에 더한다.
+// [AI Note]: QA-14 ~ QA-16 (인스턴스 추가 · 삭제 · 메인 삭제 불가, Dev-9) · QA-17 · QA-18 (순서 바꾸기, Dev-10).
 // 이 스펙의 테스트는 desktop · mobile 두 프로젝트에서 모두 돈다. 「바뀐 곳만 고침」은 같은 DOM 노드(holdNodes · sameNode) +
 // MutationObserver(watchApp)로 확인한다 (화면에 patch를 안 그리므로, patch 종류 · 개수는 app.test.ts가 센다).
 
@@ -116,4 +118,71 @@ test('QA-16 메인에는 [삭제] 버튼이 없고 Delete · Backspace를 눌러
   expect(await selectedInLayer(page)).toEqual(['main']);
   await expect(page.getByTestId('delete-instance')).toHaveCount(0);
   expect((await watch.take()).body.total, 'DOM 변경').toBe(0);
+});
+
+// ---------------------------------------------------------------------------
+// Dev-10: 순서 바꾸기 [↑] [↓]
+// ---------------------------------------------------------------------------
+
+const MOVE_NODES = {
+  ...Object.fromEntries(['b1', 'b2', 'b3'].map((id) => [`btn-${id}`, buttonSel(id)])),
+  ...Object.fromEntries(['b1', 'b2', 'b3'].map((id) => [`row-${id}`, layerSel(id)])),
+};
+
+async function allMovedNodesSame(page: Parameters<typeof sameNode>[0]): Promise<boolean> {
+  for (const id of ['b1', 'b2', 'b3']) {
+    if (!(await sameNode(page, `btn-${id}`, buttonSel(id)))) return false;
+    if (!(await sameNode(page, `row-${id}`, layerSel(id)))) return false;
+  }
+  return true;
+}
+
+test('QA-17 b1 행 [↓] → b3 행 [↑]로 순서가 b2 b1 b3 → b2 b3 b1이 되고 캔버스 · 레이어가 함께 바뀌며 노드는 전부 같은 참조다. 맨 위 [↑] · 맨 아래 [↓]는 아무 일 없다', async ({ page }) => {
+  await page.goto(URL);
+  await holdNodes(page, MOVE_NODES);
+  const canvasWatch = await watchApp(page, 'canvas');
+  const layerWatch = await watchApp(page, 'layer-panel');
+
+  await moveInLayer(page, 'b1', 'down');
+  expect(await canvasOrder(page)).toEqual(['b2', 'b1', 'b3']);
+  expect(await layerOrder(page)).toEqual(['b2', 'b1', 'b3']);
+  await moveInLayer(page, 'b3', 'up');
+  expect(await canvasOrder(page)).toEqual(['b2', 'b3', 'b1']);
+  expect(await layerOrder(page)).toEqual(['b2', 'b3', 'b1']);
+
+  // 버튼 · 행 노드는 전부 같은 참조 (다시 만들지 않고 옮겨짐), 글자 변경 0건
+  expect(await allMovedNodesSame(page)).toBe(true);
+  expect((await canvasWatch.take()).body.characterData, '캔버스 characterData').toBe(0);
+  expect((await layerWatch.take()).body.characterData, '레이어 characterData').toBe(0);
+  // 글자도 그대로 (순서만 바뀜)
+  expect(await canvasLabels(page)).toEqual(['버튼', '취소', '삭제', '버튼']);
+
+  // 경계: 맨 위(b2)의 [↑] · 맨 아래(b1)의 [↓]는 눌러도 아무 일 없다 (순서 · DOM 변경 0)
+  await moveInLayer(page, 'b2', 'up');
+  await moveInLayer(page, 'b1', 'down');
+  expect(await canvasOrder(page)).toEqual(['b2', 'b3', 'b1']);
+  expect(await layerOrder(page)).toEqual(['b2', 'b3', 'b1']);
+  expect((await canvasWatch.take()).body.total, '캔버스 DOM 변경').toBe(0);
+  expect((await layerWatch.take()).body.total, '레이어 DOM 변경').toBe(0);
+  expect(await allMovedNodesSame(page)).toBe(true);
+});
+
+test('QA-18 b2를 고른 채 순서를 두 번 바꿔도 b2가 계속 골라져 있다 (id로 고름, 위치로 고르지 않음)', async ({ page }) => {
+  await page.goto(URL);
+  await selectOnCanvas(page, 'b2');
+  await holdNodes(page, MOVE_NODES);
+
+  await moveInLayer(page, 'b1', 'down');
+  expect(await layerOrder(page)).toEqual(['b2', 'b1', 'b3']);
+  await moveInLayer(page, 'b3', 'up');
+  expect(await layerOrder(page)).toEqual(['b2', 'b3', 'b1']);
+  expect(await canvasOrder(page)).toEqual(['b2', 'b3', 'b1']);
+
+  await expect(page.getByTestId('property-title')).toHaveText('인스턴스 · 취소');
+  expect(await selectedOnCanvas(page)).toEqual(['b2']);
+  expect(await selectedInLayer(page)).toEqual(['b2']);
+  expect(await sameNode(page, 'btn-b2', `${buttonSel('b2')}.selected`)).toBe(true);
+  expect(await sameNode(page, 'row-b2', `${layerSel('b2')}.selected`)).toBe(true);
+  await expect(page.getByTestId('prop-label')).toHaveValue('취소');
+  expect(await allMovedNodesSame(page)).toBe(true);
 });

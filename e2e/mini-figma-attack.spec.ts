@@ -1,4 +1,4 @@
-import { test, expect, URL, selectOnCanvas, noHorizontalScroll, canvasLabels, buttonSel, layerSel, inRow } from './mini-figma-helpers';
+import { test, expect, URL, selectOnCanvas, noHorizontalScroll, canvasLabels, buttonSel, layerSel, inRow, moveInLayer, selectedOnCanvas, selectedInLayer } from './mini-figma-helpers';
 
 // [AI Note]: 공격적 시나리오 모음. 앞 Dev에서 채울 수 있는 것은 그 Dev에서 쓴다 (qa_todo 「Dev」 열): A1 · A2 = Dev-7, A3 ~ A5 = Dev-8.
 // 이 스펙의 테스트는 desktop · mobile 두 프로젝트에서 모두 돈다.
@@ -125,4 +125,33 @@ test('QA-A6 (앞부분) 고른 것을 [삭제]로 지우면 선택이 풀리고 
   await expect(page.getByTestId('property-title')).toHaveCount(0);
   await expect(page.getByTestId('figma-button')).toHaveCount(3);
   expect(await page.locator('[data-testid="figma-button"].selected, [data-testid="layer-item"].selected').count()).toBe(0);
+});
+
+// ---------------------------------------------------------------------------
+// Dev-10: [↑] [↓]가 행의 고르기를 같이 부르지 않는다 (A16, 이벤트 버블링 ④-4)
+// ---------------------------------------------------------------------------
+
+test('QA-A16 [↑] · [↓] 버튼이 고르기를 안 바꾼다: b2를 고른 채 b1 행 [↓], b3 행 [↑]를 눌러도 b2가 계속 골라져 있고 b1 · b3에 selected가 안 붙는다', async ({ page }) => {
+  await page.goto(URL);
+  await selectOnCanvas(page, 'b2');
+
+  await moveInLayer(page, 'b1', 'down');
+  await moveInLayer(page, 'b3', 'up');
+
+  await expect(page.getByTestId('property-title')).toHaveText('인스턴스 · 취소');
+  expect(await selectedOnCanvas(page)).toEqual(['b2']);
+  expect(await selectedInLayer(page)).toEqual(['b2']);
+  await expect(page.locator(`${buttonSel('b1')}.selected, ${buttonSel('b3')}.selected, ${layerSel('b1')}.selected, ${layerSel('b3')}.selected`)).toHaveCount(0);
+  // 순서만 바뀜
+  expect(await page.locator('[data-testid="layer-item"]').evaluateAll((els) => els.map((el) => el.getAttribute('data-id')))).toEqual(['b2', 'b3', 'b1']);
+});
+
+test('QA-A16 (선택 없음) 아무것도 안 고른 채 [↓]를 눌러도 선택은 계속 없다 (버블링으로 행이 골라지지 않음)', async ({ page }) => {
+  await page.goto(URL);
+
+  await moveInLayer(page, 'b1', 'down');
+
+  await expect(page.getByTestId('property-empty')).toHaveCount(1);
+  expect(await selectedOnCanvas(page)).toEqual([]);
+  expect(await selectedInLayer(page)).toEqual([]);
 });
