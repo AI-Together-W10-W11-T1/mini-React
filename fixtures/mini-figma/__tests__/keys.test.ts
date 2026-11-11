@@ -66,7 +66,7 @@ describe('keyAction — Delete · Backspace는 수정키가 하나도 없을 때
   });
 });
 
-describe('keyAction — 입력칸 안의 키는 무시 (알고리즘: 입력칸 안 키 무시)', () => {
+describe('keyAction — 글자 입력칸(글자 input · textarea) 안의 키는 전부 null (Q18 ③)', () => {
   const keys: [string, Partial<KeyInfo> & { key: string }][] = [
     ['Delete', { key: 'Delete' }],
     ['Backspace', { key: 'Backspace' }],
@@ -76,18 +76,54 @@ describe('keyAction — 입력칸 안의 키는 무시 (알고리즘: 입력칸 
     ['Meta+Shift+Z', { key: 'Z', metaKey: true, shiftKey: true }],
   ];
 
-  describe.each(['INPUT', 'SELECT', 'TEXTAREA', 'input', 'select', 'textarea', 'Input'])('targetTag = %s', (tag) => {
+  describe.each<[string, string, string | null]>([
+    ['INPUT text', 'INPUT', 'text'],
+    ['INPUT (type 모름)', 'INPUT', null],
+    ['input 소문자', 'input', 'text'],
+    ['Input 섞인 대소문자', 'Input', 'TEXT'],
+    ['INPUT number', 'INPUT', 'number'],
+    ['TEXTAREA', 'TEXTAREA', null],
+    ['textarea 소문자', 'textarea', null],
+  ])('target = %s', (_label, tag, type) => {
     it.each(keys)('%s → null', (_name, info) => {
-      expect(keyAction(press(info.key, { ...info, targetTag: tag }))).toBeNull();
+      expect(keyAction(press(info.key, { ...info, targetTag: tag, targetType: type }))).toBeNull();
     });
   });
+});
 
+describe('keyAction — 선택 상자 · 체크박스 안: Undo/Redo는 앱 동작, Delete · Backspace는 무시 (Q18 ②)', () => {
+  describe.each<[string, string, string | null]>([
+    ['SELECT', 'SELECT', null],
+    ['select 소문자', 'select', null],
+    ['INPUT checkbox', 'INPUT', 'checkbox'],
+    ['input 소문자 · type 대문자 CHECKBOX', 'input', 'CHECKBOX'],
+  ])('target = %s', (_label, tag, type) => {
+    const at = { targetTag: tag, targetType: type };
+    it('Ctrl+z · Meta+z → undo, Ctrl+Shift+Z · Meta+Shift+Z → redo', () => {
+      expect(keyAction(press('z', { ...at, ctrlKey: true }))).toBe('undo');
+      expect(keyAction(press('z', { ...at, metaKey: true }))).toBe('undo');
+      expect(keyAction(press('Z', { ...at, ctrlKey: true, shiftKey: true }))).toBe('redo');
+      expect(keyAction(press('Z', { ...at, metaKey: true, shiftKey: true }))).toBe('redo');
+    });
+    it('Delete · Backspace → null', () => {
+      expect(keyAction(press('Delete', at))).toBeNull();
+      expect(keyAction(press('Backspace', at))).toBeNull();
+    });
+    it('Alt가 있거나 정해진 키 밖이면 여전히 null', () => {
+      expect(keyAction(press('z', { ...at, ctrlKey: true, altKey: true }))).toBeNull();
+      expect(keyAction(press('y', { ...at, ctrlKey: true }))).toBeNull();
+      expect(keyAction(press('z', at))).toBeNull();
+    });
+  });
+});
+
+describe('keyAction — 입력칸이 아닌 곳은 전부 처리', () => {
   describe.each<[string, string | null]>([
     ['BUTTON', 'BUTTON'],
     ['DIV', 'DIV'],
     ['BODY', 'BODY'],
     ['없음(null)', null],
-  ])('targetTag = %s (입력칸이 아니므로 처리)', (_label, tag) => {
+  ])('targetTag = %s', (_label, tag) => {
     it('Delete → delete, Ctrl+z → undo, Ctrl+Shift+Z → redo', () => {
       expect(keyAction(press('Delete', { targetTag: tag }))).toBe('delete');
       expect(keyAction(press('z', { ctrlKey: true, targetTag: tag }))).toBe('undo');

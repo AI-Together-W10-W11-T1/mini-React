@@ -232,3 +232,60 @@ test('QA-25 b2를 고르고 Delete, b3를 고르고 Backspace로 지우고 Ctrl+
   expect(await selectedOnCanvas(page)).toEqual([]);
   expect(await sameNode(page, 'btn1', buttonSel('b1'))).toBe(true);
 });
+
+test('QA-29 메인 라벨 `새` 입력 후 색을 빨강으로 바꾸고 Ctrl+Z하면 색만 한 단계 되돌아가고(브라우저 기본 Undo와 겹치지 않음), Redo · Undo도 한 단계씩이다', async ({ page }) => {
+  await page.goto(URL);
+  await selectOnCanvas(page, 'main');
+  await page.getByTestId('prop-label').fill('새');
+  await page.getByTestId('prop-color').selectOption({ label: '빨강' });
+  expect((await canvasLabels(page))[0]).toBe('새');
+  expect(await classOf(page, 'main')).toContain('btn-red');
+  // [AI Note]: 위에서 다른 것을 다시 고르지 않는다 — 라벨 입력칸 값이 프로그램으로 다시 쓰이지 않아 브라우저 기본 글자 되돌리기 기록이 남은 채로 Ctrl+Z가 겹치는지 보려는 것
+
+  await pressUndo(page);
+  expect((await canvasLabels(page))[0], '색만 되돌아가고 글자는 그대로').toBe('새');
+  expect(await classOf(page, 'main')).toContain('btn-blue');
+
+  await pressRedo(page);
+  expect(await classOf(page, 'main')).toContain('btn-red');
+  expect((await canvasLabels(page))[0]).toBe('새');
+
+  await pressUndo(page);
+  expect(await classOf(page, 'main')).toContain('btn-blue');
+  expect((await canvasLabels(page))[0], '한 단계만').toBe('새');
+
+  await pressUndo(page);
+  expect((await canvasLabels(page))[0]).toBe('버튼');
+});
+
+test('QA-30 선택 상자 · 체크박스에 포커스가 남은 채 Ctrl+Z · Ctrl+Shift+Z도 앱 Undo · Redo이고 라벨 칸 글자는 건드리지 않는다 (Q18 ②)', async ({ page }) => {
+  await page.goto(URL);
+  await selectOnCanvas(page, 'main');
+  await page.getByTestId('prop-label').fill('새');
+  const size = page.getByTestId('prop-size');
+  await size.selectOption('L');
+  await size.focus(); // 포커스를 선택 상자에 둔 채로 키를 누른다 (blurFocus를 안 부름)
+  expect(await classOf(page, 'main')).toContain('btn-L');
+
+  await page.keyboard.press('Control+KeyZ');
+  expect(await classOf(page, 'main'), '크기 되돌아감').toContain('btn-M');
+  expect((await canvasLabels(page))[0], '글자는 그대로').toBe('새');
+  await expect(page.getByTestId('prop-label')).toHaveValue('새');
+
+  await page.keyboard.press('Control+Shift+KeyZ');
+  expect(await classOf(page, 'main'), '다시 L').toContain('btn-L');
+  expect((await canvasLabels(page))[0]).toBe('새');
+
+  // 체크박스: 아이콘 보이기를 켜고 (포커스가 체크박스에 남음) Ctrl+Z → 꺼짐, Ctrl+Shift+Z → 켜짐
+  const hasIcon = page.getByTestId('prop-hasicon');
+  await hasIcon.click();
+  await hasIcon.focus();
+  await expect(page.locator(`${buttonSel('main')} .btn-icon`)).toHaveCount(1);
+  await page.keyboard.press('Control+KeyZ');
+  await expect(page.locator(`${buttonSel('main')} .btn-icon`)).toHaveCount(0);
+  expect((await canvasLabels(page))[0]).toBe('새');
+  expect(await classOf(page, 'main')).toContain('btn-L');
+  await page.keyboard.press('Control+Shift+KeyZ');
+  await expect(page.locator(`${buttonSel('main')} .btn-icon`)).toHaveCount(1);
+  expect((await canvasLabels(page))[0]).toBe('새');
+});

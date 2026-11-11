@@ -731,12 +731,14 @@ describe('키보드 · Undo/Redo (Dev-11)', () => {
     repeat?: boolean;
   }
   /** 키 하나를 누른 것처럼 document까지 올라가는 keydown을 보내고 렌더가 끝나길 기다린다 (target 기본 = body) */
-  const press = async (key: string, options: KeyOptions = {}, target: Element = document.body): Promise<void> => {
-    target.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true, ...options }));
+  const press = async (key: string, options: KeyOptions = {}, target: Element = document.body): Promise<boolean> => {
+    const event = new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true, ...options });
+    target.dispatchEvent(event);
     await Promise.resolve();
+    return event.defaultPrevented; // [AI Note]: 앱이 브라우저 기본 동작(Undo/Redo)을 막았는지 (Q18)
   };
-  const undoKey = (): Promise<void> => press('z', { ctrlKey: true });
-  const redoKey = (): Promise<void> => press('z', { ctrlKey: true, shiftKey: true });
+  const undoKey = (): Promise<boolean> => press('z', { ctrlKey: true });
+  const redoKey = (): Promise<boolean> => press('z', { ctrlKey: true, shiftKey: true });
   const ids = (): (string | null)[] => buttons().slice(1).map((b) => b.getAttribute('data-id'));
   const docIds = (): string[] => (slot(0) as typeof INITIAL_DOC).instances.map((it) => it.id);
 
@@ -860,25 +862,94 @@ describe('키보드 · Undo/Redo (Dev-11)', () => {
     expect((slot(2) as UndoState).past).toHaveLength(2);
   });
 
-  it('입력칸 안의 keydown은 doc · history를 안 바꾼다 (target이 input · select · checkbox여도) — 렌더 0번', async () => {
+  it('라벨 글자 칸(글자 input) 안의 keydown은 앱 동작이 없고 막지도 않는다 (Q18 ③) — 렌더 0번 · doc · history 그대로 · defaultPrevented false', async () => {
     await click(buttonOf('b2'));
     await choose('prop-color', 'green');
     const doc = slot(0);
     const history = slot(2);
     const before = renders;
-    const targets = [byId('prop-label'), byId('prop-size'), byId('prop-hasicon'), byId('prop-color')];
-    for (const target of targets) {
-      await press('Delete', {}, target);
-      await press('Backspace', {}, target);
-      await press('z', { ctrlKey: true }, target);
-      await press('z', { metaKey: true }, target);
-      await press('Z', { ctrlKey: true, shiftKey: true }, target);
+    const label = byId('prop-label');
+    const results = [
+      await press('Delete', {}, label),
+      await press('Backspace', {}, label),
+      await press('z', { ctrlKey: true }, label),
+      await press('z', { metaKey: true }, label),
+      await press('Z', { ctrlKey: true, shiftKey: true }, label),
+    ];
+    expect(results, '브라우저 기본 동작(글자 지우기 · 되돌리기)을 막지 않음').toEqual([false, false, false, false, false]);
+    expect(renders - before).toBe(0);
+    expect(slot(0)).toBe(doc);
+    expect(slot(2)).toBe(history);
+    expect(ids()).toEqual(['b1', 'b2', 'b3']);
+    expect(slot(1)).toBe('b2');
+  });
+
+  it('선택 상자 · 체크박스 안의 Delete · Backspace는 무시하고 막지 않는다 (Q18) — 렌더 0번 · doc · history 그대로', async () => {
+    await click(buttonOf('b2'));
+    await choose('prop-color', 'green');
+    const doc = slot(0);
+    const history = slot(2);
+    const before = renders;
+    for (const target of [byId('prop-size'), byId('prop-hasicon'), byId('prop-color')]) {
+      expect(await press('Delete', {}, target)).toBe(false);
+      expect(await press('Backspace', {}, target)).toBe(false);
     }
     expect(renders - before).toBe(0);
     expect(slot(0)).toBe(doc);
     expect(slot(2)).toBe(history);
     expect(ids()).toEqual(['b1', 'b2', 'b3']);
     expect(slot(1)).toBe('b2');
+  });
+
+  it('선택 상자 안의 Ctrl+Z · Ctrl+Shift+Z = 앱 Undo · Redo + preventDefault (Q18 ②)', async () => {
+    await click(buttonOf('b2'));
+    await choose('prop-size', 'L');
+    expect(buttonOf('b2').classList.contains('btn-L')).toBe(true);
+    expect(await press('z', { ctrlKey: true }, byId('prop-size'))).toBe(true);
+    expect(buttonOf('b2').classList.contains('btn-L')).toBe(false);
+    expect(buttonOf('b2').classList.contains('btn-M')).toBe(true);
+    expect(await press('Z', { ctrlKey: true, shiftKey: true }, byId('prop-size'))).toBe(true);
+    expect(buttonOf('b2').classList.contains('btn-L')).toBe(true);
+    expect(await press('z', { metaKey: true }, byId('prop-color'))).toBe(true);
+    expect(buttonOf('b2').classList.contains('btn-M')).toBe(true);
+  });
+
+  it('체크박스 안의 Ctrl+Z · Ctrl+Shift+Z = 앱 Undo · Redo + preventDefault (Q18 ②)', async () => {
+    await click(buttonOf('b2'));
+    await toggle('prop-hasicon', true);
+    const withIcon = root.querySelectorAll('[data-testid="btn-icon"]').length;
+    expect(withIcon).toBeGreaterThan(0);
+    expect(await press('z', { ctrlKey: true }, byId('prop-hasicon'))).toBe(true);
+    expect(root.querySelectorAll('[data-testid="btn-icon"]').length).toBe(withIcon - 1);
+    expect(await press('Z', { ctrlKey: true, shiftKey: true }, byId('prop-hasicon'))).toBe(true);
+    expect(root.querySelectorAll('[data-testid="btn-icon"]').length).toBe(withIcon);
+  });
+
+  it('입력칸 밖(body)에서 cancelable Ctrl+Z · Ctrl+Shift+Z는 defaultPrevented true + 앱 Undo · Redo, 그 밖의 키(Delete · Escape · Ctrl+Y · Alt+Z)는 false (Q18 ①)', async () => {
+    await click(buttonOf('main'));
+    await choose('prop-color', 'red');
+    expect(await press('z', { ctrlKey: true })).toBe(true);
+    expect(buttonOf('main').classList.contains('btn-blue')).toBe(true);
+    expect(await press('Z', { ctrlKey: true, shiftKey: true })).toBe(true);
+    expect(buttonOf('main').classList.contains('btn-red')).toBe(true);
+    // 되돌릴 것이 없어도 앱이 처리한 키이므로 막는다 (브라우저 기본 Undo가 남은 글자 기록에 적용되지 않게)
+    await undoKey();
+    expect(await undoKey()).toBe(true);
+    // 메인이 선택돼 Delete는 아무 일 없고, 어느 쪽이든 막지 않는다
+    expect(await press('Delete')).toBe(false);
+    expect(await press('Escape')).toBe(false);
+    expect(await press('y', { ctrlKey: true })).toBe(false);
+    expect(await press('z', { ctrlKey: true, altKey: true })).toBe(false);
+  });
+
+  it('입력칸 밖 Undo는 앱 한 단계만 되돌린다 — 글자 입력 뒤 색을 바꾸고 Ctrl+Z 하면 색만 돌아가고 글자는 그대로 (QA-29 단위판)', async () => {
+    await click(buttonOf('main'));
+    await typeInto('prop-label', '새');
+    await choose('prop-color', 'red');
+    expect(await undoKey()).toBe(true);
+    expect(labels()[0]).toBe('새');
+    expect(buttonOf('main').classList.contains('btn-blue')).toBe(true);
+    expect((slot(2) as UndoState).past).toHaveLength(1);
   });
 
   it('수정키 조합은 아무 일 없다 (Q17-4): Shift+Delete · Ctrl+Backspace · Alt+Delete · Meta+Backspace · Alt+Z · Ctrl+Alt+Z · Ctrl+Y · Escape · z', async () => {

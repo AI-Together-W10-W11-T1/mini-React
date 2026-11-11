@@ -222,9 +222,9 @@ test('QA-A7 메인에서 Delete · Backspace를 각각 5번 연달아 눌러도 
   expect((await watch.take()).body.total, 'DOM 변경').toBe(0);
 });
 
-test('QA-A8 입력칸 · 선택 상자 · 체크박스 안의 키는 앱 동작을 안 일으킨다 (Delete · Backspace로 안 지워지고 Ctrl+Z · Meta+Z로 앱 Undo가 안 일어남)', async ({ page }) => {
+test('QA-A8 라벨 글자 칸 안의 키는 앱 동작이 없고, 선택 상자 · 체크박스 안에서는 Delete · Backspace가 무시되지만 Ctrl+Z · Ctrl+Shift+Z는 앱 Undo · Redo다 (Q18)', async ({ page }) => {
   await page.goto(URL);
-  // Undo 한 단계: 메인 색 빨강 (앱 Undo가 잘못 돌면 이 색이 파랑으로 돌아간다)
+  // Undo 한 단계: 메인 색 빨강 (앱 Undo가 돌면 이 색이 파랑으로 돌아간다)
   await selectOnCanvas(page, 'main');
   await page.getByTestId('prop-color').selectOption({ label: '빨강' });
   await selectOnCanvas(page, 'b2');
@@ -234,9 +234,29 @@ test('QA-A8 입력칸 · 선택 상자 · 체크박스 안의 키는 앱 동작�
     await expect(page.getByTestId('figma-button'), `${where}: 버튼`).toHaveCount(4);
     await expect(instanceCount(page), `${where}: 레이어 행`).toHaveCount(3);
     expect(await selectedOnCanvas(page), `${where}: 선택`).toEqual(['b2']);
+    expect((await canvasLabels(page))[2], `${where}: b2 글자`).toBe('취소');
   };
 
-  // ① 라벨 칸(글자 `취소`)
+  // [AI Note]: 선택 상자 · 체크박스 안에서 Delete · Backspace는 무시, Ctrl+Z는 앱 Undo(메인 색 파랑), Ctrl+Shift+Z는 앱 Redo(빨강)
+  const selectAndCheckbox = async (testId: string, where: string): Promise<void> => {
+    await page.getByTestId(testId).focus();
+    for (const key of ['Delete', 'Backspace']) await page.keyboard.press(key);
+    await appUntouched(where);
+    await page.keyboard.press('Control+KeyZ');
+    expect(await mainColorClass(page), `${where}: Ctrl+Z → 앱 Undo`).toContain('btn-blue');
+    await expect(page.getByTestId('figma-button'), `${where}: 버튼`).toHaveCount(4);
+    expect(await selectedOnCanvas(page), `${where}: 선택`).toEqual(['b2']);
+    expect((await canvasLabels(page))[2], `${where}: b2 글자`).toBe('취소');
+    await page.keyboard.press('Control+Shift+KeyZ');
+    await appUntouched(`${where} Redo 뒤`);
+  };
+
+  // ② 크기 선택 상자
+  await selectAndCheckbox('prop-size', '선택 상자');
+  // ③ 체크박스 (눌러서 바꾸지 않고 포커스만)
+  await selectAndCheckbox('prop-hasicon', '체크박스');
+
+  // ① 라벨 칸(글자 `취소`): 앱 동작 없음
   const label = page.getByTestId('prop-label');
   await label.click();
   await page.keyboard.press('End');
@@ -247,17 +267,11 @@ test('QA-A8 입력칸 · 선택 상자 · 체크박스 안의 키는 앱 동작�
   await page.keyboard.press('Delete');
   await page.keyboard.press('Control+KeyZ');
   await page.keyboard.press('Meta+KeyZ');
-  await appUntouched('라벨 칸');
-
-  // ② 크기 선택 상자
-  await page.getByTestId('prop-size').focus();
-  for (const key of ['Delete', 'Backspace', 'Control+KeyZ', 'Control+KeyZ']) await page.keyboard.press(key);
-  await appUntouched('선택 상자');
-
-  // ③ 체크박스 (눌러서 바꾸지 않고 포커스만)
-  await page.getByTestId('prop-hasicon').focus();
-  for (const key of ['Delete', 'Backspace', 'Control+KeyZ', 'Control+KeyZ']) await page.keyboard.press(key);
-  await appUntouched('체크박스');
+  // 이 뒤 글자는 Chromium의 글자 되돌리기라 단언하지 않는다. 앱 Undo가 안 일어남 = 메인 색 빨강 그대로
+  expect(await mainColorClass(page), '라벨 칸: 메인 색').toContain('btn-red');
+  await expect(page.getByTestId('figma-button'), '라벨 칸: 버튼').toHaveCount(4);
+  await expect(instanceCount(page), '라벨 칸: 레이어 행').toHaveCount(3);
+  expect(await selectedOnCanvas(page), '라벨 칸: 선택').toEqual(['b2']);
 });
 
 test('QA-A9 Undo 한도: [+ 인스턴스]를 50번 누르면 처음 모습이 빠져 Ctrl+Z 49번에 b1 b2 b3 b4에서 멈추고 50번째는 아무 일 없다. Ctrl+Shift+Z 49번이면 b1~b53', async ({ page }) => {
