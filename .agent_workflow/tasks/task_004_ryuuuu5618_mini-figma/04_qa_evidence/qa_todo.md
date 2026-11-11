@@ -36,7 +36,7 @@
 | QA-7 | MF-12 · 14 · D-02 (Q3-1) | 처음 상태: `b3`만 색이 빨강(override) | 메인을 고르고 색을 `초록`으로 바꾼다 | 메인 · `b1` · `b2`는 초록(`btn-green`), **`b3`는 빨강 그대로**(`btn-red`, "이미 컬러를 추가했기 때문에 메인이 바꿔도 영향 없음"). 버튼 노드 같은 참조 | `e2e/mini-figma-main.spec.ts` |
 | QA-8 | MF-14 · D-03 · D-04 · Q17-1 | 메인을 고른 상태(아이콘 보이기 꺼짐), 캔버스 버튼 4개 · 각 글자 `<span>` 노드를 붙잡아 둠 | 아이콘 보이기 체크박스를 켠다. 이어서 끈다 | 켜면 4개 버튼 모두에 아이콘 `★`(`btn-icon`)이 **글자 앞**에 생기고(노드 **추가**, 개수 4, `btn-icon`의 다음 형제가 `btn-label`), **글자 `<span>` 노드는 4개 모두 같은 참조**(버튼 안 자식이 모두 key라서 위치가 밀려도 글자를 다시 만들지 않음). 끄면 아이콘 노드 **제거**(`btn-icon` 0개)되고 글자 노드는 계속 같은 참조. 캔버스 DOM 변경은 각각 childList 4건(추가 4 · 제거 4)뿐, characterData · attributes 0 | `e2e/mini-figma-main.spec.ts` |
 | QA-9 | MF-14 · D-01 (명세 4절 Instance swap) | 메인을 고른 상태에서 아이콘 보이기를 켜 둠, `b1`의 아이콘 `<span>` 노드를 붙잡아 둠 | 아이콘 종류를 `♥`로 바꾼다 | 4개 버튼의 아이콘 글자가 `♥`. **아이콘 `<span>` 노드는 같은 참조**(다시 만들지 않고 같은 태그라 글자만 바뀜 — 엔진이 컴포넌트를 diff 전에 풀기 때문, 정상 동작). 캔버스 DOM 변경은 글자 변경뿐(childList 0) | `e2e/mini-figma-main.spec.ts` |
-| QA-10 | MF-12 · 14 · 21 · P2-10 · T-14 · D-01 | `b1`을 고른 상태(칸 5개 모두 「메인 따름」), 메인 · `b1` · `b2` · `b3` 버튼 노드를 붙잡아 둠 | 라벨 칸을 `확인`으로 바꾼다 (`fill`) | **`b1`만** `확인`, 메인 `버튼` · `b2` `취소` · `b3` `삭제` 그대로(그 버튼의 characterData 변경 없음). 라벨 칸은 override 표시(`override` 클래스 + ↻ 버튼이 생김), 나머지 4칸은 계속 「메인 따름」. 레이어의 `b1` 행 이름도 `확인`. 버튼 노드 같은 참조 | `e2e/mini-figma-instance.spec.ts` |
+| QA-10 | MF-12 · 14 · 21 · P2-10 · T-14 · D-01 | `b1`을 고른 상태(칸 5개 모두 「메인 따름」), 메인 · `b1` · `b2` · `b3` 버튼 노드를 붙잡아 둠 | 라벨 칸을 `확인`으로 바꾼다 (`fill`) | **`b1`만** `확인`, 메인 `버튼` · `b2` `취소` · `b3` `삭제` 그대로(그 버튼의 characterData 변경 없음). 라벨 칸은 override 표시(`override` 클래스 + ↻ 버튼이 생김), 나머지 4칸은 계속 「메인 따름」. 레이어의 `b1` 행 이름도 `확인`. 버튼 노드 같은 참조. 이어서 `b1`의 크기를 `S`로 바꾸면 **`b1`만 `btn-S`**(메인 · `b2` · `b3`는 `btn-M` 그대로, 인스턴스 크기 override, P-22), 색 칸까지 같은 방식으로 `b1`만 바뀜(색을 `초록`으로 → `b1`만 `btn-green`) | `e2e/mini-figma-instance.spec.ts` |
 | QA-11 | MF-12 (Q3-1 · Q10) | `b1` 라벨을 `확인`으로 바꿔 둠(override) | 메인을 고르고 라벨을 `저장`으로 바꾼다 | 메인 `저장`. **`b1`은 `확인` 그대로**(override는 메인이 바뀌어도 그대로). `b2` `취소` · `b3` `삭제`도 그대로. 다시 `b1`을 고르면 라벨 칸 `확인`에 ↻가 있음 | `e2e/mini-figma-instance.spec.ts` |
 | QA-12 | MF-13 | `b1` 라벨 override `확인`, 메인 라벨 `저장` | `b1`의 라벨 ↻를 누른다. 이어서 메인 라벨을 `보관`으로 바꾼다 | ↻ 뒤 `b1` 글자가 **메인 값 `저장`**(글자가 사라지지 않음 = `undefined`를 넣지 않고 키를 지움), 라벨 칸은 다시 「메인 따름」(↻ 사라짐). 이어서 메인을 `보관`으로 바꾸면 `b1`도 `보관`으로 따라감. 버튼 노드 같은 참조 | `e2e/mini-figma-instance.spec.ts` |
 | QA-13 | MF-21 | 처음 상태 | `b2`를 고른다. 이어서 `b3`를 고른다. 이어서 `b1`을 고른다 | `b2`: 라벨 칸 override(색 구분 + ↻), 나머지 4칸 「메인 따름」(↻ 없음). `b3`: 라벨 「메인 따름」, 색 칸만 override + ↻. `b1`: 5칸 모두 「메인 따름」(↻ 0개). 칸마다 값 표시(선택 상자 값)도 맞음 | `e2e/mini-figma-instance.spec.ts` |
@@ -63,7 +63,7 @@
 | QA | 시나리오 | Then | Dev | 스펙 파일 |
 | --- | --- | --- | --- | --- |
 | QA-A1 | 특수문자 라벨: 메인 라벨 칸에 `<b>굵게</b> &amp; 😀`, 이어서 `<img src=x onerror="window.__pwned=1">`를 입력 | 캔버스 버튼 글자가 **마크업이 아니라 글자 그대로**(`btn-label` textContent), `<b>` · `<img>` 요소가 생기지 않고 `onerror`도 실행 안 됨(`window.__pwned` 없음), 입력칸 값 그대로 | 7 | `e2e/mini-figma-attack.spec.ts` |
-| QA-A2 | 아주 긴 글자: 메인 라벨 칸에 공백 없는 200자 문자열 입력 (mobile 포함) | 가로 스크롤 없음(`noHorizontalScroll`), 버튼이 영역 밖으로 삐져나가지 않음, 입력은 한 단계로 묶여 `Ctrl+Z` 한 번에 `버튼`으로 | 7 · 11 | `e2e/mini-figma-attack.spec.ts` |
+| QA-A2 | 아주 긴 글자: 메인 라벨 칸에 공백 없는 200자 문자열 입력 (mobile 포함) | 가로 스크롤 없음(`noHorizontalScroll`), 버튼이 영역 밖으로 삐져나가지 않음(CSS: 라벨 `overflow-wrap: anywhere` + 버튼 `max-width: 100%` — 버튼이 flex 항목이라 `break-word`로는 최소 너비가 안 줄어 넘칠 수 있음), 입력은 한 단계로 묶여 `Ctrl+Z` 한 번에 `버튼`으로 | 7 · 11 | `e2e/mini-figma-attack.spec.ts` |
 | QA-A3 | 빈 라벨 override: `b1`의 라벨 칸을 `fill('')`로 비움. 이어서 메인 라벨을 `저장`으로 바꿈 | `b1` 버튼 글자가 `''`(**override이므로 메인 값으로 안 돌아감**), 버튼은 글자 없이 배경 색만 있는 채 **화면에 보임**(크기 > 0), 라벨 칸에 ↻가 있음. 레이어의 `b1` 행 이름은 id `b1`로 표시(빈 글자 대신). 메인을 바꿔도 `b1`은 `''` 그대로. ↻를 누르면 `저장`으로 | 8 | `e2e/mini-figma-attack.spec.ts` |
 | QA-A4 | 메인과 같은 값 override: `b1` 라벨을 `버튼x`로 바꿨다가 `버튼`으로 되돌려 입력(메인 값과 같아짐). 이어서 메인 라벨을 `저장`으로 바꿈 | 값이 메인과 같아도 **override로 남아** 있음(라벨 칸에 ↻ 계속 보임). 메인이 `저장`이 돼도 `b1`은 `버튼` 그대로 | 8 | `e2e/mini-figma-attack.spec.ts` |
 | QA-A5 | ↻ 뒤 메인 변경: `b3`의 색 ↻ → 메인 색을 `초록`으로. 이어서 `b3`의 라벨 ↻ → 메인 라벨을 비움(`''`) | `b3`가 메인을 다시 따라감(색 `btn-green`, 라벨도 메인 값). 클래스 글에 `undefined`가 없고 글자가 `undefined`로 나오지 않음(키를 지웠지 `undefined`를 넣지 않음). 메인을 `''`로 비우면 메인 · `b3`가 같이 빈 글자 | 8 | `e2e/mini-figma-attack.spec.ts` |
@@ -86,7 +86,7 @@
 
 - 센 방법: `canvasCounts` = `patch.path`(`MOVE`는 `patch.parent`)가 캔버스 접두 `[0, 1]`로 시작하는 줄만 모아 **`SET_EVENT`를 뺀** 종류별 개수. `layerCounts`는 접두 `[0, 0]`. **속성 패널(`[0, 2]`)은 `value` / `checked`가 바뀔 때마다 `SET_PROP` 줄이 함께 생기므로(`diff.ts:109`, `:211-218`) 센 값을 단언하지 않는다** — 고르기 · 삭제의 `REPLACE`(D-05)만 「1줄 이상」으로 따로 본다. 캔버스에는 입력칸이 없어 `SET_PROP`이 나오지 않는다
 - 도우미가 맞는 칸을 보는지 `root.firstElementChild.children[1]`의 `data-testid`가 `canvas`인지 한 줄로 확인한다
-- 시작 상태(`INITIAL_DOC`, 선택 없음)에서 각 행을 독립된 `it`으로 돌린다. 「Given」에 적은 준비 편집이 있으면 그 뒤의 렌더만 센다
+- 시작 상태(`INITIAL_DOC`, 선택 없음)에서 각 행을 독립된 `it`으로 돌린다. 「Given」에 적은 준비 편집이 있으면 그 뒤의 렌더만 센다. **준비 동작마다 `await Promise.resolve()`로 렌더를 끝낸 뒤 센 동작을 한다** (Batching, 결정 9 B: 준비 동작과 센 동작을 같은 틱에 보내면 렌더가 합쳐져 `lastPatches`에 준비 동작의 줄이 섞인다 — 예: 메인 고르기의 `SET_ATTR`이 P-3에 섞임)
 
 | # | 동작 (Given → When) | 캔버스 | 레이어 | 속성 패널 | 근거 |
 | --- | --- | --- | --- | --- | --- |
@@ -111,6 +111,7 @@
 | P-19 | 메인 색 빨강(1단계) → Undo | `{ SET_ATTR: 3 }` | `{}` | 세지 않음 | MF-30 |
 | P-20 | 맨 위 [↑] · 맨 아래 [↓] · 같은 값 다시 쓰기 | 렌더 0번 (`App` 실행 횟수 그대로, `lastPatches` 그대로) | 〃 | 〃 | ④-13 · 공통 주의 7 |
 | P-21 | `b1` 라벨 override(`확인`) 상태 → ↻ | `{ SET_TEXT: 1 }` (메인 글자로) | `{ SET_TEXT: 1 }` | 세지 않음 | MF-13 |
+| P-22 | `b1` 선택 → 크기 `S` | `{ SET_ATTR: 1 }` (b1 버튼 class만. 메인 · b2 · b3는 그대로) | `{}` | 세지 않음 | MF-12 · 14 · D-02 |
 
 ## 단위 테스트 (Vitest, `fixtures/mini-figma/__tests__/`) — 인수와 별개로 확인
 
@@ -120,7 +121,7 @@
 | `undo.test.ts` | 같은 대상 + 같은 칸 연달아 = 한 단계(시간 기준 없음) · 다른 칸 · 다른 대상 · `null` 묶음(추가 · 삭제 · 순서 · ↻)은 새 단계이자 묶음 끝 · Undo/Redo · Undo 뒤 새 수정이면 Redo 버림 · **`UNDO_LIMIT = 50`: 49단계면 `past` 49 · 처음까지 Undo 가능, 50단계면 처음이 빠져 Undo 49번 · 50번째 무시, 60단계여도 `past` 49** · 바뀐 게 없으면 기록 안 남김 | MF-30 · 31 |
 | `keys.test.ts` | Delete · Backspace(**수정키 Ctrl · Meta · Alt · Shift 없을 때만**) · Ctrl/Meta+Z · Ctrl/Meta+Shift+Z(`'Z'` 포함) 표 · 입력칸(`INPUT` · `SELECT` · `TEXTAREA`) 안은 전부 무시 · 정해진 키 밖 · `Shift+Delete` · `Ctrl+Backspace` · `Meta+Backspace` · `Alt+Delete` · `Alt+z`는 null | MF-33 · 34 |
 | `rootOnlyHooks.test.ts` | `App.ts`만 `useState` · `useEffect` 호출, `components/*.ts` · `model.ts` · `undo.ts` · `keys.ts`는 Hook · `document` · `window` · 엔진 내부 패키지 import 없음, 검사기가 일부러 틀린 소스를 잡음, **컴포넌트 파일 목록 = `Button.ts` · `Canvas.ts` · `Icons.ts` · `LayerPanel.ts` · `PropertyPanel.ts`**(새 파일이 검사 밖으로 새지 않게) | MF-04 · P2-07 · 08 · 09 · T-16 |
-| `app.test.ts` (jsdom) | 시작 화면 DOM · 최상위 자식 순서(레이어 · 캔버스 · 속성) · **위 「patch 기대 표」 P-1 ~ P-21을 `canvasCounts` · `layerCounts`로 그대로** (인스턴스 아이콘 켜기 P-10 ~ P-14 포함) · 삭제 · Undo · Redo · 메인 편집 · 인스턴스 편집 한 동작 = 렌더 한 번(`App` 실행 횟수) · **keydown 리스너는 상태가 여러 번 바뀌어도 1개(`add` − `remove` = 1, `document.addEventListener` spy는 `render()` 전에 걸고 테스트마다 `unmount()`로 정리)**, `unmount()` 뒤 keydown 무시 · 입력칸에서 보낸 keydown은 무시 · 수정키 조합 무시 · 고르기는 Undo 기록에 안 들어감 · `b4` 추가 → Undo → 추가 = `b5`(`nextId` 안 되돌림) | MF-04 · 10 · 14 · 31 · 32 · 34 · 명세 4절(Instance swap · SET_EVENT · Batching) |
+| `app.test.ts` (jsdom) | 시작 화면 DOM · 최상위 자식 순서(레이어 · 캔버스 · 속성) · **위 「patch 기대 표」 P-1 ~ P-22를 `canvasCounts` · `layerCounts`로 그대로** (인스턴스 아이콘 켜기 P-10 ~ P-14 포함) · 삭제 · Undo · Redo · 메인 편집 · 인스턴스 편집 한 동작 = 렌더 한 번(`App` 실행 횟수) · **keydown 리스너는 상태가 여러 번 바뀌어도 1개(`add` − `remove` = 1, `document.addEventListener` spy는 `render()` 전에 걸고 테스트마다 `unmount()`로 정리)**, `unmount()` 뒤 keydown 무시 · 입력칸에서 보낸 keydown은 무시 · 수정키 조합 무시 · 고르기는 Undo 기록에 안 들어감 · `b4` 추가 → Undo → 추가 = `b5`(`nextId` 안 되돌림) | MF-04 · 10 · 14 · 31 · 32 · 34 · 명세 4절(Instance swap · SET_EVENT · Batching) |
 
 ## 회귀 · 환경
 
