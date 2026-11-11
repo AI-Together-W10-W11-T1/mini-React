@@ -222,9 +222,11 @@ test('QA-A22 색 입력칸 연타: 서로 다른 색을 30번 연달아 보내�
   expect(await colorsOf(page)).toEqual(CHANGED);
   await expect(page.getByTestId('prop-color')).toHaveValue('#0052ff');
 
-  // 한 번 더는 아무 일 없다 (더 되돌릴 단계가 없음)
+  // 한 번 더는 아무 일 없다 (더 되돌릴 단계가 없음): 키도 [↶] 버튼도 (꺼져 있음)
+  await expect(page.getByTestId('undo-button')).toBeDisabled();
   const watch = await watchApp(page);
   await pressUndo(page);
+  await page.getByTestId('undo-button').click({ force: true });
   expect(await colorsOf(page)).toEqual(CHANGED);
   expect((await watch.take()).body.total, '한 번 더 Undo = DOM 변경 0').toBe(0);
 });
@@ -270,6 +272,7 @@ test('QA-A24 같은 색 다시 누르기: 메인이 지금 색 칩을 다시 누
   await pickColor(page, '#0052ff');
   expect((await watch.take()).body.total, '① DOM 변경').toBe(0);
   expect(await colorsOf(page)).toEqual(CHANGED);
+  await expect(page.getByTestId('undo-button'), '① 같은 값은 기록 안 함 → [↶] 안 켜짐').toBeDisabled();
 
   // ② b1(메인 따름)을 고르고 b1의 지금 색(메인과 같은 #0052ff) 칩: override 생김, 캔버스 · 레이어 DOM 변경 0
   await selectOnCanvas(page, 'b1');
@@ -280,6 +283,7 @@ test('QA-A24 같은 색 다시 누르기: 메인이 지금 색 칩을 다시 누
   expect(await overriddenFields(page), '② override가 생겼다').toEqual(['color']);
   await expect(page.locator(inRow('color', 'prop-reset'))).toHaveCount(1);
   expect(await bgOf(page, 'b1')).toBe(rgb('#0052ff'));
+  await expect(page.getByTestId('undo-button'), '② override 생김 → [↶] 켜짐').toBeEnabled();
   expect((await canvasWatch.take()).body.total, '② 캔버스 DOM 변경').toBe(0);
   expect((await layerWatch.take()).body.total, '② 레이어 DOM 변경').toBe(0);
 });

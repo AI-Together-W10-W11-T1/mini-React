@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { INITIAL_DOC } from '../model';
 import type { Doc } from '../model';
-import { EMPTY_UNDO, UNDO_LIMIT, recordEdit, redo, undo } from '../undo';
+import { EMPTY_UNDO, UNDO_LIMIT, canRedo, canUndo, recordEdit, redo, undo } from '../undo';
 import type { UndoGroup, UndoState } from '../undo';
 
 /** 서로 다른 객체인 Doc 하나 (라벨로 구분) */
@@ -306,5 +306,65 @@ describe('불변 — 저장된 Doc · 상태를 나중에 고치지 않는다', 
     undo(state, docs[2]);
     expect(state.past).toEqual(pastBefore);
     expect(state.future).toEqual([]);
+  });
+});
+
+describe('canUndo · canRedo — [↶] [↷] 버튼을 켜고 끄는 값 (FD-12)', () => {
+  it('빈 기록은 둘 다 거짓이다', () => {
+    expect(canUndo(EMPTY_UNDO)).toBe(false);
+    expect(canRedo(EMPTY_UNDO)).toBe(false);
+  });
+
+  it('수정 뒤에는 canUndo만 참이다', () => {
+    const state = recordEdit(EMPTY_UNDO, docOf(0), docOf(1), mainLabel);
+    expect(canUndo(state)).toBe(true);
+    expect(canRedo(state)).toBe(false);
+  });
+
+  it('바뀐 것이 없는 수정(같은 Doc)은 기록이 안 남아 canUndo가 거짓 그대로다', () => {
+    const d0 = docOf(0);
+    expect(canUndo(recordEdit(EMPTY_UNDO, d0, d0, null))).toBe(false);
+  });
+
+  it('Undo 뒤에는 canRedo가 참이고, 처음까지 되돌리면 canUndo가 거짓이다', () => {
+    const { state, docs } = stack(2);
+    const once = undo(state, docs[2]);
+    expect(canUndo(once.state)).toBe(true);
+    expect(canRedo(once.state)).toBe(true);
+    const twice = undo(once.state, once.doc);
+    expect(canUndo(twice.state)).toBe(false);
+    expect(canRedo(twice.state)).toBe(true);
+  });
+
+  it('Redo를 끝까지 하면 canRedo가 거짓이 된다', () => {
+    const { state, docs } = stack(2);
+    const u = undoAll(state, docs[2], 2);
+    const r = redoAll(u.state, u.doc, 2);
+    expect(canUndo(r.state)).toBe(true);
+    expect(canRedo(r.state)).toBe(false);
+  });
+
+  it('새 수정이 future를 버리면 canRedo가 거짓이다 (P-28)', () => {
+    const { state, docs } = stack(2);
+    const u = undo(state, docs[2]);
+    expect(canRedo(u.state)).toBe(true);
+    const edited = recordEdit(u.state, u.doc, docOf(100), null);
+    expect(canRedo(edited)).toBe(false);
+    expect(canUndo(edited)).toBe(true);
+  });
+
+  it('한도(past 49칸)에서도 canUndo는 참이고, 49번 되돌린 뒤에는 거짓이다', () => {
+    const { state, docs } = stack(60);
+    expect(state.past).toHaveLength(49);
+    expect(canUndo(state)).toBe(true);
+    const u = undoAll(state, docs[60], 49);
+    expect(canUndo(u.state)).toBe(false);
+    expect(canRedo(u.state)).toBe(true);
+  });
+
+  it('상태를 고치지 않는다 (freeze한 상태에서도 오류 없음)', () => {
+    const state = deepFreeze(recordEdit(EMPTY_UNDO, docOf(0), docOf(1), null));
+    expect(() => canUndo(state)).not.toThrow();
+    expect(() => canRedo(state)).not.toThrow();
   });
 });

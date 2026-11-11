@@ -78,6 +78,11 @@ export function textOf(page: Page, id: string): Promise<string> {
   return page.locator(buttonSel(id)).evaluate((el) => getComputedStyle(el).color);
 }
 
+/** 캔버스 버튼 하나의 class 글 */
+export async function classOf(page: Page, id: string): Promise<string> {
+  return (await page.locator(buttonSel(id)).getAttribute('class')) ?? '';
+}
+
 /** 메인 · b1 · b2 · b3 버튼의 배경색 (위치 순) */
 export async function colorsOf(page: Page): Promise<string[]> {
   const out: string[] = [];

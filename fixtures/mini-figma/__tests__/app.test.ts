@@ -263,6 +263,7 @@ describe('고르기 (MF-20 · D-05)', () => {
     await click(buttonOf('b3'));
     expect(canvasCounts(instance.lastPatches)).toEqual({ SET_ATTR: 2 });
     expect(layerCounts(instance.lastPatches)).toEqual({ SET_ATTR: 2 });
+    expect(toolbarCounts(instance.lastPatches)).toEqual({});
     expect(root.querySelector('[data-testid="property-title"]')?.textContent).toBe('인스턴스 · 삭제');
     expect(buttons().filter((b) => b.classList.contains('selected')).map((b) => b.getAttribute('data-id'))).toEqual(['b3']);
   });
@@ -317,6 +318,7 @@ describe('메인 속성 편집 (MF-14 · MF-15 · P2-10 · D-01 ~ D-04) — patc
     await typeInto('prop-label', '버튼!');
     expect(canvasCounts(instance.lastPatches)).toEqual({ SET_TEXT: 2 });
     expect(layerCounts(instance.lastPatches)).toEqual({ SET_TEXT: 1 });
+    expect(toolbarCounts(instance.lastPatches), '첫 수정 = [↶]이 켜짐').toEqual({ SET_ATTR: 1 });
     expect(renders - before).toBe(1);
     expect(labels()).toEqual(['버튼!', '버튼!', '취소', '삭제']);
     expect(layerNames()).toEqual(['버튼!', '취소', '삭제']);
@@ -334,6 +336,7 @@ describe('메인 속성 편집 (MF-14 · MF-15 · P2-10 · D-01 ~ D-04) — patc
     await choose('prop-size', 'L');
     expect(canvasCounts(instance.lastPatches)).toEqual({ SET_ATTR: 4 });
     expect(layerCounts(instance.lastPatches)).toEqual({});
+    expect(toolbarCounts(instance.lastPatches)).toEqual({ SET_ATTR: 1 });
     expect(buttons().every((b) => b.classList.contains('btn-L'))).toBe(true);
   });
 
@@ -341,6 +344,7 @@ describe('메인 속성 편집 (MF-14 · MF-15 · P2-10 · D-01 ~ D-04) — patc
     await pick('#05b169');
     expect(canvasCounts(instance.lastPatches)).toEqual({ SET_STYLE: 6 });
     expect(layerCounts(instance.lastPatches)).toEqual({});
+    expect(toolbarCounts(instance.lastPatches)).toEqual({ SET_ATTR: 1 });
     expect(bgs()).toEqual([rgb('#05b169'), rgb('#05b169'), rgb('#05b169'), rgb('#cf202f')]);
     expect(['main', 'b1', 'b2', 'b3'].map(fgOf)).toEqual([rgb('#0a0b0d'), rgb('#0a0b0d'), rgb('#0a0b0d'), rgb('#ffffff')]);
   });
@@ -349,6 +353,7 @@ describe('메인 속성 편집 (MF-14 · MF-15 · P2-10 · D-01 ~ D-04) — patc
     await pick('#cf202f');
     expect(canvasCounts(instance.lastPatches)).toEqual({ SET_STYLE: 3 });
     expect(layerCounts(instance.lastPatches)).toEqual({});
+    expect(toolbarCounts(instance.lastPatches)).toEqual({ SET_ATTR: 1 });
     const styles = canvasStyles(instance.lastPatches);
     expect(styles).toHaveLength(3);
     for (const patch of styles) {
@@ -380,6 +385,7 @@ describe('메인 속성 편집 (MF-14 · MF-15 · P2-10 · D-01 ~ D-04) — patc
     await toggle('prop-hasicon', true);
     expect(canvasCounts(instance.lastPatches)).toEqual({ INSERT: 4 });
     expect(layerCounts(instance.lastPatches)).toEqual({});
+    expect(toolbarCounts(instance.lastPatches)).toEqual({ SET_ATTR: 1 });
     expect(renders - before).toBe(1);
     const inserts = instance.lastPatches.filter((p) => p.kind === 'INSERT' && startsWith(p.path, CANVAS_PREFIX));
     expect(inserts).toHaveLength(4);
@@ -397,6 +403,7 @@ describe('메인 속성 편집 (MF-14 · MF-15 · P2-10 · D-01 ~ D-04) — patc
     await toggle('prop-hasicon', false);
     expect(canvasCounts(instance.lastPatches)).toEqual({ REMOVE: 4 });
     expect(layerCounts(instance.lastPatches)).toEqual({});
+    expect(toolbarCounts(instance.lastPatches), '같은 칸 묶음 = [↶]은 이미 켜져 있음').toEqual({});
     expect(root.querySelectorAll('[data-testid="btn-icon"]')).toHaveLength(0);
   });
 
@@ -406,6 +413,7 @@ describe('메인 속성 편집 (MF-14 · MF-15 · P2-10 · D-01 ~ D-04) — patc
     await choose('prop-icon', 'heart');
     expect(canvasCounts(instance.lastPatches)).toEqual({ SET_TEXT: 4 });
     expect(layerCounts(instance.lastPatches)).toEqual({});
+    expect(toolbarCounts(instance.lastPatches)).toEqual({});
     expect(Array.from(root.querySelectorAll('[data-testid="btn-icon"]'))).toEqual(icons);
     expect(icons.map((el) => el.textContent)).toEqual(['♥', '♥', '♥', '♥']);
   });
@@ -470,6 +478,7 @@ describe('인스턴스 속성 편집 · override 표시 · ↻ (MF-12 ~ 15 · MF
     await typeInto('prop-label', '확인');
     expect(canvasCounts(instance.lastPatches)).toEqual({ SET_TEXT: 1 });
     expect(layerCounts(instance.lastPatches)).toEqual({ SET_TEXT: 1 });
+    expect(toolbarCounts(instance.lastPatches)).toEqual({ SET_ATTR: 1 });
     expect(renders - before).toBe(1);
     expect(labels()).toEqual(['버튼', '확인', '취소', '삭제']);
     expect(overriddenRows()).toEqual(['label']);
@@ -481,6 +490,7 @@ describe('인스턴스 속성 편집 · override 표시 · ↻ (MF-12 ~ 15 · MF
     await choose('prop-size', 'S');
     expect(canvasCounts(instance.lastPatches)).toEqual({ SET_ATTR: 1 });
     expect(layerCounts(instance.lastPatches)).toEqual({});
+    expect(toolbarCounts(instance.lastPatches)).toEqual({ SET_ATTR: 1 });
     expect(buttons().map((b) => (b.classList.contains('btn-S') ? 'S' : b.classList.contains('btn-M') ? 'M' : '?'))).toEqual(['M', 'S', 'M', 'M']);
   });
 
@@ -489,6 +499,7 @@ describe('인스턴스 속성 편집 · override 표시 · ↻ (MF-12 ~ 15 · MF
     await toggle('prop-hasicon', true);
     expect(canvasCounts(instance.lastPatches)).toEqual({ INSERT: 1 });
     expect(layerCounts(instance.lastPatches)).toEqual({});
+    expect(toolbarCounts(instance.lastPatches)).toEqual({ SET_ATTR: 1 });
     const insert = instance.lastPatches.find((p) => p.kind === 'INSERT' && startsWith(p.path, CANVAS_PREFIX));
     expect(insert?.kind === 'INSERT' && insert.path).toEqual([...B2_PATH, 0]);
     expect(buttonOf('b2').querySelector('[data-testid="btn-icon"]')?.textContent).toBe('★');
@@ -501,6 +512,7 @@ describe('인스턴스 속성 편집 · override 표시 · ↻ (MF-12 ~ 15 · MF
     await choose('prop-icon', 'heart');
     expect(canvasCounts(instance.lastPatches)).toEqual({ SET_TEXT: 1 });
     expect(layerCounts(instance.lastPatches)).toEqual({});
+    expect(toolbarCounts(instance.lastPatches)).toEqual({});
     expect(buttonOf('b2').querySelector('[data-testid="btn-icon"]')?.textContent).toBe('♥');
   });
 
@@ -517,6 +529,7 @@ describe('인스턴스 속성 편집 · override 표시 · ↻ (MF-12 ~ 15 · MF
     await toggle('prop-hasicon', true);
     expect(canvasCounts(instance.lastPatches)).toEqual({ INSERT: 3 });
     expect(layerCounts(instance.lastPatches)).toEqual({});
+    expect(toolbarCounts(instance.lastPatches)).toEqual({});
     expect(instance.lastPatches.filter((p) => p.kind !== 'SET_EVENT' && startsWith(p.kind === 'MOVE' ? p.parent : p.path, B2_PATH))).toHaveLength(0);
     expect(buttonOf('b2').querySelector('[data-testid="btn-icon"]')?.textContent).toBe('♥');
   });
@@ -527,6 +540,7 @@ describe('인스턴스 속성 편집 · override 표시 · ↻ (MF-12 ~ 15 · MF
     for (const [kind, glyph] of [['heart', '♥'], ['star', '★']] as const) {
       await choose('prop-icon', kind);
       expect(canvasCounts(instance.lastPatches)).toEqual({ SET_TEXT: 3 });
+      expect(toolbarCounts(instance.lastPatches)).toEqual({});
       expect(instance.lastPatches.filter((p) => p.kind !== 'SET_EVENT' && startsWith(p.kind === 'MOVE' ? p.parent : p.path, B2_PATH))).toHaveLength(0);
       expect(['main', 'b1', 'b3'].map((id) => buttonOf(id).querySelector('[data-testid="btn-icon"]')?.textContent)).toEqual([glyph, glyph, glyph]);
       expect(buttonOf('b2').querySelector('[data-testid="btn-icon"]')?.textContent).toBe('♥');
@@ -543,6 +557,7 @@ describe('인스턴스 속성 편집 · override 표시 · ↻ (MF-12 ~ 15 · MF
     await click(resetButton('hasIcon') as HTMLElement);
     expect(canvasCounts(instance.lastPatches)).toEqual({ REMOVE: 1 });
     expect(layerCounts(instance.lastPatches)).toEqual({});
+    expect(toolbarCounts(instance.lastPatches)).toEqual({});
     expect(renders - r1).toBe(1);
     expect(buttonOf('b2').querySelector('[data-testid="btn-icon"]')).toBeNull();
 
@@ -559,6 +574,7 @@ describe('인스턴스 속성 편집 · override 표시 · ↻ (MF-12 ~ 15 · MF
     await toggle('prop-hasicon', true);
     expect(canvasCounts(instance.lastPatches)).toEqual({ INSERT: 4 });
     expect(layerCounts(instance.lastPatches)).toEqual({});
+    expect(toolbarCounts(instance.lastPatches)).toEqual({});
     expect(buttons().map((b) => b.querySelector('[data-testid="btn-icon"]')?.textContent)).toEqual(['★', '★', '★', '★']);
   });
 
@@ -569,6 +585,7 @@ describe('인스턴스 속성 편집 · override 표시 · ↻ (MF-12 ~ 15 · MF
     await click(resetButton('label') as HTMLElement);
     expect(canvasCounts(instance.lastPatches)).toEqual({ SET_TEXT: 1 });
     expect(layerCounts(instance.lastPatches)).toEqual({ SET_TEXT: 1 });
+    expect(toolbarCounts(instance.lastPatches), '↻는 이미 켜진 [↶] 위의 새 단계').toEqual({});
     expect(renders - before).toBe(1);
     expect(labels()).toEqual(['버튼', '버튼', '취소', '삭제']);
     expect(overriddenRows()).toEqual([]);
@@ -783,6 +800,151 @@ describe('팔레트 판 (Dev-3)', () => {
 });
 
 // ---------------------------------------------------------------------------
+// Dev-6: [↶ 되돌리기] · [↷ 다시 하기] 버튼 (FD-12, P-23 · P-24 · P-28)
+// ---------------------------------------------------------------------------
+
+describe('Undo/Redo 버튼 (Dev-6)', () => {
+  const undoButton = (): HTMLButtonElement => byId('undo-button') as HTMLButtonElement;
+  const redoButton = (): HTMLButtonElement => byId('redo-button') as HTMLButtonElement;
+  const keyDown = async (options: { shiftKey?: boolean } = {}): Promise<void> => {
+    document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'z', ctrlKey: true, bubbles: true, cancelable: true, ...options }));
+    await Promise.resolve();
+  };
+
+  it('처음에는 [↶] [↷] 모두 disabled 속성이 있고 글자는 「↶ 되돌리기」 · 「↷ 다시 하기」다. Hook은 그대로 useState 4칸 + useEffect 1칸이다', () => {
+    expect(undoButton().hasAttribute('disabled')).toBe(true);
+    expect(redoButton().hasAttribute('disabled')).toBe(true);
+    expect(undoButton().textContent).toBe('↶ 되돌리기');
+    expect(redoButton().textContent).toBe('↷ 다시 하기');
+    expect(Array.from(byId('toolbar').children).map(testId)).toEqual(['app-name', 'add-instance', 'undo-button', 'redo-button']);
+    // Hook 칸 순서 불변: doc · selectedId · history · nextId (+ keydown effect 1칸)
+    expect(slot(0)).toBe(INITIAL_DOC);
+    expect(slot(1)).toBeNull();
+    expect(slot(2)).toBe(EMPTY_UNDO);
+    expect(slot(3)).toBe(4);
+    expect(instance.hooks).toHaveLength(5);
+  });
+
+  it('수정하면 [↶]이 켜지고(disabled 없음) [↷]은 꺼진 채다. 고르기만 해서는 안 켜진다', async () => {
+    await click(buttonOf('b2'));
+    expect(undoButton().hasAttribute('disabled')).toBe(true);
+    await pick('#05b169');
+    expect(undoButton().hasAttribute('disabled')).toBe(false);
+    expect(redoButton().hasAttribute('disabled')).toBe(true);
+  });
+
+  it('P-23 삭제(P-17) 뒤 [↶] 버튼 = 캔버스 { INSERT: 1 } · 레이어 { INSERT: 1 } · 도구 막대 { SET_ATTR: 2 }, 렌더 1번. 문서 · 선택 · 기록이 키 Ctrl+Z와 같다', async () => {
+    await click(buttonOf('b2'));
+    await click(byId('delete-instance'));
+    const before = renders;
+    await click(undoButton());
+    expect(canvasCounts(instance.lastPatches)).toEqual({ INSERT: 1 });
+    expect(layerCounts(instance.lastPatches)).toEqual({ INSERT: 1 });
+    expect(toolbarCounts(instance.lastPatches)).toEqual({ SET_ATTR: 2 });
+    expect(renders - before).toBe(1);
+    expect(buttons().slice(1).map((b) => b.getAttribute('data-id'))).toEqual(['b1', 'b2', 'b3']);
+    expect(slot(0)).toEqual(INITIAL_DOC);
+    expect(slot(1)).toBeNull();
+    expect((slot(2) as UndoState).past).toHaveLength(0);
+    expect((slot(2) as UndoState).future).toHaveLength(1);
+    expect(undoButton().hasAttribute('disabled')).toBe(true);
+    expect(redoButton().hasAttribute('disabled')).toBe(false);
+  });
+
+  it('버튼과 키는 같은 함수를 쓴다: 같은 동작 순서의 결과(문서 · 선택 · 기록)가 서로 같다', async () => {
+    // 버튼으로 한 번
+    await click(buttonOf('main'));
+    await pick('#cf202f');
+    await click(undoButton());
+    const byButton = { doc: slot(0), selected: slot(1), past: (slot(2) as UndoState).past.length, future: (slot(2) as UndoState).future.length };
+    // 키로 다시 Redo 한 뒤 Undo 한 번 (같은 지점으로)
+    await keyDown({ shiftKey: true });
+    await keyDown();
+    expect({ doc: slot(0), selected: slot(1), past: (slot(2) as UndoState).past.length, future: (slot(2) as UndoState).future.length }).toEqual(byButton);
+    // [↷] 버튼 = Ctrl+Shift+Z와 같은 결과
+    await click(redoButton());
+    expect(bgs().slice(0, 3)).toEqual([rgb('#cf202f'), rgb('#cf202f'), rgb('#cf202f')]);
+    expect(slot(1)).toBe('main');
+  });
+
+  it('P-24 (P-19 뒤, Undo 상태) [↷] 버튼 = 캔버스 { SET_STYLE: 3 } · 도구 막대 { SET_ATTR: 2 }, 렌더 1번', async () => {
+    await click(buttonOf('main'));
+    await pick('#cf202f');
+    await click(undoButton());
+    const before = renders;
+    await click(redoButton());
+    expect(canvasCounts(instance.lastPatches)).toEqual({ SET_STYLE: 3 });
+    expect(layerCounts(instance.lastPatches)).toEqual({});
+    expect(toolbarCounts(instance.lastPatches)).toEqual({ SET_ATTR: 2 });
+    expect(renders - before).toBe(1);
+    expect(undoButton().hasAttribute('disabled')).toBe(false);
+    expect(redoButton().hasAttribute('disabled')).toBe(true);
+  });
+
+  it('P-28 수정 → Undo → 다른 칸 새 수정: [↷]이 꺼지고 [↶]이 켜진다 = 도구 막대 { SET_ATTR: 2 }', async () => {
+    await click(buttonOf('main'));
+    await choose('prop-size', 'L');
+    await click(undoButton());
+    expect(undoButton().hasAttribute('disabled')).toBe(true);
+    expect(redoButton().hasAttribute('disabled')).toBe(false);
+    await typeInto('prop-label', '새');
+    expect(toolbarCounts(instance.lastPatches)).toEqual({ SET_ATTR: 2 });
+    expect(undoButton().hasAttribute('disabled')).toBe(false);
+    expect(redoButton().hasAttribute('disabled')).toBe(true);
+    expect((slot(2) as UndoState).future).toHaveLength(0);
+  });
+
+  it('꺼진 [↶] [↷]를 눌러도 렌더 0번 · lastPatches 그대로다 (P-20): 처음 화면에서도, 끝까지 되돌린 뒤에도', async () => {
+    const patches = instance.lastPatches;
+    const before = renders;
+    await click(undoButton());
+    await click(redoButton());
+    expect(renders - before).toBe(0);
+    expect(instance.lastPatches).toBe(patches);
+    expect(slot(2)).toBe(EMPTY_UNDO);
+
+    await click(buttonOf('main'));
+    await choose('prop-size', 'L');
+    await click(undoButton());
+    const after = instance.lastPatches;
+    const count = renders;
+    await click(undoButton()); // 이제 꺼져 있다
+    expect(renders - count).toBe(0);
+    expect(instance.lastPatches).toBe(after);
+  });
+
+  it('Undo 한도 (Q17-2) 버튼판: [+ 인스턴스] 60번 뒤 [↶] 버튼 49번 = 처음 b1~b14, 그 뒤 [↶]은 꺼짐', async () => {
+    for (let i = 0; i < 60; i += 1) await click(byId('add-instance'));
+    expect((slot(2) as UndoState).past).toHaveLength(49);
+    expect(undoButton().hasAttribute('disabled')).toBe(false);
+    for (let i = 0; i < 49; i += 1) await click(undoButton());
+    expect((slot(0) as typeof INITIAL_DOC).instances.map((it) => it.id)).toEqual(Array.from({ length: 14 }, (_, i) => `b${i + 1}`));
+    expect(undoButton().hasAttribute('disabled')).toBe(true);
+    await click(undoButton());
+    expect((slot(0) as typeof INITIAL_DOC).instances).toHaveLength(14);
+  });
+
+  it('라벨 입력 중 첫 글자로 [↶]이 켜져도 라벨 입력칸 · [↶] 노드는 같은 참조다 (도구 막대는 disabled 속성만 바뀜)', async () => {
+    await click(buttonOf('main'));
+    const input = byId('prop-label');
+    const undoNode = undoButton();
+    await typeInto('prop-label', '버튼!');
+    expect(undoButton().hasAttribute('disabled')).toBe(false);
+    expect(byId('prop-label')).toBe(input);
+    expect(undoButton()).toBe(undoNode);
+    expect((input as HTMLInputElement).value).toBe('버튼!');
+  });
+
+  it('버튼을 눌러도 keydown 리스너는 1개다 (등록 − 해제 = 1)', async () => {
+    await click(buttonOf('main'));
+    await choose('prop-size', 'L');
+    await click(undoButton());
+    await click(redoButton());
+    expect(keydownListeners()).toBe(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Dev-9: 인스턴스 추가 · 삭제 · 메인 삭제 불가 (P-16 · P-17, MF-22 ~ 24)
 // ---------------------------------------------------------------------------
 
@@ -817,7 +979,7 @@ describe('인스턴스 추가 · 삭제 (Dev-9)', () => {
     await click(addButton());
     expect(canvasCounts(instance.lastPatches)).toEqual({ INSERT: 1 });
     expect(layerCounts(instance.lastPatches)).toEqual({ INSERT: 1 });
-    expect(toolbarCounts(instance.lastPatches)).toEqual({});
+    expect(toolbarCounts(instance.lastPatches), '첫 수정 = [↶]이 켜짐').toEqual({ SET_ATTR: 1 });
     expect(renders - before).toBe(1);
     expect(buttons().map((b) => b.getAttribute('data-id'))).toEqual(['main', 'b1', 'b2', 'b3', 'b4']);
     expect(layerNames()).toEqual(['버튼', '취소', '삭제', '버튼']);
@@ -843,6 +1005,7 @@ describe('인스턴스 추가 · 삭제 (Dev-9)', () => {
     await click(deleteButton());
     expect(canvasCounts(instance.lastPatches)).toEqual({ REMOVE: 1 });
     expect(layerCounts(instance.lastPatches)).toEqual({ REMOVE: 1 });
+    expect(toolbarCounts(instance.lastPatches)).toEqual({ SET_ATTR: 1 });
     const panelReplaces = instance.lastPatches.filter((p) => p.kind === 'REPLACE' && startsWith(p.path, PANEL_PREFIX_ALL));
     expect(panelReplaces.length).toBeGreaterThanOrEqual(1);
     expect(heading.isConnected).toBe(false);
@@ -901,6 +1064,7 @@ describe('순서 바꾸기 (Dev-10)', () => {
     await click(moveButton('b1', 'down'));
     expect(canvasCounts(instance.lastPatches)).toEqual({ MOVE: 1 });
     expect(layerCounts(instance.lastPatches)).toEqual({ MOVE: 1 });
+    expect(toolbarCounts(instance.lastPatches)).toEqual({ SET_ATTR: 1 });
     expect(renders - before).toBe(1);
     expect(order()).toEqual(['b2', 'b1', 'b3']);
     expect(layerNames()).toEqual(['취소', '버튼', '삭제']);
@@ -1029,6 +1193,7 @@ describe('키보드 · Undo/Redo (Dev-11)', () => {
     await press('Delete');
     expect(canvasCounts(instance.lastPatches)).toEqual({ REMOVE: 1 });
     expect(layerCounts(instance.lastPatches)).toEqual({ REMOVE: 1 });
+    expect(toolbarCounts(instance.lastPatches)).toEqual({ SET_ATTR: 1 });
     expect(instance.lastPatches.filter((p) => p.kind === 'REPLACE' && startsWith(p.path, PANEL_PREFIX_ALL)).length).toBeGreaterThanOrEqual(1);
     expect(renders - before, '삭제 한 동작 = 렌더 1번').toBe(1);
     console.log(`[P-17 키] 캔버스 ${JSON.stringify(canvasCounts(instance.lastPatches))} 레이어 ${JSON.stringify(layerCounts(instance.lastPatches))} 속성 패널 REPLACE ${instance.lastPatches.filter((p) => p.kind === 'REPLACE' && startsWith(p.path, PANEL_PREFIX_ALL)).length}줄 렌더 +${renders - before}`);
@@ -1062,6 +1227,7 @@ describe('키보드 · Undo/Redo (Dev-11)', () => {
     await undoKey();
     expect(canvasCounts(instance.lastPatches)).toEqual({ INSERT: 1 });
     expect(layerCounts(instance.lastPatches)).toEqual({ INSERT: 1 });
+    expect(toolbarCounts(instance.lastPatches), '[↶] 꺼짐 + [↷] 켜짐').toEqual({ SET_ATTR: 2 });
     expect(renders - before, 'Undo 한 동작 = 렌더 1번').toBe(1);
     expect(ids()).toEqual(['b1', 'b2', 'b3']);
     expect(slot(1)).toBeNull();
@@ -1074,10 +1240,12 @@ describe('키보드 · Undo/Redo (Dev-11)', () => {
     await undoKey();
     expect(canvasCounts(instance.lastPatches)).toEqual({ SET_STYLE: 3 });
     expect(layerCounts(instance.lastPatches)).toEqual({});
+    expect(toolbarCounts(instance.lastPatches), 'Undo = [↶] 꺼짐 + [↷] 켜짐').toEqual({ SET_ATTR: 2 });
     expect(renders - before).toBe(1);
     expect(bgs()).toEqual([rgb('#0052ff'), rgb('#0052ff'), rgb('#0052ff'), rgb('#cf202f')]);
     await redoKey();
     expect(canvasCounts(instance.lastPatches)).toEqual({ SET_STYLE: 3 });
+    expect(toolbarCounts(instance.lastPatches), 'Redo = [↶] 켜짐 + [↷] 꺼짐').toEqual({ SET_ATTR: 2 });
     expect(bgs()).toEqual([rgb('#cf202f'), rgb('#cf202f'), rgb('#cf202f'), rgb('#cf202f')]);
     expect(slot(1)).toBe('main'); // 고르기는 그대로
   });
