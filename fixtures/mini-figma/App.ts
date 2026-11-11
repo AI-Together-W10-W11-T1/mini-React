@@ -1,18 +1,23 @@
-import { h, useEffect, useState } from '@mini-react/react';
+import { h, useEffect, useMemo, useState } from '@mini-react/react';
 import type { VNode } from '@mini-react/shared';
 import { Canvas } from './components/Canvas';
 import { LayerPanel } from './components/LayerPanel';
+import { PreviewPanel } from './components/PreviewPanel';
 import { PropertyPanel } from './components/PropertyPanel';
 import { Toolbar } from './components/Toolbar';
 import { INITIAL_DOC, addInstance, moveInstance, reconcileSelection, removeInstance, resetInstanceField, setInstanceField, setMainField } from './model';
 import type { Doc, Field, MainProps } from './model';
 import { keyAction } from './keys';
+import { createPreview } from './preview';
+import type { Preview } from './preview';
+import { INITIAL_NAV, canBack, canForward } from './previewNav';
+import type { PreviewNav } from './previewNav';
 import { EMPTY_UNDO, canRedo, canUndo, recordEdit, redo, undo } from './undo';
 import type { UndoGroup, UndoResult, UndoState } from './undo';
 
-// [AI Note]: 루트 컴포넌트. 모든 useState · useEffect는 이 파일에서만 부른다 (MF-04 · P2-07 · P2-08).
+// [AI Note]: 루트 컴포넌트. 모든 useState · useEffect · useMemo는 이 파일에서만 부른다 (MF-04 · P2-07 · P2-08).
 // 자식(Toolbar · LayerPanel · Canvas · PropertyPanel)은 props만 받는 순수 함수이고, 바꾸고 싶은 것은 루트가 내려 주는 콜백 props로 알린다 (Lifting State Up).
-// 상태 칸은 4개고 렌더마다 같은 순서로 부른다 (Hook 개수가 달라지면 엔진이 오류, dev_todo 공통 주의 9):
+// 상태 칸은 4개(+ 실제 영역용 3칸, 아래)고 렌더마다 같은 순서로 부른다 (Hook 개수가 달라지면 엔진이 오류, dev_todo 공통 주의 9):
 //   doc        = { main, instances } 한 칸 — Undo가 기록하는 것은 이것뿐
 //   selectedId = 'main' | 인스턴스 id | null — 고르기는 Undo 기록 밖 (처음은 null, ④-2)
 //   history    = Undo 기록 (undo.ts)
@@ -118,6 +123,29 @@ export function App(): VNode {
     return () => document.removeEventListener('keydown', onKey);
   }, [doc, selectedId, history]);
 
+  // [AI Note]: 실제 영역(patch-preview, PP-09) — 기존 5칸(useState 4 + useEffect 1)의 순서는 그대로 두고 뒤에 3칸만 덧붙인다 (slot(0 ~ 3) 불변).
+  //   [5] useMemo = 보관함: 한 번 만들어 계속 쓰는 같은 객체. 안에 createPreview 결과를 넣어 두는 자리이고 setter가 없어 바꿔도 렌더가 안 일어난다 (엔진에 useRef가 없어서 이렇게 한다)
+  //   [6] useEffect([]) = 마운트 patch 직후 한 번: DOM에서 테스트 영역 · 실제 영역 상자 · 깜빡임 층을 찾아 createPreview를 만든다 (렌더 중에는 DOM이 아직 없다). cleanup = 보관함 비움
+  //   [7] useState(nav) = 뒤로 · 앞으로 가능 여부 (App state, PP-09). 렌더 중 canBack · canForward로 계산해 PreviewPanel에 내려 준다
+  const vault = useMemo<{ preview: Preview | null }>(() => ({ preview: null }), []);
+  useEffect(() => {
+    const testArea = document.querySelector('[data-testid="canvas"]');
+    const realArea = document.querySelector<HTMLElement>('[data-testid="real-area"]');
+    const overlayLayer = document.querySelector<HTMLElement>('[data-testid="real-overlay"]');
+    if (testArea === null || realArea === null || overlayLayer === null) return;
+    vault.preview = createPreview({ testArea, realArea, overlayLayer });
+    return () => {
+      vault.preview = null;
+    };
+  }, []);
+  const [nav, setNav] = useState<PreviewNav>(INITIAL_NAV);
+
+  // [AI Note]: [Patch] [뒤로] [앞으로] 핸들러는 다음 Dev에서 연결한다 (이번에는 처음 채우기까지만).
+  const onPreviewPatch = (): void => {};
+  const onPreviewBack = (): void => {};
+  const onPreviewForward = (): void => {};
+  void setNav;
+
   return h(
     'div',
     { class: 'app' },
@@ -126,5 +154,7 @@ export function App(): VNode {
     h(LayerPanel, { main: doc.main, instances: doc.instances, selectedId, onSelect, onMove }),
     h(Canvas, { main: doc.main, instances: doc.instances, selectedId, onSelect }),
     h(PropertyPanel, { main: doc.main, instances: doc.instances, selectedId, onEdit, onReset, onDelete: deleteSelected }),
+    // 실제 영역 구역 = 5번째 자식 [0,4]. DOM 순서는 맨 끝, 자리는 CSS로 정한다 (앞 네 개의 경로 접두 [0,0] ~ [0,3]은 그대로)
+    h(PreviewPanel, { canBack: canBack(nav), canForward: canForward(nav), onPatch: onPreviewPatch, onBack: onPreviewBack, onForward: onPreviewForward }),
   );
 }

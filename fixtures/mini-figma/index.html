@@ -63,6 +63,19 @@
       .btn-L { padding: 14px 28px; font-size: 1.25rem; }
       .figma-button.selected { outline: 3px solid var(--accent); outline-offset: 2px; }
 
+      /* 영역 제목 (캔버스 안 「테스트 영역」) */
+      .area-title { margin: 0 0 12px; font-size: 1.125rem; font-weight: 600; line-height: 1.33; color: var(--ink); }
+
+      /* 실제 영역 구역: 머리글(제목 + 버튼 3개) + 상자. 깜빡임 층은 상자와 같은 크기로 겹치고 마우스를 안 받는다. 박스는 흐름에 끼지 않는다(absolute) */
+      .real-section { display: flex; flex-direction: column; gap: 12px; }
+      .real-header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; }
+      .real-header .panel-title { margin: 0; }
+      .real-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+      .real-frame { position: relative; flex: 1 1 auto; min-height: 0; }
+      .real-area { min-height: 120px; }
+      .real-overlay { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+      .viz-box { position: absolute; }
+
       .property-empty { margin: 0; color: var(--ink-soft); }
       /* 속성 칸: 이름 + 입력 부품. 긴 글자도 칸 안에서 줄어들게 min-width: 0 */
       .prop-row { display: flex; align-items: center; gap: 8px; margin: 10px 0; }
@@ -95,13 +108,21 @@
         html, body { height: 100%; }
         body { overflow: hidden; }
         [data-testid='app-root'] { height: 100%; }
-        .app { height: 100%; grid-template-rows: auto minmax(0, 1fr); align-items: stretch; }
-        .app > .layer-panel, .app > .canvas, .app > .property-panel { overflow-y: auto; overscroll-behavior: contain; }
+        .app { height: 100%; grid-template-rows: auto minmax(0, 1fr) minmax(0, 1fr); align-items: stretch; }
+        .app > .layer-panel, .app > .canvas, .app > .property-panel, .app > .real-section { overflow-y: auto; overscroll-behavior: contain; }
         .canvas { min-height: 0; }
+        /* patch-preview 배치: 가운데 열을 위(테스트 영역 = 캔버스) · 아래(실제 영역)로 반반 나눈다. 레이어 · 속성은 두 행에 걸쳐 화면 아래까지.
+           DOM 순서는 도구 막대 · 레이어 · 캔버스 · 속성 · 실제 영역 그대로(경로 접두 불변), 자리만 grid 명시 배치로 정한다 */
+        .app > .layer-panel { grid-column: 1; grid-row: 2 / span 2; }
+        .app > .canvas { grid-column: 2; grid-row: 2; }
+        .app > .real-section { grid-column: 2; grid-row: 3; }
+        .app > .property-panel { grid-column: 3; grid-row: 2 / span 2; }
       }
 
       @media (max-width: 720px) {
         .app { grid-template-columns: minmax(0, 1fr); }
+        /* 속성 패널만 뒤로 보내 순서 = 도구 막대 → 레이어 → 캔버스 → 실제 영역 → 속성 (DOM에서는 실제 영역이 맨 끝) */
+        .app > .property-panel { order: 1; }
         .toolbar { gap: 8px; }
         .btn-primary, .btn-secondary { padding: 0 14px; font-size: 0.875rem; }
         .layer-move { min-width: 40px; min-height: 40px; }

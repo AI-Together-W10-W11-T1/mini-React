@@ -36,6 +36,8 @@ export function Canvas(props: Props): VNode {
   return h(
     'section',
     { class: 'canvas', 'data-testid': 'canvas' },
+    // [AI Note]: 테스트 영역 제목 — 캔버스 안 경로가 한 칸 밀린다. 실제 영역으로 복사할 때 정리 함수(previewVNode)가 이 제목을 뺀다.
+    h('h2', { class: 'area-title', 'data-testid': 'test-area-title' }, '테스트 영역'),
     h('div', { class: 'canvas-main', 'data-testid': 'canvas-main' }, h(Button, draw('main', main))),
     h(
       'div',
