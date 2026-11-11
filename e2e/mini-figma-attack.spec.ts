@@ -65,6 +65,11 @@ test('QA-A2 아주 긴 글자: 공백 없는 200자를 넣어도 가로 스크�
 
   expect((await canvasLabels(page))[0]).toBe(long);
   expect(await noHorizontalScroll(page)).toBe(true);
+  // 인스턴스를 골라도 긴 이름(「인스턴스 · AAAA…」 머리 · 레이어 행)이 패널 밖으로 안 나가 가로 스크롤이 없다
+  await selectOnCanvas(page, 'b1');
+  await expect(page.getByTestId('property-title')).toHaveText(`인스턴스 · ${long}`);
+  expect(await noHorizontalScroll(page)).toBe(true);
+  await selectOnCanvas(page, 'main');
   // 모든 버튼의 오른쪽 끝이 캔버스 오른쪽 끝을 넘지 않는다
   const canvas = await page.getByTestId('canvas').boundingBox();
   if (canvas === null) throw new Error('캔버스가 안 보인다');
