@@ -10,7 +10,7 @@ import type { Doc, Field, MainProps } from './model';
 import { keyAction } from './keys';
 import { createPreview } from './preview';
 import type { Preview } from './preview';
-import { INITIAL_NAV, canBack, canForward } from './previewNav';
+import { INITIAL_NAV, canBack, canForward, navBack, navForward, navPush } from './previewNav';
 import type { PreviewNav } from './previewNav';
 import { EMPTY_UNDO, canRedo, canUndo, recordEdit, redo, undo } from './undo';
 import type { UndoGroup, UndoResult, UndoState } from './undo';
@@ -140,11 +140,18 @@ export function App(): VNode {
   }, []);
   const [nav, setNav] = useState<PreviewNav>(INITIAL_NAV);
 
-  // [AI Note]: [Patch] [뒤로] [앞으로] 핸들러는 다음 Dev에서 연결한다 (이번에는 처음 채우기까지만).
-  const onPreviewPatch = (): void => {};
-  const onPreviewBack = (): void => {};
-  const onPreviewForward = (): void => {};
-  void setNav;
+  // [AI Note]: [Patch] [뒤로] [앞으로] = 보관함의 createPreview 결과를 부르고, **기록이 실제로 움직였을 때만** nav를 바꾼다 (실제 영역 기록만 움직임, PP-06).
+  // doc · selectedId · history(앱 Undo)는 건드리지 않는다 — 테스트 영역 · 앱 상태 · Undo는 그대로. 바뀐 게 없는 Patch · 경계 이동은 false라 setter를 안 부른다.
+  // nav는 함수형 setter로 바꾼다: 같은 틱에 연타해도 낡은 nav 값을 읽지 않고 쌓인 만큼 정확히 센다. 효과가 아직 안 돈 상태(보관함 비어 있음)면 아무것도 안 한다.
+  const onPreviewPatch = (): void => {
+    if (vault.preview?.patch()) setNav(navPush);
+  };
+  const onPreviewBack = (): void => {
+    if (vault.preview?.back()) setNav(navBack);
+  };
+  const onPreviewForward = (): void => {
+    if (vault.preview?.forward()) setNav(navForward);
+  };
 
   return h(
     'div',
