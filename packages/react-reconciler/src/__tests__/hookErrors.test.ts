@@ -1,11 +1,26 @@
-import { describe, it, expect, vi } from 'vitest';
+import { afterEach, describe, it, expect, vi } from 'vitest';
 import { h, useEffect, useMemo, useState } from '@mini-react/react';
 import type { AreaChildren, Patch, Props, VNode } from '@mini-react/shared';
 import { NESTED_RENDER_LIMIT } from '@mini-react/shared';
+import { setRenderErrorHandler } from '@mini-react/scheduler';
 import { FunctionComponent } from '../FunctionComponent';
 import type { FunctionComponentHost } from '../FunctionComponent';
+import { flush } from '../../../shared/src/__tests__/helpers';
 
 type Setter<S> = (next: S | ((prev: S) => S)) => void;
+
+// [AI Note]: Batching(결정 9 B)에서는 setter가 일으킨 렌더의 오류가 마이크로태스크 안에서 나므로 호출한 쪽이 try/catch로 잡을 수 없다.
+// 테스트는 scheduler의 오류 처리 함수 자리(setRenderErrorHandler)로 오류를 모아 확인한다. 직접 부른 mount() · update()는 예전처럼 던진다.
+const errors: unknown[] = [];
+function collectRenderErrors(): void {
+  errors.length = 0;
+  setRenderErrorHandler((error) => void errors.push(error));
+}
+afterEach(() => {
+  setRenderErrorHandler(null);
+  errors.length = 0;
+});
+const messages = (): string[] => errors.map((e) => (e as Error).message);
 
 function makeHost() {
   const patches: (readonly Patch[])[] = [];
@@ -146,7 +161,8 @@ describe('Hook 호출 순서 · 개수 오류 (정책 「§4.2 허용하지 않�
 });
 
 describe('렌더 중 컴포넌트가 던진 예외 (§6.2 오류 복구)', () => {
-  it('상태 · 이전 VNode 그대로, 예외는 위로, 다음 update는 정상', () => {
+  it('상태 · 이전 VNode 그대로, 예외는 삼키지 않고 오류 처리 함수로, 다음 update는 정상', async () => {
+    collectRenderErrors();
     let boom = false;
     let setN: Setter<number> = () => {};
     const { host, patches } = makeHost();
@@ -162,16 +178,21 @@ describe('렌더 중 컴포넌트가 던진 예외 (§6.2 오류 복구)', () =>
     );
     fc.mount();
     boom = true;
-    expect(() => setN(1)).toThrow('render boom'); // setter 안 렌더의 예외가 호출한 쪽으로
+    setN(1); // 렌더는 마이크로태스크에서 돌고, 그 예외는 호출한 쪽이 아니라 오류 처리 함수(기본 = 다시 던지기)로 간다
+    expect(errors).toEqual([]);
+    await flush();
+    expect(messages()).toEqual(['render boom']);
     expect(patches).toHaveLength(0);
     expect(fc.hooks[0]).toMatchObject({ kind: 'state', value: 1 }); // setter가 바꾼 값은 그대로 (렌더만 적용 안 됨)
     boom = false;
     setN(2);
+    await flush();
     expect(patches).toHaveLength(1);
     expect(patches[0]).toEqual([{ kind: 'SET_TEXT', path: [0, 0], before: '0', after: '2' }]);
   });
 
-  it('깊이 카운터도 복구된다 (예외 뒤 많이 불러도 무한 렌더 오류가 나지 않음)', () => {
+  it('예약 표시 · 연달아 횟수도 복구된다 (예외 뒤 많이 불러도 큐가 막히거나 무한 렌더 오류가 나지 않음)', async () => {
+    collectRenderErrors();
     let boom = true;
     let setN: Setter<number> = () => {};
     const fc = new FunctionComponent(
@@ -185,9 +206,43 @@ describe('렌더 중 컴포넌트가 던진 예외 (§6.2 오류 복구)', () =>
       makeHost().host,
     );
     fc.mount();
-    for (let i = 1; i <= 100; i++) expect(() => setN(i)).toThrow('boom');
+    for (let i = 1; i <= 100; i++) {
+      setN(i);
+      await flush(); // 한 번에 하나씩: 렌더마다 오류가 나도 다음 예약이 정상으로 걸린다
+    }
+    expect(errors).toHaveLength(100);
+    expect(new Set(messages())).toEqual(new Set(['boom']));
     boom = false;
-    expect(() => setN(1000)).not.toThrow();
+    errors.length = 0;
+    setN(1000);
+    await flush();
+    expect(errors).toEqual([]); // 큐가 막히지 않았고 무한 렌더 오류도 없다
+    expect(fc.hooks[0]).toMatchObject({ value: 1000 });
+  });
+
+  it('렌더가 던진 오류 뒤에도 effect 보호 코드 · 이전 VNode가 흔들리지 않는다 (다음 렌더의 patch before는 마지막 성공 모습)', async () => {
+    collectRenderErrors();
+    let boom = false;
+    let setN: Setter<number> = () => {};
+    const { host, patches } = makeHost();
+    const fc = new FunctionComponent(
+      (): VNode => {
+        const [n, s] = useState(0);
+        setN = s;
+        if (boom) throw new Error('render boom');
+        return h('p', null, String(n));
+      },
+      {},
+      host,
+    );
+    fc.mount();
+    boom = true;
+    setN(1);
+    await flush();
+    boom = false;
+    setN(2);
+    await flush();
+    expect(patches).toEqual([[{ kind: 'SET_TEXT', path: [0, 0], before: '0', after: '2' }]]);
   });
 });
 
@@ -268,25 +323,38 @@ describe('무한 렌더 안전장치 (정책: 연달아 50번 넘으면 오류)'
     return { ctx, fc: new FunctionComponent(App, {}, makeHost().host) };
   }
 
-  it('중첩이 10번으로 끝나는 연쇄는 정상이다 (카운터를 10까지 올리는 effect)', () => {
+  it('연달아 10번으로 끝나는 연쇄는 정상이다 (카운터를 10까지 올리는 effect)', async () => {
+    collectRenderErrors();
     const { ctx, fc } = chain(10);
-    expect(() => fc.mount()).not.toThrow();
+    fc.mount();
+    await flush();
+    expect(errors).toEqual([]);
     expect(ctx.n).toBe(10);
   });
 
-  it(`한도(${NESTED_RENDER_LIMIT})까지는 정상이다 — 중첩 ${NESTED_RENDER_LIMIT}번`, () => {
+  it(`한도(${NESTED_RENDER_LIMIT})까지는 정상이다 — 연달아 ${NESTED_RENDER_LIMIT}번`, async () => {
+    collectRenderErrors();
     const { ctx, fc } = chain(NESTED_RENDER_LIMIT);
-    expect(() => fc.mount()).not.toThrow();
+    fc.mount();
+    await flush();
+    expect(errors).toEqual([]);
     expect(ctx.n).toBe(NESTED_RENDER_LIMIT);
   });
 
-  it(`${NESTED_RENDER_LIMIT + 1}번째 중첩에서 오류 (문구에 "무한 렌더" · 한도 숫자)`, () => {
-    const { fc } = chain(NESTED_RENDER_LIMIT + 1);
-    expect(() => fc.mount()).toThrow(`무한 렌더`);
-    expect(() => chain(NESTED_RENDER_LIMIT + 1).fc.mount()).toThrow(String(NESTED_RENDER_LIMIT));
+  it(`${NESTED_RENDER_LIMIT + 1}번째 렌더에서 오류 (문구에 "무한 렌더" · 한도 숫자), 그 렌더는 돌지 않는다`, async () => {
+    collectRenderErrors();
+    const { ctx, fc } = chain(NESTED_RENDER_LIMIT + 1);
+    fc.mount();
+    await flush();
+    expect(errors).toHaveLength(1);
+    expect(messages()[0]).toContain('무한 렌더');
+    expect(messages()[0]).toContain(String(NESTED_RENDER_LIMIT));
+    expect(ctx.n).toBe(NESTED_RENDER_LIMIT); // 51번째 렌더(n=51)는 실행되지 않았다
+    expect(fc.hooks[0]).toMatchObject({ kind: 'state', value: NESTED_RENDER_LIMIT + 1 }); // setter가 바꾼 칸 값은 남는다 (기존 정책)
   });
 
-  it('매번 setter를 부르는 effect는 오류를 내고, 그 뒤에도 앱이 죽지 않는다 (깊이 복구)', () => {
+  it('매번 setter를 부르는 effect는 오류를 내고, 그 뒤에도 앱이 죽지 않는다 (연달아 횟수 복구)', async () => {
+    collectRenderErrors();
     let loop = true;
     let setN: Setter<number> = () => {};
     const { host, patches } = makeHost();
@@ -302,11 +370,17 @@ describe('무한 렌더 안전장치 (정책: 연달아 50번 넘으면 오류)'
       {},
       host,
     );
-    expect(() => fc.mount()).toThrow('무한 렌더');
+    fc.mount();
+    await flush();
+    expect(errors).toHaveLength(1);
+    expect(messages()[0]).toContain('무한 렌더');
     loop = false;
     patches.length = 0;
-    // 앱이 살아 있다: 새 setter 호출이 정상 렌더 (깊이가 0으로 돌아와 있음)
-    expect(() => setN((c) => c + 1)).not.toThrow();
+    errors.length = 0;
+    // 앱이 살아 있다: 새 setter 호출이 정상 렌더 (연달아 횟수가 0으로 돌아와 있음)
+    setN((c) => c + 1);
+    await flush();
+    expect(errors).toEqual([]);
     expect(patches.length).toBe(1);
   });
 });
@@ -356,7 +430,7 @@ describe('렌더 중 setter 호출은 오류 (검수 1회차 NB-1 · 정책 「�
     expect(updater).not.toHaveBeenCalled();
   });
 
-  it('렌더 중 setter 오류 뒤에도 새 컴포넌트 인스턴스는 정상으로 마운트되고 setter가 patch를 낸다 (전역 깊이 · 렌더 표시 복구)', () => {
+  it('렌더 중 setter 오류 뒤에도 새 컴포넌트 인스턴스는 정상으로 마운트되고 setter가 patch를 낸다 (전역 깊이 · 렌더 표시 복구)', async () => {
     let boom = true;
     let setN: Setter<number> = () => {};
     const { host, patches } = makeHost();
@@ -379,10 +453,11 @@ describe('렌더 중 setter 호출은 오류 (검수 1회차 NB-1 · 정책 「�
     }, {}, host);
     ok.mount();
     setN(1);
+    await flush();
     expect(patches).toHaveLength(1);
   });
 
-  it('effect 안(렌더가 끝난 뒤) setter는 지금처럼 허용된다', () => {
+  it('effect 안(렌더가 끝난 뒤) setter는 지금처럼 허용된다', async () => {
     const fc = new FunctionComponent(
       (): VNode => {
         const [n, setN] = useState(0);
@@ -395,6 +470,7 @@ describe('렌더 중 setter 호출은 오류 (검수 1회차 NB-1 · 정책 「�
       makeHost().host,
     );
     expect(() => fc.mount()).not.toThrow();
+    await flush();
     expect(fc.hooks[0]).toMatchObject({ value: 2 });
   });
 
@@ -417,7 +493,7 @@ describe('렌더 중 setter 호출은 오류 (검수 1회차 NB-1 · 정책 「�
     expect(() => fc.update()).toThrow(MSG);
   });
 
-  it('cleanup 안 setter도 렌더 밖이라 허용된다', () => {
+  it('cleanup 안 setter도 렌더 밖이라 허용된다', async () => {
     let setN: Setter<number> = () => {};
     const fc = new FunctionComponent(
       (): VNode => {
@@ -431,5 +507,7 @@ describe('렌더 중 setter 호출은 오류 (검수 1회차 NB-1 · 정책 「�
     );
     fc.mount();
     expect(() => setN(1)).not.toThrow();
+    await flush();
+    expect(fc.hooks[0]).toMatchObject({ value: 1 });
   });
 });

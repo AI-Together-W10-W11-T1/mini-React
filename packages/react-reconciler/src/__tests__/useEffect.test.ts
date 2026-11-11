@@ -1,10 +1,14 @@
-import { describe, it, expect, vi } from 'vitest';
+import { afterEach, describe, it, expect, vi } from 'vitest';
 import { h, useEffect, useState } from '@mini-react/react';
 import type { AreaChildren, Patch, VNode } from '@mini-react/shared';
 import { FunctionComponent } from '../FunctionComponent';
+import { flush } from '../../../shared/src/__tests__/helpers';
+import { setRenderErrorHandler } from '@mini-react/scheduler';
 import type { FunctionComponentHost } from '../FunctionComponent';
 
 type Setter<S> = (next: S | ((prev: S) => S)) => void;
+
+afterEach(() => setRenderErrorHandler(null)); // 오류 처리 함수를 바꾼 테스트가 실패해도 다음 테스트에 남지 않게
 
 // [AI Note]: 가짜 host와 effect가 같은 log에 적는다 — "host.mount / host.apply 뒤에 effect"인지 순서로 확인한다.
 function setup(App: (log: string[]) => VNode) {
@@ -33,7 +37,7 @@ describe('useEffect — 실행 시점 (P2-16 · T-12)', () => {
     expect(log).toEqual(['mount', 'effect']);
   });
 
-  it('update: host.apply 뒤에 실행된다 (같은 setter 호출 안에서 바로)', () => {
+  it('update: 모은 렌더의 host.apply 직후에 실행된다 (setter를 부른 코드가 끝난 직후, 한 번)', async () => {
     let set: Setter<number> = () => {};
     const { fc, log } = setup((log) => {
       const [n, setN] = useState(0);
@@ -46,7 +50,48 @@ describe('useEffect — 실행 시점 (P2-16 · T-12)', () => {
     fc.mount();
     log.length = 0;
     set(1);
+    await flush();
     expect(log).toEqual(['apply', 'effect:1']);
+  });
+
+  it('setter를 3번 모으면 렌더 · host.apply · effect가 모두 한 번이고, effect는 apply 직후 최종 값으로 돈다', async () => {
+    let set: Setter<number> = () => {};
+    const { fc, log } = setup((log) => {
+      const [n, setN] = useState(0);
+      set = setN;
+      useEffect(() => {
+        log.push(`effect:${n}`);
+      }, [n]);
+      return h('p', null, String(n));
+    });
+    fc.mount();
+    log.length = 0;
+    set((c) => c + 1);
+    set((c) => c + 1);
+    set((c) => c + 1);
+    expect(log).toEqual([]); // 부른 직후에는 렌더 · effect 모두 아직
+    await flush();
+    expect(log).toEqual(['apply', 'effect:3']);
+  });
+
+  it('렌더가 예약된 뒤 effect를 돌리기 전에 unmount()하면 그 렌더도 effect도 돌지 않는다', async () => {
+    let set: Setter<number> = () => {};
+    const App = vi.fn();
+    const { fc, log } = setup((log) => {
+      App();
+      const [n, setN] = useState(0);
+      set = setN;
+      useEffect(() => void log.push('effect'));
+      return h('p', null, String(n));
+    });
+    fc.mount();
+    log.length = 0;
+    App.mockClear();
+    set(1);
+    fc.unmount(); // 같은 틱에 해제 → 예약된 렌더는 돌아도 아무 일 없다
+    await flush();
+    expect(App).not.toHaveBeenCalled();
+    expect(log).toEqual([]);
   });
 
   it('바뀐 게 없어 host.apply가 없어도(변경 0건) 의존성 생략 effect는 update 뒤에 돈다', () => {
@@ -95,7 +140,7 @@ describe('useEffect — 의존성 (정책 「§4.2 useEffect 의존성」)', () 
     expect(body).toHaveBeenCalledTimes(1);
   });
 
-  it('[a] = a가 바뀔 때만 (다른 상태가 바뀌어도 안 돈다)', () => {
+  it('[a] = a가 바뀔 때만 (다른 상태가 바뀌어도 안 돈다)', async () => {
     const seen: number[] = [];
     let setA: Setter<number> = () => {};
     let setB: Setter<number> = () => {};
@@ -111,11 +156,15 @@ describe('useEffect — 의존성 (정책 「§4.2 useEffect 의존성」)', () 
     });
     fc.mount();
     setB(1);
+    await flush();
     setB(2);
+    await flush();
     expect(seen).toEqual([0]);
     setA(5);
+    await flush();
     expect(seen).toEqual([0, 5]);
     setB(3);
+    await flush();
     expect(seen).toEqual([0, 5]);
   });
 
@@ -165,7 +214,7 @@ describe('useEffect — 의존성 (정책 「§4.2 useEffect 의존성」)', () 
 });
 
 describe('useEffect — cleanup · unmount (정책 「§4.2 cleanup · 해제」)', () => {
-  it('cleanup은 마운트 직후엔 없고, 다시 실행하기 직전에 1번 불린다 (cleanup(이전) → 본문(새) 순서)', () => {
+  it('cleanup은 마운트 직후엔 없고, 다시 실행하기 직전에 1번 불린다 (cleanup(이전) → 본문(새) 순서)', async () => {
     let set: Setter<number> = () => {};
     const { fc, log } = setup((log) => {
       const [n, setN] = useState(0);
@@ -179,12 +228,14 @@ describe('useEffect — cleanup · unmount (정책 「§4.2 cleanup · 해제」
     fc.mount();
     expect(log).toEqual(['mount', 'run:0']);
     set(1);
+    await flush();
     expect(log).toEqual(['mount', 'run:0', 'apply', 'cleanup:0', 'run:1']);
     set(2);
+    await flush();
     expect(log.slice(5)).toEqual(['apply', 'cleanup:1', 'run:2']);
   });
 
-  it('의존성이 안 바뀌면 cleanup도 안 부른다', () => {
+  it('의존성이 안 바뀌면 cleanup도 안 부른다', async () => {
     const cleanup = vi.fn();
     let setOther: Setter<number> = () => {};
     const { fc } = setup(() => {
@@ -195,7 +246,9 @@ describe('useEffect — cleanup · unmount (정책 「§4.2 cleanup · 해제」
     });
     fc.mount();
     setOther(1);
+    await flush();
     setOther(2);
+    await flush();
     expect(cleanup).not.toHaveBeenCalled();
   });
 
@@ -225,7 +278,7 @@ describe('useEffect — cleanup · unmount (정책 「§4.2 cleanup · 해제」
     expect(order).toEqual(['A', 'C']);
   });
 
-  it('unmount() 뒤 setter는 무시된다 (렌더 · host.apply 없음)', () => {
+  it('unmount() 뒤 setter는 무시된다 (렌더 · host.apply 없음)', async () => {
     let set: Setter<number> = () => {};
     const App = vi.fn();
     const { fc, log } = setup((log) => {
@@ -240,6 +293,7 @@ describe('useEffect — cleanup · unmount (정책 「§4.2 cleanup · 해제」
     log.length = 0;
     App.mockClear();
     set(1);
+    await flush();
     expect(App).not.toHaveBeenCalled();
     expect(log).toEqual([]);
   });
@@ -268,8 +322,8 @@ describe('useEffect — cleanup · unmount (정책 「§4.2 cleanup · 해제」
   });
 });
 
-describe('useEffect — effect 안에서 setter (렌더 중첩, 결정 9 A)', () => {
-  it('effect에서 setter를 부르면 렌더가 한 번 더 돌고 최종 상태 · 이전 VNode가 맞다', () => {
+describe('useEffect — effect 안에서 setter (연달아 렌더, 결정 9 B)', () => {
+  it('effect에서 setter를 부르면 렌더가 한 번 더 돌고 최종 상태 · 이전 VNode가 맞다', async () => {
     let renders = 0;
     let set: Setter<number> = () => {};
     const { fc, patches } = setup(() => {
@@ -282,15 +336,18 @@ describe('useEffect — effect 안에서 setter (렌더 중첩, 결정 9 A)', ()
       return h('p', null, String(n));
     });
     fc.mount();
-    expect(renders).toBe(4); // 0 → 1 → 2 → 3
+    expect(renders).toBe(1); // mount 직후: setter가 예약한 렌더는 아직 안 돈다
+    await flush();
+    expect(renders).toBe(4); // 0 → 1 → 2 → 3 (렌더가 연달아 이어진다)
     expect(patches.map((p) => (p[0] as { after: string }).after)).toEqual(['1', '2', '3']);
     // 이전 VNode가 마지막 렌더(3)로 저장되어 있어야 다음 diff의 before가 맞다
     set(4);
+    await flush();
     const last = patches[patches.length - 1][0] as { before: string; after: string };
     expect(last).toMatchObject({ before: '3', after: '4' });
   });
 
-  it('의존성 [] effect가 setter를 불러도 자기 자신을 다시 실행하지 않는다 (무한 루프 없음)', () => {
+  it('의존성 [] effect가 setter를 불러도 자기 자신을 다시 실행하지 않는다 (무한 루프 없음)', async () => {
     const body = vi.fn();
     let setN: Setter<number> = () => {};
     const { fc } = setup(() => {
@@ -303,32 +360,29 @@ describe('useEffect — effect 안에서 setter (렌더 중첩, 결정 9 A)', ()
       return h('p', null);
     });
     fc.mount();
+    await flush();
     expect(body).toHaveBeenCalledTimes(1);
   });
 
-  it('중첩 렌더에서 같은 effect가 다시 돌아도 cleanup이 빠지지 않는다 (바깥 본문이 늦게 끝나는 경우)', () => {
+  it('effect가 자기 의존성을 바꿔 다음 렌더에서 같은 effect가 다시 돌아도 cleanup이 빠지지 않는다 (cleanup(이전) → 본문(새) 순서)', async () => {
     const log: string[] = [];
-    let setN: Setter<number> = () => {};
     const { fc } = setup(() => {
       const [n, s] = useState(0);
-      setN = s;
       useEffect(() => {
         log.push(`run:${n}`);
-        if (n === 0) s(1); // 자기 의존성을 바꾼다 → 안쪽에서 같은 effect가 다시 돎
+        if (n === 0) s(1); // 자기 의존성을 바꾼다 → 다음 렌더에서 같은 effect가 다시 돎
         return () => void log.push(`cleanup:${n}`);
       }, [n]);
       return h('p', null, String(n));
     });
     fc.mount();
+    await flush();
     fc.unmount();
-    setN(2);
-    // run:0 → (안쪽) run:1 … 각 실행의 cleanup이 정확히 한 번씩 불렸다
-    const runs = log.filter((l) => l.startsWith('run')).length;
-    const cleanups = log.filter((l) => l.startsWith('cleanup')).length;
-    expect(cleanups).toBe(runs);
+    // 각 실행의 cleanup이 정확히 한 번씩, 순서대로 불렸다
+    expect(log).toEqual(['run:0', 'cleanup:0', 'run:1', 'cleanup:1']);
   });
 
-  it('같은 목록 뒤쪽 effect는 안쪽 렌더가 대신 실행해 한 번만 돈다 (옛 클로저로 다시 돌지 않음)', () => {
+  it('같은 목록의 뒤쪽 effect는 렌더마다 한 번씩만, 그 렌더의 값으로 돈다 (옛 클로저로 다시 돌지 않음)', async () => {
     const seen: number[] = [];
     const { fc } = setup(() => {
       const [n, setN] = useState(0);
@@ -341,12 +395,15 @@ describe('useEffect — effect 안에서 setter (렌더 중첩, 결정 9 A)', ()
       return h('p', null, String(n));
     });
     fc.mount();
-    expect(seen).toEqual([1]); // 0으로 한 번, 1로 한 번이 아니라 최신 값으로만
+    await flush();
+    expect(seen).toEqual([0, 1]); // 렌더(0)에서 한 번, 이어진 렌더(1)에서 한 번 (task_002 즉시 동기 때는 안쪽 렌더가 대신 돌아 [1])
   });
 });
 
 describe('실패한 렌더는 effect 예약을 되돌린다 (검수 1회차 NB-2 · 정책 「§4.2 렌더 실패」)', () => {
-  it('effect 안 setter가 일으킨 안쪽 렌더가 (effect를 예약한 뒤) 실패해 예외를 삼켜도, 바깥의 뒤쪽 effect가 그 회차에 빠지지 않는다', () => {
+  it('effect 안 setter가 예약한 렌더가 (effect를 예약한 뒤) 실패해도, 그 렌더의 effect는 돌지 않고 앞 렌더의 effect는 빠지지 않는다', async () => {
+    const errors: unknown[] = [];
+    setRenderErrorHandler((error) => void errors.push(error));
     const calls: string[] = [];
     let boom = false;
     let setN: Setter<number> = () => {};
@@ -357,12 +414,7 @@ describe('실패한 렌더는 effect 예약을 되돌린다 (검수 1회차 NB-2
         calls.push(`A${n}`);
         if (n === 1) {
           boom = true;
-          try {
-            s(5); // 안쪽 렌더(n=5)가 실패한다 — 예외를 삼킨다
-          } catch {
-            /* 삼킴 */
-          }
-          boom = false;
+          s(5); // 이어서 예약되는 렌더(n=5)가 실패한다
         }
       }); // 의존성 생략: 매 렌더 예약
       useEffect(() => {
@@ -375,7 +427,15 @@ describe('실패한 렌더는 effect 예약을 되돌린다 (검수 1회차 NB-2
     fc.mount();
     calls.length = 0;
     setN(1);
-    // 바깥 렌더(n=1)의 effect A · B가 둘 다 돈다. A 안의 안쪽 렌더(n=5)는 실패해 없었던 일이다
+    await flush();
+    // 렌더(n=1)의 effect A · B가 둘 다 돈다. 이어서 예약된 렌더(n=5)는 effect 두 개를 예약한 뒤 실패해 없었던 일이다 (A5 · B5 없음)
     expect(calls).toEqual(['A1', 'B1']);
+    expect(errors).toHaveLength(1);
+    expect((errors[0] as Error).message).toBe('inner render boom');
+    // 앞 렌더가 남긴 예약이 흔들리지 않았으므로 다음 정상 렌더도 effect가 정상으로 돈다
+    boom = false;
+    setN(6);
+    await flush();
+    expect(calls).toEqual(['A1', 'B1', 'A6', 'B6']);
   });
 });

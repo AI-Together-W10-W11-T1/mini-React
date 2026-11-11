@@ -1,7 +1,9 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { h, useEffect, useState } from '@mini-react/react';
 import type { Props, VNode } from '@mini-react/shared';
+import { setRenderErrorHandler } from '@mini-react/scheduler';
 import { render } from '../render';
+import { flush } from '../../../shared/src/__tests__/helpers';
 
 // [AI Note]: Dev-16(엔진 통합 테스트)을 제외한 대신, 엔진(react + reconciler + bindings)을 처음 실제 DOM(jsdom)에 이어 붙이는
 // 이 파일이 "옮긴 검사 ① ~ ⑥"까지 맡는다. 테스트 앱은 이 파일 안의 작은 카운터 · 입력창 · 목록이다.
@@ -23,13 +25,19 @@ function makeContainer(): HTMLElement {
 afterEach(() => {
   mounted.splice(0).forEach((box) => box.remove());
   vi.restoreAllMocks();
+  setRenderErrorHandler(null); // 오류 처리 함수를 바꾼 테스트가 실패해도 다음 테스트에 남지 않게
 });
 
-/** MutationObserver 기록을 바로(동기로) 꺼내 센다 */
+/**
+ * MutationObserver 기록을 꺼내 센다.
+ * [AI Note]: Batching(결정 9 B) 테스트는 `await flush()`를 거치는데, 그 사이 마이크로태스크에서 observer 콜백이 먼저 기록을 가져가 버린다.
+ * 그래서 콜백에서 기록을 모아 두고 take()가 (모은 것 + 아직 남은 것)을 돌려준다.
+ */
 function watch(target: Node): { take(): MutationRecord[] } {
-  const observer = new MutationObserver(() => {});
+  const seen: MutationRecord[] = [];
+  const observer = new MutationObserver((records) => seen.push(...records));
   observer.observe(target, { subtree: true, childList: true, attributes: true, characterData: true });
-  return { take: () => observer.takeRecords() };
+  return { take: () => [...seen.splice(0), ...observer.takeRecords()] };
 }
 
 function byId<T extends Element>(box: Element, testId: string): T {
@@ -38,13 +46,17 @@ function byId<T extends Element>(box: Element, testId: string): T {
   return found as T;
 }
 
-function click(el: Element): void {
+// [AI Note]: 마이크로태스크 Batching(결정 9 B): 이벤트 핸들러가 부른 setter의 렌더는 핸들러가 끝난 직후에 돈다.
+// 사용자 클릭 하나하나는 서로 다른 틱이므로 이벤트 하나마다 flush로 비워 "이벤트 하나 = 렌더 하나"를 유지한다.
+async function click(el: Element): Promise<void> {
   el.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+  await flush();
 }
 
-function typeInto(input: HTMLInputElement, value: string): void {
+async function typeInto(input: HTMLInputElement, value: string): Promise<void> {
   input.value = value;
   input.dispatchEvent(new Event('input', { bubbles: true }));
+  await flush();
 }
 
 describe('render — 진입점 (P2-05 · P2-06 · P2-15 · P2-21)', () => {
@@ -76,16 +88,35 @@ describe('render — 진입점 (P2-05 · P2-06 · P2-15 · P2-21)', () => {
     expect(document.getElementById('root-box')).toBe(box);
   });
 
-  it('클릭 → setter → 별도 렌더 호출 없이 DOM이 바뀐다 (P2-15 · P2-06)', () => {
+  it('클릭 → setter → 별도 렌더 호출 없이 DOM이 바뀐다 (P2-15 · P2-06)', async () => {
     const box = makeContainer();
     render(Counter, box);
-    click(byId(box, 'plus'));
+    await click(byId(box, 'plus'));
     expect(byId(box, 'value').textContent).toBe('1');
-    click(byId(box, 'plus'));
+    await click(byId(box, 'plus'));
     expect(byId(box, 'value').textContent).toBe('2');
   });
 
-  it('바뀐 글자 노드만 바뀌고 형제 · 부모 요소는 같은 참조다 (P2-21 · T-06)', () => {
+  it('Batching: 클릭 직후(같은 JS 실행 안)에는 DOM이 아직 옛 값이고, 한 틱 뒤 새 값이다 · 같은 틱 클릭 20번은 렌더 1번', async () => {
+    let renders = 0;
+    function Counting(): VNode {
+      renders += 1;
+      const [count, setCount] = useState(0);
+      return h('main', null, h('p', { 'data-testid': 'value' }, count), h('button', { 'data-testid': 'plus', onClick: () => setCount((c) => c + 1) }, '+1'));
+    }
+    const box = makeContainer();
+    render(Counting, box);
+    const button = byId(box, 'plus');
+    for (let i = 0; i < 20; i += 1) button.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    expect(byId(box, 'value').textContent).toBe('0'); // 렌더는 지금 코드가 끝난 직후
+    expect(renders).toBe(1);
+    await flush();
+    expect(byId(box, 'value').textContent).toBe('20');
+    expect(renders).toBe(2);
+    expect(byId(box, 'plus')).toBe(button); // 버튼은 같은 참조
+  });
+
+  it('바뀐 글자 노드만 바뀌고 형제 · 부모 요소는 같은 참조다 (P2-21 · T-06)', async () => {
     const box = makeContainer();
     render(Counter, box);
     const main = box.firstElementChild;
@@ -94,7 +125,7 @@ describe('render — 진입점 (P2-05 · P2-06 · P2-15 · P2-21)', () => {
     const fixed = byId(box, 'static');
     const button = byId(box, 'plus');
     const watcher = watch(box);
-    click(button);
+    await click(button);
     expect(box.firstElementChild).toBe(main);
     expect(byId(box, 'value')).toBe(value);
     expect(byId(box, 'value').firstChild).toBe(text);
@@ -104,7 +135,7 @@ describe('render — 진입점 (P2-05 · P2-06 · P2-15 · P2-21)', () => {
     expect(records.map((r) => r.type)).toEqual(['characterData']);
   });
 
-  it('바뀐 게 없으면 DOM 변경이 0건이다 (T-04)', () => {
+  it('바뀐 게 없으면 DOM 변경이 0건이다 (T-04)', async () => {
     let bump: Setter<number> = () => {};
     function Quiet(): VNode {
       const [tick, setTick] = useState(0);
@@ -116,19 +147,20 @@ describe('render — 진입점 (P2-05 · P2-06 · P2-15 · P2-21)', () => {
     const fc = render(Quiet, box);
     const watcher = watch(box);
     bump((t) => t + 1);
+    await flush();
     expect(fc.lastPatches).toEqual([]);
     expect(watcher.take()).toHaveLength(0);
   });
 
-  it('컨테이너를 통째로 다시 그리지 않는다: replaceChildren은 mount 때 한 번뿐, innerHTML 쓰기 없음', () => {
+  it('컨테이너를 통째로 다시 그리지 않는다: replaceChildren은 mount 때 한 번뿐, innerHTML 쓰기 없음', async () => {
     const box = makeContainer();
     const replace = vi.spyOn(box, 'replaceChildren');
     const writeHtml = vi.fn();
     Object.defineProperty(box, 'innerHTML', { configurable: true, get: () => '', set: writeHtml });
     render(Counter, box);
     expect(replace).toHaveBeenCalledTimes(1);
-    click(byId(box, 'plus'));
-    click(byId(box, 'plus'));
+    await click(byId(box, 'plus'));
+    await click(byId(box, 'plus'));
     expect(replace).toHaveBeenCalledTimes(1);
     expect(writeHtml).not.toHaveBeenCalled();
   });
@@ -146,12 +178,12 @@ describe('render — 진입점 (P2-05 · P2-06 · P2-15 · P2-21)', () => {
     expect(cleanup).toHaveBeenCalledTimes(1);
   });
 
-  it('인스턴스가 hooks 배열과 lastPatches를 읽기 전용으로 보여 준다 (T-15)', () => {
+  it('인스턴스가 hooks 배열과 lastPatches를 읽기 전용으로 보여 준다 (T-15)', async () => {
     const box = makeContainer();
     const fc = render(Counter, box);
     expect(fc.hooks).toHaveLength(1);
     expect(fc.lastPatches).toEqual([]);
-    click(byId(box, 'plus'));
+    await click(byId(box, 'plus'));
     // 글자 바꾸기 1줄 + 핸들러가 새 함수라 이벤트 교체 1줄
     expect(fc.lastPatches.map((p) => p.kind).sort()).toEqual(['SET_EVENT', 'SET_TEXT']);
   });
@@ -174,27 +206,28 @@ describe('옮긴 검사 ① 입력 이벤트 → value · 같은 입력창 · �
     );
   }
 
-  it('input 이벤트 → 상태 → 인사 글자 · input.value 프로퍼티가 맞는다', () => {
+  it('input 이벤트 → 상태 → 인사 글자 · input.value 프로퍼티가 맞는다', async () => {
     const box = makeContainer();
     render(Greeting, box);
     const input = byId<HTMLInputElement>(box, 'name');
-    typeInto(input, '민수');
+    await typeInto(input, '민수');
     expect(byId(box, 'greet').textContent).toBe('안녕하세요, 민수님');
     expect(input.value).toBe('민수');
-    typeInto(input, '');
+    await typeInto(input, '');
     expect(byId(box, 'greet').textContent).toBe('이름을 입력해 주세요');
   });
 
-  it('입력 도중 입력창은 같은 노드 · 포커스 · 선택 위치가 유지된다 (값이 같으면 다시 대입하지 않음)', () => {
+  it('입력 도중 입력창은 같은 노드 · 포커스 · 선택 위치가 유지된다 (값이 같으면 다시 대입하지 않음)', async () => {
     const box = makeContainer();
     render(Greeting, box);
     const input = byId<HTMLInputElement>(box, 'name');
     input.focus();
-    typeInto(input, '가다');
+    await typeInto(input, '가다');
     input.setSelectionRange(1, 1);
     // 커서 자리(1)에 `나`를 끼워 넣는다: 값 `가나다`, 커서는 2
     input.setRangeText('나', 1, 1, 'end');
     input.dispatchEvent(new Event('input', { bubbles: true }));
+    await flush();
     expect(input.value).toBe('가나다');
     expect(byId(box, 'greet').textContent).toBe('안녕하세요, 가나다님');
     expect(byId(box, 'name')).toBe(input);
@@ -203,15 +236,15 @@ describe('옮긴 검사 ① 입력 이벤트 → value · 같은 입력창 · �
     expect(input.selectionEnd).toBe(2);
   });
 
-  it('다른 상태가 바뀌어도(버튼 클릭) 입력창 노드 · 값 · 포커스 · 커서가 그대로다', () => {
+  it('다른 상태가 바뀌어도(버튼 클릭) 입력창 노드 · 값 · 포커스 · 커서가 그대로다', async () => {
     const box = makeContainer();
     render(Greeting, box);
     const input = byId<HTMLInputElement>(box, 'name');
     input.focus();
-    typeInto(input, '영희');
+    await typeInto(input, '영희');
     input.setSelectionRange(1, 1);
-    click(byId(box, 'plus'));
-    click(byId(box, 'plus'));
+    await click(byId(box, 'plus'));
+    await click(byId(box, 'plus'));
     expect(byId(box, 'plus').textContent).toBe('2');
     expect(byId(box, 'name')).toBe(input);
     expect(input.value).toBe('영희');
@@ -221,7 +254,7 @@ describe('옮긴 검사 ① 입력 이벤트 → value · 같은 입력창 · �
 });
 
 describe('옮긴 검사 ② 렌더 20번 뒤 클릭 1번 = 핸들러 정확히 1번 (§6.2 핸들러 교체 · §4.3)', () => {
-  it('핸들러를 계속 바꿔 끼워도 한 번 누르면 한 번만 불린다', () => {
+  it('핸들러를 계속 바꿔 끼워도 한 번 누르면 한 번만 불린다', async () => {
     let calls = 0;
     function Busy(): VNode {
       const [tick, setTick] = useState(0);
@@ -246,9 +279,9 @@ describe('옮긴 검사 ② 렌더 20번 뒤 클릭 1번 = 핸들러 정확히 1
     const box = makeContainer();
     const addListener = vi.spyOn(HTMLElement.prototype, 'addEventListener');
     render(Busy, box);
-    for (let i = 0; i < 20; i += 1) click(byId(box, 'tick'));
+    for (let i = 0; i < 20; i += 1) await click(byId(box, 'tick'));
     expect(byId(box, 'tick').textContent).toBe('20');
-    click(byId(box, 'target'));
+    await click(byId(box, 'target'));
     expect(calls).toBe(1);
     expect(byId(box, 'target').textContent).toBe('1');
     // 요소마다 이벤트 이름당 리스너는 한 번만 등록했다: 버튼 둘 × click = 2번
@@ -285,13 +318,13 @@ describe('옮긴 검사 ③ key 목록 순서 바꾸기 → 같은 <li> 유지 �
   }
   const order = (box: Element): string[] => Array.from(box.querySelectorAll('li')).map((li) => li.getAttribute('data-id') ?? '');
 
-  it('[위로] 뒤 순서가 바뀌고 세 <li> · <ul>이 모두 같은 참조다 (MOVE)', () => {
+  it('[위로] 뒤 순서가 바뀌고 세 <li> · <ul>이 모두 같은 참조다 (MOVE)', async () => {
     const box = makeContainer();
     render(List, box);
     const ul = box.querySelector('ul');
     const before = Array.from(box.querySelectorAll('li'));
     const watcher = watch(box);
-    click(byId(box, 'up-c'));
+    await click(byId(box, 'up-c'));
     expect(order(box)).toEqual(['a', 'c', 'b']);
     expect(box.querySelector('ul')).toBe(ul);
     const after = Array.from(box.querySelectorAll('li'));
@@ -304,18 +337,18 @@ describe('옮긴 검사 ③ key 목록 순서 바꾸기 → 같은 <li> 유지 �
     expect(records.every((r) => r.type === 'childList' && r.target === ul)).toBe(true);
   });
 
-  it('이동 뒤 [삭제]가 맞는 항목에 걸리고 나머지 <li>는 같은 참조다', () => {
+  it('이동 뒤 [삭제]가 맞는 항목에 걸리고 나머지 <li>는 같은 참조다', async () => {
     const box = makeContainer();
     render(List, box);
     const [a, b, c] = Array.from(box.querySelectorAll('li'));
-    click(byId(box, 'up-c')); // a c b
-    click(byId(box, 'remove-c')); // a b
+    await click(byId(box, 'up-c')); // a c b
+    await click(byId(box, 'remove-c')); // a b
     expect(order(box)).toEqual(['a', 'b']);
     const rest = Array.from(box.querySelectorAll('li'));
     expect(rest[0]).toBe(a);
     expect(rest[1]).toBe(b);
     expect(c.isConnected).toBe(false);
-    click(byId(box, 'remove-a'));
+    await click(byId(box, 'remove-a'));
     expect(order(box)).toEqual(['b']);
   });
 });
@@ -361,44 +394,44 @@ describe('옮긴 검사 ④ 목록 한 바퀴 — 안내 ↔ 목록 · 추가 ·
     );
   }
 
-  it('빈 목록 안내 → 추가(D-05 교체, D-03 추가) → class 변경(D-02) → 삭제(D-04) → 안내로 되돌아옴(D-05)', () => {
+  it('빈 목록 안내 → 추가(D-05 교체, D-03 추가) → class 변경(D-02) → 삭제(D-04) → 안내로 되돌아옴(D-05)', async () => {
     const box = makeContainer();
     render(Todos, box);
     const empty = byId(box, 'empty');
     expect(empty.textContent).toBe('할 일이 없어요');
 
-    click(byId(box, 'add'));
+    await click(byId(box, 'add'));
     expect(empty.isConnected).toBe(false); // D-05: 안내 <p> → <ul>
     const ul = byId(box, 'list');
     expect(ul.children).toHaveLength(1);
 
-    click(byId(box, 'add')); // D-03
+    await click(byId(box, 'add')); // D-03
     expect(ul.children).toHaveLength(2);
     const first = ul.children[0];
     expect(byId(box, 'list')).toBe(ul);
 
     const checkbox = first.querySelector('input') as HTMLInputElement;
-    click(checkbox); // D-02: class 속성 변경 (checked는 프로퍼티)
+    await click(checkbox); // D-02: class 속성 변경 (checked는 프로퍼티)
     expect(first.getAttribute('class')).toBe('todo done');
     expect(ul.children[0]).toBe(first);
     expect(ul.children[1].getAttribute('class')).toBe('todo');
-    click(checkbox);
+    await click(checkbox);
     expect(first.getAttribute('class')).toBe('todo');
 
     const second = ul.children[1];
-    click(byId(box, 'rm-1')); // D-04
+    await click(byId(box, 'rm-1')); // D-04
     expect(ul.children).toHaveLength(1);
     expect(ul.children[0]).toBe(second); // 엉뚱한 줄이 지워지지 않고 남은 줄은 같은 참조
     expect(first.isConnected).toBe(false);
 
-    click(byId(box, 'rm-2')); // 목록 → 안내 (D-05 반대 방향)
+    await click(byId(box, 'rm-2')); // 목록 → 안내 (D-05 반대 방향)
     expect(ul.isConnected).toBe(false);
     expect(byId(box, 'empty').textContent).toBe('할 일이 없어요');
   });
 });
 
 describe('옮긴 검사 ⑤ effect는 patch 직후: 본문에서 DOM을 읽으면 이미 새 값 (T-12 · §4.2)', () => {
-  it('mount · update 모두 effect 본문 안에서 읽은 DOM이 이번 렌더 값이다', () => {
+  it('mount · update 모두 effect 본문 안에서 읽은 DOM이 이번 렌더 값이다', async () => {
     const seen: string[] = [];
     const box = makeContainer();
     function Watcher(): VNode {
@@ -409,14 +442,14 @@ describe('옮긴 검사 ⑤ effect는 patch 직후: 본문에서 DOM을 읽으�
       return h('main', null, h('p', null, `값 ${n}`), h('button', { 'data-testid': 'plus', onClick: () => setN((c) => c + 1) }, '+'));
     }
     render(Watcher, box);
-    click(byId(box, 'plus'));
-    click(byId(box, 'plus'));
+    await click(byId(box, 'plus'));
+    await click(byId(box, 'plus'));
     expect(seen).toEqual(['값 0', '값 1', '값 2']);
   });
 });
 
-describe('옮긴 검사 ⑥ [+3] 렌더 3번 · 같은 값 렌더 0번 + DOM 변경 0건 (T-04 · T-14 · §4.2)', () => {
-  it('함수형 setter 세 번 = 렌더 3번 · 최종 3, 같은 값 setter = 렌더 0번 · DOM 변경 0건', () => {
+describe('옮긴 검사 ⑥ [+3] 렌더 1번 · 같은 값 렌더 0번 + DOM 변경 0건 (T-04 · T-14 · §4.2 Batching)', () => {
+  it('함수형 setter 세 번 = 렌더 1번 · 최종 3, 같은 값 setter = 렌더 0번 · DOM 변경 0건', async () => {
     let renders = 0; // 바깥 변수로 센다 (상태가 아님)
     function Counter(): VNode {
       renders += 1;
@@ -443,19 +476,21 @@ describe('옮긴 검사 ⑥ [+3] 렌더 3번 · 같은 값 렌더 0번 + DOM 변
     const box = makeContainer();
     render(Counter, box);
     expect(renders).toBe(1);
-    click(byId(box, 'plus3'));
+    await click(byId(box, 'plus3'));
     expect(byId(box, 'value').textContent).toBe('3');
-    expect(renders).toBe(4); // 즉시 동기: setter 수만큼 렌더
+    expect(renders).toBe(2); // Batching: setter 3번을 모아 렌더 1번 (task_002 즉시 동기 때는 4)
     const watcher = watch(box);
-    click(byId(box, 'same'));
-    expect(renders).toBe(4);
+    await click(byId(box, 'same'));
+    expect(renders).toBe(2);
     expect(byId(box, 'value').textContent).toBe('3');
     expect(watcher.take()).toHaveLength(0);
   });
 });
 
 describe('update 중 patch 예외 복구 (검수 1회차 NB-7 · 정책 「§5」)', () => {
-  it('실제 DOM이 밖에서 망가져 patch가 던지면 영역을 마지막 성공 모습으로 다시 그리고 예외는 setter 호출자에게 간다', () => {
+  it('실제 DOM이 밖에서 망가져 patch가 던지면 영역을 마지막 성공 모습으로 다시 그리고 예외는 마이크로태스크의 오류 처리 함수로 간다 (task_002 즉시 동기 때는 setter 호출자)', async () => {
+    const errors: unknown[] = [];
+    setRenderErrorHandler((error) => void errors.push(error));
     const box = makeContainer();
     let setN: Setter<number> = () => {};
     const App = (): VNode => {
@@ -466,11 +501,16 @@ describe('update 중 patch 예외 복구 (검수 1회차 NB-7 · 정책 「§5�
     render(App, box);
     expect(box.textContent).toBe('n=0');
     box.querySelector('p')!.remove(); // 밖에서 DOM을 망가뜨림 → 다음 patch의 경로가 없다
-    expect(() => setN(1)).toThrow('patch:');
+    setN(1);
+    expect(errors).toEqual([]); // 렌더는 지금 코드가 끝난 뒤
+    await flush();
+    expect(errors).toHaveLength(1);
+    expect((errors[0] as Error).message).toContain('patch:');
     expect(box.textContent).toBe('n=0'); // 마지막으로 성공한 VNode로 다시 그려 짐 (새 n=1이 아님)
     expect(box.querySelectorAll('p')).toHaveLength(1);
     // 이후 setter는 복구된 DOM 위에서 정상으로 돈다
     setN(2);
+    await flush();
     expect(box.textContent).toBe('n=2');
   });
 });
@@ -499,16 +539,16 @@ describe('render 옵션 onPatch — patch 관찰 콜백 (확장 1 Dev-23 · PRD 
     );
   }
 
-  it('update의 patch마다 { patch, node, stage }로 불린다 (SET_TEXT → 글자 노드, stage after)', () => {
+  it('update의 patch마다 { patch, node, stage }로 불린다 (SET_TEXT → 글자 노드, stage after)', async () => {
     const box = makeContainer();
     const { seen, onPatch } = observed();
     render(Panel, box, { onPatch });
     expect(seen).toEqual([]); // 처음 그리기(mount)는 patch가 아니라서 알리지 않는다
-    click(box.querySelector('button')!);
+    await click(box.querySelector('button')!);
     expect(seen.filter((s) => s.kind === 'SET_TEXT')).toEqual([{ kind: 'SET_TEXT', stage: 'after', tag: '#text' }]);
   });
 
-  it('무변경 update(같은 값 setter 아님, 다시 그려도 diff 0건)는 불리지 않는다', () => {
+  it('무변경 update(같은 값 setter 아님, 다시 그려도 diff 0건)는 불리지 않는다', async () => {
     const box = makeContainer();
     const { seen, onPatch } = observed();
     let force: () => void = () => {};
@@ -522,12 +562,14 @@ describe('render 옵션 onPatch — patch 관찰 콜백 (확장 1 Dev-23 · PRD 
       { onPatch },
     );
     force();
+    await flush();
     force();
+    await flush();
     expect(inst.lastPatches).toEqual([]);
     expect(seen).toEqual([]);
   });
 
-  it('SET_PROP · SET_EVENT · SET_ATTR도 알린다 (입력창 값 · 핸들러 교체 · 속성)', () => {
+  it('SET_PROP · SET_EVENT · SET_ATTR도 알린다 (입력창 값 · 핸들러 교체 · 속성)', async () => {
     const box = makeContainer();
     const { seen, onPatch } = observed();
     let setName: Setter<string> = () => {};
@@ -541,12 +583,13 @@ describe('render 옵션 onPatch — patch 관찰 콜백 (확장 1 Dev-23 · PRD 
       { onPatch },
     );
     setName('가');
+    await flush();
     expect(seen.map((s) => s.kind).sort()).toEqual(['SET_ATTR', 'SET_EVENT', 'SET_PROP']);
     expect(seen.every((s) => s.stage === 'after')).toBe(true);
     expect(seen.find((s) => s.kind === 'SET_PROP')?.tag).toBe('input');
   });
 
-  it('REMOVE는 지우기 직전(stage before), INSERT는 적용 직후(stage after)', () => {
+  it('REMOVE는 지우기 직전(stage before), INSERT는 적용 직후(stage after)', async () => {
     const box = makeContainer();
     const { seen, onPatch } = observed();
     let setN: Setter<number> = () => {};
@@ -560,29 +603,31 @@ describe('render 옵션 onPatch — patch 관찰 콜백 (확장 1 Dev-23 · PRD 
       { onPatch },
     );
     setN(3);
+    await flush();
     expect(seen).toEqual([{ kind: 'INSERT', stage: 'after', tag: 'li' }]);
     seen.length = 0;
     setN(1);
+    await flush();
     expect(seen.map((s) => `${s.kind}:${s.stage}`)).toEqual(['REMOVE:before', 'REMOVE:before']);
   });
 
-  it('콜백이 없으면 동작이 이전과 똑같다 (옵션 없이 · 빈 옵션으로 불러도 정상)', () => {
+  it('콜백이 없으면 동작이 이전과 똑같다 (옵션 없이 · 빈 옵션으로 불러도 정상)', async () => {
     const a = makeContainer();
     const b = makeContainer();
     render(Panel, a);
     render(Panel, b, {});
-    click(a.querySelector('button')!);
-    click(b.querySelector('button')!);
+    await click(a.querySelector('button')!);
+    await click(b.querySelector('button')!);
     expect(a.innerHTML).toBe(b.innerHTML);
     expect(a.querySelector('p')!.textContent).toBe('n=1');
   });
 
-  it('콜백 안에서 DOM을 읽을 수 있고 표시용 class · 속성이 실제 DOM에 붙지 않는다', () => {
+  it('콜백 안에서 DOM을 읽을 수 있고 표시용 class · 속성이 실제 DOM에 붙지 않는다', async () => {
     const box = makeContainer();
     const texts: string[] = [];
     render(Panel, box, { onPatch: (e) => texts.push(e.node.textContent ?? '') });
     const before = box.innerHTML;
-    click(box.querySelector('button')!);
+    await click(box.querySelector('button')!);
     expect(texts[0]).toBe('n=1'); // 첫 patch(SET_TEXT) 시점에 이미 새 글자가 DOM에 있다 (뒤따르는 줄은 새 핸들러 SET_EVENT)
     expect(box.innerHTML).toBe(before.replace('n=0', 'n=1'));
   });

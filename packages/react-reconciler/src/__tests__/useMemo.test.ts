@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { h, useMemo, useState } from '@mini-react/react';
 import type { AreaChildren, Patch, VNode } from '@mini-react/shared';
 import { FunctionComponent } from '../FunctionComponent';
+import { flush } from '../../../shared/src/__tests__/helpers';
 import type { FunctionComponentHost } from '../FunctionComponent';
 
 const host: FunctionComponentHost = {
@@ -84,7 +85,7 @@ describe('useMemo — 계산 저장 · 재사용 (P2-17 · T-13)', () => {
     expect(factory).toHaveBeenCalledTimes(2);
   });
 
-  it('다른 상태가 바뀌어도 의존성이 그대로면 재사용한다 (T-13)', () => {
+  it('다른 상태가 바뀌어도 의존성이 그대로면 재사용한다 (T-13)', async () => {
     const factory = vi.fn((items: string[]) => items.length);
     const items = ['a', 'b'];
     const ctx = { memo: 0, setOther: (() => {}) as (v: number) => void };
@@ -97,7 +98,9 @@ describe('useMemo — 계산 저장 · 재사용 (P2-17 · T-13)', () => {
     const fc = new FunctionComponent(App, {}, host);
     fc.mount();
     ctx.setOther(1);
+    await flush();
     ctx.setOther(2);
+    await flush();
     expect(factory).toHaveBeenCalledTimes(1);
     expect(ctx.memo).toBe(2);
   });

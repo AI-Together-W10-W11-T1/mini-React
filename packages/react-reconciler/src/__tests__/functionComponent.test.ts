@@ -1,9 +1,12 @@
-import { describe, it, expect, vi } from 'vitest';
+import { afterEach, describe, it, expect, vi } from 'vitest';
 import { h, useEffect, useState } from '@mini-react/react';
 import type { AreaChildren, Patch, Props, VNode } from '@mini-react/shared';
 import { FunctionComponent } from '../FunctionComponent';
 import type { FunctionComponentHost } from '../FunctionComponent';
-import { el, text } from '../../../shared/src/__tests__/helpers';
+import { setRenderErrorHandler } from '@mini-react/scheduler';
+import { el, flush, text } from '../../../shared/src/__tests__/helpers';
+
+afterEach(() => setRenderErrorHandler(null)); // 오류 처리 함수를 바꾼 테스트가 실패해도 다음 테스트에 남지 않게
 
 // [AI Note]: 가짜 host — DOM 없이 엔진이 host에 무엇을 넘기는지만 기록한다. host에는 읽기 메서드가 없다 (mount · apply 둘뿐).
 function makeHost() {
@@ -248,7 +251,9 @@ describe('FunctionComponent — update 중 host.apply 예외 복구 (검수 1회
     expect(((caught as { recoveryError?: Error }).recoveryError as Error).message).toBe('recovery boom');
   });
 
-  it('setter가 일으킨 update에서 apply가 던져도 같은 복구 (호출한 쪽으로 예외, 상태 값은 남음)', () => {
+  it('setter가 일으킨 update에서 apply가 던져도 같은 복구 (예외는 마이크로태스크의 오류 처리 함수로, 상태 값은 남음)', async () => {
+    const errors: unknown[] = [];
+    setRenderErrorHandler((error) => void errors.push(error));
     let setN: (next: number) => void = () => {};
     const { host, mounts, state } = makeFlakyHost();
     const fc = new FunctionComponent(
@@ -262,7 +267,10 @@ describe('FunctionComponent — update 중 host.apply 예외 복구 (검수 1회
     );
     fc.mount();
     state.failApply = true;
-    expect(() => setN(1)).toThrow('apply boom');
+    setN(1);
+    await flush();
+    expect(errors).toHaveLength(1);
+    expect((errors[0] as Error).message).toBe('apply boom'); // 호출한 쪽이 아니라 오류 처리 함수로 (task_002 즉시 동기 때는 호출한 쪽)
     expect(mounts[1]).toEqual([el('p', {}, text('0'))]);
     expect(fc.hooks[0]).toMatchObject({ value: 1 }); // 기존 정책: 렌더가 아닌 setter가 바꾼 state는 남음
   });

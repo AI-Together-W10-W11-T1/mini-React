@@ -14,3 +14,8 @@ export function text(value: string): TextVNode {
 export function comment(value: string): CommentVNode {
   return { type: COMMENT_NODE, props: { nodeValue: value }, children: [] };
 }
+
+/** 마이크로태스크 Batching(결정 9 B) 뒤 렌더가 끝날 때까지 기다린다. setter · 이벤트 한 번마다 이 함수로 비운다 ("호출 하나 = 렌더 하나") */
+export function flush(): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, 0));
+}
