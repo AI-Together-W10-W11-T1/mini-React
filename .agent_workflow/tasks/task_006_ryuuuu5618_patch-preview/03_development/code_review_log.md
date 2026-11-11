@@ -38,3 +38,16 @@
 - 지적 3 · 5: 주석만 바뀜 (코드 줄 변경 없음), dev_todo 머리 PP-01 ~ 12
 - A33 · 34 · 35 · 37 「계획」: 문제 없음 (명세 §6 「빠르게」 범위 = QA-46~54 · A30~32, A36은 단위). QA는 통과로 세지 말고 「범위 밖(계획)」으로만 표시
 - NON-BLOCKING 없음. 재실행 불필요 (마스터 확인 vitest 1178 · packages diff 0)
+
+## 회차 1/3 — Dev-8 (diff `03_diff_dev8.patch`, 48d9dce..a327456) — **APPROVE**
+
+검수자: mr-reviewer (Opus). patch 기준 (작업 트리의 사용자 미커밋 디자인 변경은 제외). 테스트는 직접 실행하지 않음 (작업자 보고 · 마스터 확인 근거).
+- 칸 번호: `previewDocs.ts`가 `navPush` · `navBack` · `navForward`를 그대로 씀, `trackPush` = `slice(0, index+1)` + push + `nav.size`에 맞춰 앞 자르기 → 한도 50에서도 `docs.length === nav.size`. 무변경 Patch는 `trackPush` 안 부름. PD-4 · 5가 엔진 History와 단계 대조 · 무작위 2000번
+- 같은 틱 연타: `vault.track` 동기 읽기 · 쓰기, 이동 가능 여부를 먼저 판정 후 엔진 `back()` · `forward()` (A41)
+- selectedId 함수형 setter + `reconcileSelection`, `moveTo`에 `setNextId` 없음 (U-2 · U-3 · QA-58 · 59)
+- Hook 7칸 유지 (`track`은 useMemo 보관함 안), `previewDocs.ts`는 rootOnlyHooks 순수 모듈 검사에 추가
+- 요약 표 샘플(QA-55 · 58 · 60 · 62 · A38 · A40) Then 항목 모두 단언됨
+
+**NON-BLOCKING**
+1. `qa_todo.md:164` QA-60: b2는 처음부터 라벨 override(`model.ts:34`) → `['color']`→`[]`가 아니라 `['label','color']`→`['label']` (테스트가 맞음) → **마스터가 문서 수정함**
+2. 코드로 같은 틱에 [실행 취소] + [Patch]를 이어 부르면 `onPreviewPatch`가 이동 전 `doc`을 저장할 수 있음. 클릭은 이벤트마다 마이크로태스크가 비워져 실제 조작으로는 안 생김 → 기록만 (고치지 않음)

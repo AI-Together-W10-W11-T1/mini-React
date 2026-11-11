@@ -23,3 +23,7 @@
 2026-11-12T00:40 | stage=1 | agent=mr-worker | round=- | signal=UNKNOWN | Dev-8 | by=hook
 2026-11-12T00:47 | stage=2 | agent=mr-worker | round=- | signal=UNKNOWN | Dev-7 | by=hook
 2026-11-12T00:47 | stage=2 | agent=master | round=- | signal=VERIFY | 사용자 디자인 커밋 5e841b2 확인(tsc 0 · vitest 1178 · playwright 316). 실제 영역 점무늬 제거 905a582(사용자 "추천대로"). FD-02 · MF-21 · PP-02에 변경 기록. 다음 = Dev-8 진행 여부 질문
+2026-11-12T00:50 | stage=1 | agent=master | round=- | signal=TEST_CASES_OK | 사용자 "dev-8을 조금 더 빠르게 진행하고 싶어" → Dev-8 진행 · 테스트 케이스 표 그대로 수용으로 기록. 속도: 시나리오 묶어 e2e 수 줄이기(단언 유지) · 깨짐 확인 핵심 3개만 · 개발 중엔 관련 스펙만, 전체는 끝에 1번
+2026-11-12T01:06 | stage=2 | agent=mr-worker | round=- | signal=UNKNOWN | Dev-8 | by=hook
+2026-11-12T01:08 | stage=2 | agent=mr-reviewer | round=1/3 | signal=UNKNOWN | Dev-8 | by=hook
+2026-11-12T01:08 | stage=2 | agent=master | round=1 | signal=APPROVE | Dev-8 검수 1/3 APPROVE (a327456), NON-BLOCKING 1 문서 수정 · 2 기록만. 다음 = 사용자 디자인 커밋 뒤 QA + 캡처(005 · 006)
