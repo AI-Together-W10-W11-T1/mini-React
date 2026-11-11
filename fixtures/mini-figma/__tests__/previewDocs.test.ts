@@ -11,7 +11,7 @@ import type { DocTrack } from '../previewDocs';
 // 칸 수 · 잘림 · 경계는 previewNav(navPush · navBack · navForward)가 정하고, 엔진 History에 같은 연산을 돌려 매 단계 맞춰 본다.
 
 /** 번호표가 붙은 doc 사본 (label에 번호를 넣어 서로 구별한다) */
-const docN = (n: number): Doc => ({ main: { ...INITIAL_DOC.main, label: `d${n}` }, instances: [] });
+const docN = (n: number): Doc => ({ main: { ...INITIAL_DOC.main, label: `d${n}` }, instances: [], variables: INITIAL_DOC.variables });
 const tag = (d: Doc): string => d.main.label;
 const entry = (n: number): HistoryEntry => ({ snapshot: [], patches: [], inverse: [{ kind: 'SET_TEXT', path: [0], before: String(n), after: String(n - 1) }] });
 

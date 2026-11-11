@@ -1,6 +1,8 @@
 // [AI Note]: 색 순수 함수 모음. DOM · Hook · 엔진 import가 없다 (rootOnlyHooks.test.ts가 검사).
 // 색은 이름('blue')이 아니라 `#rrggbb` 값으로 저장하고(FD-20), 버튼은 클래스가 아니라 `style`로 칠한다(FD-23).
 
+import type { Variable } from './model';
+
 /** 칩 8개 (FD-21). 이 순서대로 팔레트 판에 그려진다 */
 export const PALETTE: readonly string[] = ['#0052ff', '#cf202f', '#05b169', '#f4b000', '#0a0b0d', '#5b616e', '#a8acb3', '#eef0f3'];
 
@@ -42,4 +44,42 @@ export function textColorFor(bg: string): '#ffffff' | '#0a0b0d' {
  */
 export function buttonStyle(color: string): { 'background-color': string; color: string } {
   return { 'background-color': color, color: textColorFor(color) };
+}
+
+// ---------------------------------------------------------------------------
+// 변수 연결 (task_007): 버튼 `color` 칸에 hex 대신 `'var:<id>'`를 저장하면 그 변수를 가리킨다 (VR-02)
+// ---------------------------------------------------------------------------
+
+const VAR_PREFIX = 'var:';
+const DEFAULT_COLOR = '#0052ff';
+
+/** 변수 id → 연결 표현 `var:<id>` */
+export function varRef(id: string): string {
+  return VAR_PREFIX + id;
+}
+
+/** 연결 표현인가 (`var:` 로 시작). 변수가 실제로 있는지는 보지 않는다 */
+export function isVarRef(color: string): boolean {
+  return color.startsWith(VAR_PREFIX);
+}
+
+/** 연결이면 변수 id, 아니면 null */
+export function varIdOf(color: string): string | null {
+  return isVarRef(color) ? color.slice(VAR_PREFIX.length) : null;
+}
+
+/**
+ * 그리기 직전에 색을 hex로 푼다 (VR-03). 순서: ① hex면 그대로 ② `var:<id>`면 그 변수 값 ③ 없는 id면 fallback(메인 색, 그것도 연결이면 같은 규칙으로 한 번 풀기) ④ `#0052ff`.
+ * [AI Note]: id는 정확히 일치해야 한다 (대소문자 · 공백 다르면 없는 id). 변수끼리 연결(alias)은 없어서 재귀 · 순환 검사가 필요 없다.
+ */
+export function resolveColor(color: string, variables: readonly Variable[], fallback?: string): string {
+  const id = varIdOf(color);
+  if (id === null) return color;
+  const found = variables.find((v) => v.id === id);
+  if (found !== undefined && isHexColor(found.value)) return found.value;
+  if (fallback === undefined) return DEFAULT_COLOR;
+  const fallbackId = varIdOf(fallback);
+  if (fallbackId === null) return fallback;
+  const viaFallback = variables.find((v) => v.id === fallbackId);
+  return viaFallback !== undefined && isHexColor(viaFallback.value) ? viaFallback.value : DEFAULT_COLOR;
 }

@@ -843,7 +843,7 @@ describe('인스턴스 추가 · 삭제 (Dev-9)', () => {
     const doc = slot(0) as typeof INITIAL_DOC;
     expect(doc.instances[3]).toEqual({ id: 'b4' });
     expect(Object.keys(doc.instances[3])).toEqual(['id']);
-    expect(Object.keys(doc)).toEqual(['main', 'instances']);
+    expect(Object.keys(doc)).toEqual(['main', 'instances', 'variables']);
     expect(doc.instances.slice(0, 3)).toEqual(INITIAL_DOC.instances);
   });
 
