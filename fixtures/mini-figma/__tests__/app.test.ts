@@ -660,14 +660,15 @@ describe('팔레트 판 (Dev-3)', () => {
     }
   });
 
-  it('색 입력칸(prop-color)은 type=color이고 값은 지금 색이며, 값 글자(color-hex)도 지금 색이다. 색 칸에 <select>가 없다', () => {
+  it('색 입력칸(prop-color)은 type=color이고 값은 지금 색이며, 값 글자(color-hex)도 지금 색이다. 색 칸의 <select>는 변수 상자(prop-variable) 하나뿐이다', () => {
     const input = byId('prop-color') as HTMLInputElement;
     expect(input.localName).toBe('input');
     expect(input.type).toBe('color');
     expect(input.value).toBe('#0052ff');
     expect(byId('color-hex').textContent).toBe('#0052ff');
     expect(root.querySelector('[data-testid="color-palette"]')).not.toBeNull();
-    expect(root.querySelector('[data-testid="prop-row"][data-field="color"] select')).toBeNull();
+    const selects = Array.from(root.querySelectorAll('[data-testid="prop-row"][data-field="color"] select'));
+    expect(selects.map((el) => el.getAttribute('data-testid'))).toEqual(['prop-variable']);
   });
 
   it('칩을 누르면 onEdit로 메인 값 · 버튼 배경 · 칩 표시 · 입력칸 값 · 값 글자가 같이 바뀐다 (칩 8개 전부)', async () => {
@@ -843,7 +844,7 @@ describe('인스턴스 추가 · 삭제 (Dev-9)', () => {
     const doc = slot(0) as typeof INITIAL_DOC;
     expect(doc.instances[3]).toEqual({ id: 'b4' });
     expect(Object.keys(doc.instances[3])).toEqual(['id']);
-    expect(Object.keys(doc)).toEqual(['main', 'instances']);
+    expect(Object.keys(doc)).toEqual(['main', 'instances', 'variables']);
     expect(doc.instances.slice(0, 3)).toEqual(INITIAL_DOC.instances);
   });
 
@@ -970,6 +971,75 @@ describe('순서 바꾸기 (Dev-10)', () => {
     await click(moveButton('b2', 'up'));
     expect(canvasCounts(instance.lastPatches)).toEqual({ MOVE: 1 });
     expect(order()).toEqual(['b2', 'b1', 'b3']);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 레이어 하위 목록 접기 · 펼치기: 인스턴스 행은 메인 아래 하위 레이어, 메인 행의 [▾]/[▸]로 접고 편다 (루트 state [7], 처음 펼침)
+// ---------------------------------------------------------------------------
+
+describe('레이어 하위 목록 접기 · 펼치기', () => {
+  const toggle = (): HTMLElement => byId('layer-toggle');
+  const list = (): HTMLElement => byId('layer-list');
+  const collapsed = (): boolean => list().classList.contains('collapsed');
+
+  it('처음은 펼침: [▾] · aria-expanded="true" · ul에 collapsed 없음. 버튼은 메인 행 안 이름 뒤(이름이 0번 자식 그대로)', () => {
+    expect(collapsed()).toBe(false);
+    expect(toggle().textContent).toBe('▾');
+    expect(toggle().getAttribute('aria-expanded')).toBe('true');
+    expect(toggle().getAttribute('type')).toBe('button');
+    expect(Array.from(layerRow('main').children).map(testId)).toEqual(['layer-name', 'layer-toggle']);
+  });
+
+  it('[▾]를 누르면 접힘: 레이어 안만 바뀌고(행 노드는 그대로) 캔버스 · 도구 막대 patch 0, 렌더 1번, 고르기는 안 바뀜. 다시 누르면 펼침', async () => {
+    const rows = Array.from(root.querySelectorAll('[data-testid="layer-item"]'));
+    const before = renders;
+    await click(toggle());
+    expect(collapsed()).toBe(true);
+    expect(toggle().textContent).toBe('▸');
+    expect(toggle().getAttribute('aria-expanded')).toBe('false');
+    expect(slot(7)).toBe(false);
+    expect(slot(1), '접기는 메인을 고르지 않음 (stopPropagation)').toBeNull();
+    expect(renders - before).toBe(1);
+    expect(canvasCounts(instance.lastPatches)).toEqual({});
+    expect(toolbarCounts(instance.lastPatches)).toEqual({});
+    expect(Object.keys(layerCounts(instance.lastPatches)).filter((k) => k !== 'SET_ATTR' && k !== 'SET_TEXT'), '행을 지우거나 새로 만들지 않음').toEqual([]);
+    expect(Array.from(root.querySelectorAll('[data-testid="layer-item"]'))).toEqual(rows);
+    const ulPath = [...LAYER_PREFIX, 2];
+    const ulClass = instance.lastPatches.filter((p) => p.kind === 'SET_ATTR' && p.name === 'class' && p.path.length === ulPath.length && p.path.every((n, i) => n === ulPath[i]));
+    expect(ulClass, 'ul(레이어 창 [2]) class 한 줄로 행 전체를 숨김').toHaveLength(1);
+    await click(toggle());
+    expect(collapsed()).toBe(false);
+    expect(toggle().textContent).toBe('▾');
+  });
+
+  it('접힌 채 캔버스에서 인스턴스를 고르면 펼쳐진다(렌더 1번), 메인을 고르면 접힘 그대로', async () => {
+    await click(toggle());
+    await click(buttonOf('main'));
+    expect(collapsed(), '메인 고르기는 펼침을 안 건드림').toBe(true);
+    const before = renders;
+    await click(buttonOf('b2'));
+    expect(collapsed()).toBe(false);
+    expect(slot(1)).toBe('b2');
+    expect(renders - before, '고르기 + 펼치기 = 렌더 1번').toBe(1);
+  });
+
+  it('접힌 채 [인스턴스 생성]을 누르면 펼쳐져 새 행 b4가 보인다(렌더 1번)', async () => {
+    await click(buttonOf('main'));
+    await click(toggle());
+    const before = renders;
+    await clickAdd();
+    expect(collapsed()).toBe(false);
+    expect(layerNames()).toEqual(['버튼', '취소', '삭제', '버튼']);
+    expect(renders - before).toBe(1);
+  });
+
+  it('이미 펼침일 때 인스턴스를 고르는 것은 지금과 같다: 레이어 patch는 고른 표시뿐(ul class 안 바뀜)', async () => {
+    await click(buttonOf('b1'));
+    expect(collapsed()).toBe(false);
+    const ulPath = [...LAYER_PREFIX, 2];
+    const ulChanges = instance.lastPatches.filter((p) => 'path' in p && p.path.length === ulPath.length && p.path.every((n, i) => n === ulPath[i]));
+    expect(ulChanges).toEqual([]);
   });
 });
 
@@ -1321,13 +1391,14 @@ describe('실제 영역 (patch-preview, PP-01 ~ 10 · Dev-7)', () => {
     expect(byId('real-overlay').children).toHaveLength(0);
   });
 
-  it('Hook 7칸: doc · selectedId · nextId + [3] useMemo 보관함(같은 객체) · [4] useEffect · [5] useState(nav) + [6] keydown useEffect. 마운트 뒤 보관함에 preview가 들어 있다 (PP-09)', async () => {
-    expect(instance.hooks.map((hook) => hook.kind)).toEqual(['state', 'state', 'state', 'memo', 'effect', 'state', 'effect']);
-    expect(instance.hooks).toHaveLength(7);
+  it('Hook 8칸: doc · selectedId · nextId + [3] useMemo 보관함(같은 객체) · [4] useEffect · [5] useState(nav) + [6] keydown useEffect + [7] 레이어 펼침 useState. 마운트 뒤 보관함에 preview가 들어 있다 (PP-09)', async () => {
+    expect(instance.hooks.map((hook) => hook.kind)).toEqual(['state', 'state', 'state', 'memo', 'effect', 'state', 'effect', 'state']);
+    expect(instance.hooks).toHaveLength(8);
     expect(slot(0)).toBe(INITIAL_DOC);
     expect(slot(1)).toBeNull();
     expect(slot(2)).toBe(4);
     expect(slot(5)).toBe(INITIAL_NAV);
+    expect(slot(7), '레이어 인스턴스 목록은 처음 펼침').toBe(true);
     const vault = (instance.hooks[3] as MemoHook).value as { preview: unknown; track: unknown };
     expect(vault.preview).not.toBeNull();
     expect(vault.track, '보관함 track = 처음 칸만 (PP-06 변경, 새 Hook 칸 없음)').toEqual(initialTrack(INITIAL_DOC));
@@ -1733,5 +1804,343 @@ describe('실제 영역 (patch-preview, PP-01 ~ 10 · Dev-7)', () => {
     expect(forwardButton().hasAttribute('disabled')).toBe(true);
     expect(docIds()).toHaveLength(58);
     sameAreas();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// task_007 색 변수 Variables — 변수 구역 (Dev-3: VR-04 · 06, VP-10 · 11 · 12)
+// ---------------------------------------------------------------------------
+describe('변수 구역 (VR-04 · 06)', () => {
+  const rows = (): HTMLElement[] => Array.from(root.querySelectorAll<HTMLElement>('[data-testid="variable-row"]'));
+  const rowOf = (id: string): HTMLElement => {
+    const found = rows().find((r) => r.getAttribute('data-id') === id);
+    if (found === undefined) throw new Error(`변수 줄 ${id}가 없다`);
+    return found;
+  };
+  const inputOf = (id: string): HTMLInputElement => rowOf(id).querySelector<HTMLInputElement>('[data-testid="variable-color"]')!;
+  const input = async (id: string, value: string): Promise<void> => {
+    const el = inputOf(id);
+    el.value = value;
+    el.dispatchEvent(new Event('input'));
+    await Promise.resolve();
+  };
+  const variablesOf = () => (slot(0) as typeof INITIAL_DOC).variables;
+  /** 렌더마다 새로 생기는 SET_EVENT를 뺀 줄 (task_002 알려진 한계) */
+  const meaningful = (): Patch[] => instance.lastPatches.filter((p) => p.kind !== 'SET_EVENT');
+
+  it('처음: layer-panel의 끝 자식 variable-panel 안에 변수 줄 3개 · 순서 · 값 · hex 글자', () => {
+    const panel = byId('layer-panel');
+    expect(panel.lastElementChild).toBe(byId('variable-panel'));
+    expect(byId('variable-title').textContent).toBe('변수');
+    expect(rows().map((r) => r.getAttribute('data-id'))).toEqual(['primary', 'danger', 'success']);
+    expect(rows().map((r) => r.querySelector('[data-testid="variable-name"]')?.textContent)).toEqual(['Primary', 'Danger', 'Success']);
+    expect(rows().map((r) => r.querySelector('[data-testid="variable-hex"]')?.textContent)).toEqual(['#0052ff', '#cf202f', '#05b169']);
+    expect(rows().map((r) => r.querySelector('input')!.type)).toEqual(['color', 'color', 'color']);
+    expect(['primary', 'danger', 'success'].map((id) => inputOf(id).value)).toEqual(['#0052ff', '#cf202f', '#05b169']);
+    expect(rows().map((r) => (r.querySelector<HTMLElement>('[data-testid="variable-chip"]')!).style.backgroundColor)).toEqual([rgb('#0052ff'), rgb('#cf202f'), rgb('#05b169')]);
+    // 처음 화면 버튼 색 그대로 (VR-08) · div.app 자식 5개 그대로
+    expect(bgs()).toEqual([rgb('#0052ff'), rgb('#0052ff'), rgb('#0052ff'), rgb('#cf202f')]);
+    expect(area().children).toHaveLength(5);
+  });
+
+  it('VP-11 input → slot(0).variables 해당 변수만 바뀜, 캔버스 0줄 · 변수 구역 SET_STYLE 1 + SET_PROP 1 + SET_TEXT 1, 렌더 1번', async () => {
+    const before = variablesOf();
+    const mainButton = buttonOf('main');
+    const rendersBefore = renders;
+    await input('primary', '#f4b000');
+    expect(renders - rendersBefore).toBe(1);
+    const after = variablesOf();
+    expect(after[0]).toEqual({ id: 'primary', name: 'Primary', value: '#f4b000' });
+    expect(after[1]).toBe(before[1]);
+    expect(after[2]).toBe(before[2]);
+    const meaningfulLines = meaningful();
+    expect(canvasCounts(meaningfulLines)).toEqual({});
+    expect(layerCounts(meaningfulLines)).toEqual({ SET_STYLE: 1, SET_PROP: 1, SET_TEXT: 1 });
+    expect(meaningfulLines).toHaveLength(3);
+    expect(buttonOf('main')).toBe(mainButton);
+    expect(bgs()).toEqual([rgb('#0052ff'), rgb('#0052ff'), rgb('#0052ff'), rgb('#cf202f')]);
+    expect(rowOf('primary').querySelector('[data-testid="variable-hex"]')?.textContent).toBe('#f4b000');
+  });
+
+  it('VP-10 같은 값으로 input → 렌더 0번, lastPatches 그대로', async () => {
+    await input('primary', '#f4b000');
+    const patches = instance.lastPatches;
+    const rendersBefore = renders;
+    await input('primary', '#f4b000');
+    expect(renders - rendersBefore).toBe(0);
+    expect(instance.lastPatches).toBe(patches);
+    await input('danger', '#cf202f');
+    expect(renders - rendersBefore).toBe(0);
+  });
+
+  it('VP-12 같은 틱에 input 4번 연속 → 이벤트마다 렌더 1번, 마지막 값만 남고, 입력칸 노드는 같은 참조', async () => {
+    const el = inputOf('primary');
+    const rendersBefore = renders;
+    for (const hex of ['#111111', '#222222', '#333333', '#f4b000']) await input('primary', hex);
+    expect(renders - rendersBefore).toBe(4);
+    expect(inputOf('primary')).toBe(el);
+    expect(variablesOf()[0].value).toBe('#f4b000');
+    expect(rowOf('primary').querySelector('[data-testid="variable-hex"]')?.textContent).toBe('#f4b000');
+    expect(el.value).toBe('#f4b000');
+  });
+
+  it('변수 구역에 patch 글자가 없다 (MF-05) · Hook 칸은 8칸 그대로 (새 칸 없음)', () => {
+    expect(byId('variable-panel').textContent).not.toMatch(/patch/i);
+    expect(instance.hooks).toHaveLength(8);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// task_007 색 변수 Variables — 연결 UI (Dev-4: VR-02 · 05 · 06, VP-1 · 5 · 7 · 8 · 9)
+// ---------------------------------------------------------------------------
+describe('연결 UI — 변수 상자 (VR-02 · 05)', () => {
+  const linkBox = (): HTMLSelectElement => byId('prop-variable') as HTMLSelectElement;
+  const linkOptions = (): string[] => Array.from(linkBox().options).map((o) => o.textContent ?? '');
+  const hexText = (): string => byId('color-hex').textContent ?? '';
+  const meaningful = (): Patch[] => instance.lastPatches.filter((p) => p.kind !== 'SET_EVENT');
+  const panelCounts = (): Record<string, number> => countsUnder(instance.lastPatches, PANEL_PREFIX_ALL);
+  const setVar = async (id: string, value: string): Promise<void> => {
+    const el = root.querySelector<HTMLInputElement>(`[data-testid="variable-row"][data-id="${id}"] [data-testid="variable-color"]`)!;
+    el.value = value;
+    el.dispatchEvent(new Event('input'));
+    await Promise.resolve();
+  };
+  const doc = (): typeof INITIAL_DOC => slot(0) as typeof INITIAL_DOC;
+  const linkMain = async (id: string): Promise<void> => {
+    await click(buttonOf('main'));
+    await choose('prop-variable', id);
+  };
+
+  it('색 칸에 <select>는 prop-variable 하나뿐이다 (옵션 없음 · Primary · Danger · Success, 값은 변수 id)', async () => {
+    await click(buttonOf('main'));
+    const selects = root.querySelectorAll('[data-testid="prop-row"][data-field="color"] select');
+    expect(selects).toHaveLength(1);
+    expect(selects[0]).toBe(linkBox());
+    expect(linkOptions()).toEqual(['없음', 'Primary', 'Danger', 'Success']);
+    expect(Array.from(linkBox().options).map((o) => o.value)).toEqual(['', 'primary', 'danger', 'success']);
+    expect(linkBox().value).toBe('');
+    expect(pressedChips()).toEqual(['#0052ff']);
+    await click(buttonOf('b3'));
+    expect(linkBox().value).toBe('');
+    expect(pressedChips()).toEqual(['#cf202f']);
+  });
+
+  it('VP-1 메인(선택)을 Primary에 연결: main.color = var:primary, 캔버스 · 변수 구역 0줄, 속성 패널 { SET_PROP 1 + SET_ATTR 1 + SET_TEXT 1 }, 렌더 1번', async () => {
+    await click(buttonOf('main'));
+    const other = doc();
+    const before = renders;
+    await choose('prop-variable', 'primary');
+    expect(renders - before).toBe(1);
+    expect(doc().main.color).toBe('var:primary');
+    expect(doc().instances).toBe(other.instances);
+    expect(doc().variables).toBe(other.variables);
+    expect(canvasCounts(meaningful())).toEqual({});
+    expect(layerCounts(meaningful())).toEqual({});
+    expect(panelCounts()).toEqual({ SET_PROP: 1, SET_ATTR: 1, SET_TEXT: 1 });
+    expect(pressedChips()).toEqual([]);
+    expect(hexText()).toBe('Primary');
+    expect((byId('prop-color') as HTMLInputElement).value).toBe('#0052ff');
+    expect(linkBox().value).toBe('primary');
+    expect(bgs()).toEqual([rgb('#0052ff'), rgb('#0052ff'), rgb('#0052ff'), rgb('#cf202f')]);
+  });
+
+  it('VP-2 · 3 (VP-1 뒤) Primary #f4b000 → 캔버스 SET_STYLE 6 · b3 줄 0 · 레이어 노드 0 · 변수 구역 3줄 · 속성 패널 SET_PROP 1 / #0066ff → SET_STYLE 3', async () => {
+    await linkMain('primary');
+    const b3 = buttonOf('b3');
+    const layerBefore = layerRow('b1');
+    await setVar('primary', '#f4b000');
+    expect(canvasCounts(meaningful())).toEqual({ SET_STYLE: 6 });
+    expect(buttonOf('b3')).toBe(b3);
+    expect(layerRow('b1')).toBe(layerBefore);
+    expect(layerCounts(meaningful())).toEqual({ SET_STYLE: 1, SET_PROP: 1, SET_TEXT: 1 });
+    expect(panelCounts()).toEqual({ SET_PROP: 1 });
+    expect(bgs()).toEqual([rgb('#f4b000'), rgb('#f4b000'), rgb('#f4b000'), rgb('#cf202f')]);
+    expect(fgOf('main')).toBe(rgb('#0a0b0d'));
+    expect(linkBox().value).toBe('primary');
+    expect(hexText()).toBe('Primary');
+    await setVar('primary', '#0066ff');
+    // #f4b000 (먹 글자) → #0066ff (흰 글자)라 이번엔 글자색도 바뀐다 — 글자색이 안 바뀌는 VP-3(3줄)은 아래에서 따로 센다
+    expect(canvasCounts(meaningful())).toEqual({ SET_STYLE: 6 });
+  });
+
+  it('VP-3 (VP-1 뒤) Primary #0066ff (글자색 흰 그대로) → 캔버스 SET_STYLE 3 (메인 · b1 · b2 배경만)', async () => {
+    await linkMain('primary');
+    await setVar('primary', '#0066ff');
+    expect(canvasCounts(meaningful())).toEqual({ SET_STYLE: 3 });
+  });
+
+  it('VP-4 (VP-1 뒤) b2에 칩 #05b169(override) → Primary #f4b000: 캔버스 SET_STYLE 4(메인 · b1), b2 · b3 줄 0 · b2 노드 같은 참조', async () => {
+    await linkMain('primary');
+    await click(buttonOf('b2'));
+    await pick('#05b169');
+    const b2 = buttonOf('b2');
+    await setVar('primary', '#f4b000');
+    expect(canvasCounts(meaningful())).toEqual({ SET_STYLE: 4 });
+    expect(buttonOf('b2')).toBe(b2);
+    expect(bgOf('b2')).toBe(rgb('#05b169'));
+    expect(panelCounts()).toEqual({});
+  });
+
+  it('VP-5 · 6 b3(선택)를 Danger에 연결(푼 색 같음) → 캔버스 0줄 · 속성 패널 3줄, Danger #05b169 → b3만 SET_STYLE 2, 다른 버튼 노드 같은 참조', async () => {
+    await click(buttonOf('b3'));
+    await choose('prop-variable', 'danger');
+    expect(doc().instances.find((it) => it.id === 'b3')?.color).toBe('var:danger');
+    expect(canvasCounts(meaningful())).toEqual({});
+    expect(panelCounts()).toEqual({ SET_PROP: 1, SET_ATTR: 1, SET_TEXT: 1 });
+    expect(hexText()).toBe('Danger');
+    const [m, b1, b2] = [buttonOf('main'), buttonOf('b1'), buttonOf('b2')];
+    await setVar('danger', '#05b169');
+    expect(canvasCounts(meaningful())).toEqual({ SET_STYLE: 2 });
+    expect([buttonOf('main'), buttonOf('b1'), buttonOf('b2')]).toEqual([m, b1, b2]);
+    expect(bgOf('b3')).toBe(rgb('#05b169'));
+    expect(fgOf('b3')).toBe(rgb('#0a0b0d'));
+    expect(panelCounts()).toEqual({ SET_PROP: 1 });
+    expect(hexText()).toBe('Danger');
+  });
+
+  it('VP-7 (VP-1 뒤) 같은 색 칩 #0052ff 클릭 = 연결 풀림: main.color = #0052ff, 캔버스 0줄, 속성 패널 3줄, 렌더 1번 · 이후 Primary 값이 안 따라감', async () => {
+    await linkMain('primary');
+    const before = renders;
+    await pick('#0052ff');
+    expect(renders - before).toBe(1);
+    expect(doc().main.color).toBe('#0052ff');
+    expect(canvasCounts(meaningful())).toEqual({});
+    expect(panelCounts()).toEqual({ SET_PROP: 1, SET_ATTR: 1, SET_TEXT: 1 });
+    expect(linkBox().value).toBe('');
+    expect(pressedChips()).toEqual(['#0052ff']);
+    expect(hexText()).toBe('#0052ff');
+    await setVar('primary', '#f4b000');
+    expect(canvasCounts(meaningful())).toEqual({});
+  });
+
+  it('VP-8 (VP-1 뒤) 상자 「없음」 → 지금 푼 hex로 저장: 겉모습 그대로 · 캔버스 0줄. Primary가 #f4b000일 때 「없음」이면 #f4b000이 저장됨', async () => {
+    await linkMain('primary');
+    await setVar('primary', '#f4b000');
+    await choose('prop-variable', '');
+    expect(doc().main.color).toBe('#f4b000');
+    expect(canvasCounts(meaningful())).toEqual({});
+    expect(pressedChips()).toEqual(['#f4b000']); // #f4b000은 팔레트 4번째 칩이라 연결이 풀리면 그 칩이 눌림 (qa_todo는 「팔레트에 없다」고 틀리게 적었다)
+    expect(hexText()).toBe('#f4b000');
+    await setVar('primary', '#0052ff');
+    expect(bgOf('main')).toBe(rgb('#f4b000'));
+  });
+
+  it('VP-9 (VP-5 뒤, b3 선택) ↻ → b3가 메인(Primary 연결)을 따름: 캔버스 SET_STYLE 1 (배경 #cf202f → #0052ff), 이름 글자 Primary', async () => {
+    await linkMain('primary');
+    await click(buttonOf('b3'));
+    await choose('prop-variable', 'danger');
+    const reset = root.querySelector<HTMLElement>('[data-testid="prop-row"][data-field="color"] [data-testid="prop-reset"]');
+    expect(reset).not.toBeNull();
+    await click(reset!);
+    expect(doc().instances.find((it) => it.id === 'b3')).toEqual({ id: 'b3', label: '삭제' });
+    expect(canvasCounts(meaningful())).toEqual({ SET_STYLE: 1 });
+    expect(bgOf('b3')).toBe(rgb('#0052ff'));
+    expect(fgOf('b3')).toBe(rgb('#ffffff'));
+    expect(hexText()).toBe('Primary');
+    expect(linkBox().value).toBe('primary');
+    expect(root.querySelector('[data-testid="prop-row"][data-field="color"] [data-testid="prop-reset"]')).toBeNull();
+  });
+
+  it('같은 변수 상자 값을 다시 고르면 렌더 0번 · 같은 doc', async () => {
+    await linkMain('primary');
+    const before = renders;
+    const d = doc();
+    await choose('prop-variable', 'primary');
+    expect(renders - before).toBe(0);
+    expect(doc()).toBe(d);
+  });
+
+  it('메인이 연결일 때 추가한 b4는 메인을 따라 Primary 값에 같이 바뀐다 · 인스턴스 연결은 다른 인스턴스 · variables를 같은 참조로 둔다', async () => {
+    await linkMain('primary');
+    await clickAdd();
+    await setVar('primary', '#f4b000');
+    expect(bgOf('b4')).toBe(rgb('#f4b000'));
+    await click(buttonOf('b2'));
+    const before = doc();
+    await choose('prop-variable', 'success');
+    expect(doc().variables).toBe(before.variables);
+    expect(doc().main).toBe(before.main);
+    expect(doc().instances.find((it) => it.id === 'b1')).toBe(before.instances.find((it) => it.id === 'b1'));
+    expect(doc().instances.find((it) => it.id === 'b2')?.color).toBe('var:success');
+  });
+
+  it('A57 doc에 var:ghost가 들어 있으면 푼 색(메인 색)으로 칠하고 상자는 「없음」, 이름 글자 대신 푼 hex', async () => {
+    await click(buttonOf('b1'));
+    // UI로는 없는 id를 못 만들므로 doc 칸 값을 바꿔 다시 그려 본다
+    const hook = instance.hooks[0] as StateHook;
+    hook.value = { ...doc(), main: { ...doc().main, color: '#112233' }, instances: doc().instances.map((it) => (it.id === 'b1' ? { ...it, color: 'var:ghost' } : it)) };
+    instance.update();
+    expect(bgOf('b1')).toBe(rgb('#112233'));
+    expect(linkBox().value).toBe('');
+    expect(hexText()).toBe('#112233');
+    expect(pressedChips()).toEqual([]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// task_007 색 변수 — [Patch] · [실행 취소] · [다시 실행] (Dev-5: VR-07, U-8)
+// ---------------------------------------------------------------------------
+describe('변수 · State History (VR-07, U-8)', () => {
+  const doc = (): typeof INITIAL_DOC => slot(0) as typeof INITIAL_DOC;
+  const setVar = async (id: string, value: string): Promise<void> => {
+    const el = root.querySelector<HTMLInputElement>(`[data-testid="variable-row"][data-id="${id}"] [data-testid="variable-color"]`) as HTMLInputElement;
+    el.value = value;
+    el.dispatchEvent(new Event('input'));
+    await Promise.resolve();
+  };
+  const varValues = (): string[] => Array.from(root.querySelectorAll<HTMLInputElement>('[data-testid="variable-color"]')).map((el) => el.value);
+  const realBgsNow = (): string[] => Array.from(root.querySelectorAll<HTMLElement>('[data-testid="real-figma-button"]')).map((b) => b.style.getPropertyValue('background-color'));
+  const linkValue = (): string => (byId('prop-variable') as HTMLSelectElement).value;
+  const hexNow = (): string => byId('color-hex').textContent ?? '';
+
+  it('U-8 연결 + Primary #f4b000 → [Patch]: 실제 영역은 푼 hex(var: 없음). [실행 취소] = slot(0) 처음 doc 같은 참조 · 연결 · 변수 값 복원 · 렌더 1번, [다시 실행] = Patch 때 doc 같은 참조', async () => {
+    await click(buttonOf('main'));
+    await choose('prop-variable', 'primary');
+    await setVar('primary', '#f4b000');
+    const docA = doc();
+    await click(byId('patch-button'));
+    expect(realBgsNow()).toEqual([rgb('#f4b000'), rgb('#f4b000'), rgb('#f4b000'), rgb('#cf202f')]);
+    expect(byId('real-area').innerHTML).not.toContain('var:');
+
+    let before = renders;
+    await click(byId('back-button'));
+    expect(renders - before).toBe(1);
+    expect(doc()).toBe(INITIAL_DOC);
+    expect(bgs()).toEqual([rgb('#0052ff'), rgb('#0052ff'), rgb('#0052ff'), rgb('#cf202f')]);
+    expect(realBgsNow()).toEqual(bgs());
+    expect(varValues()).toEqual(['#0052ff', '#cf202f', '#05b169']);
+    expect(linkValue()).toBe('');
+    expect(hexNow()).toBe('#0052ff');
+
+    before = renders;
+    await click(byId('forward-button'));
+    expect(renders - before).toBe(1);
+    expect(doc()).toBe(docA);
+    expect(bgs()).toEqual([rgb('#f4b000'), rgb('#f4b000'), rgb('#f4b000'), rgb('#cf202f')]);
+    expect(realBgsNow()).toEqual(bgs());
+    expect(varValues()[0]).toBe('#f4b000');
+    expect(linkValue()).toBe('primary');
+    expect(hexNow()).toBe('Primary');
+  });
+
+  it('Patch 안 한 변수 · 연결 편집은 [실행 취소] 때 버려지고 [다시 실행]해도 안 돌아온다', async () => {
+    await click(buttonOf('main'));
+    await choose('prop-variable', 'primary');
+    await setVar('primary', '#f4b000');
+    await click(byId('patch-button'));
+    await setVar('primary', '#05b169');
+    await choose('prop-variable', '');
+    await click(byId('back-button'));
+    expect(doc()).toBe(INITIAL_DOC);
+    await click(byId('forward-button'));
+    expect(doc().variables[0].value).toBe('#f4b000');
+    expect(doc().main.color).toBe('var:primary');
+    expect(bgs()[0]).toBe(rgb('#f4b000'));
+  });
+
+  it('변수만 바꾸고(연결 없음) [Patch]는 무변경이라 기록이 안 쌓인다 (되돌리기 꺼짐)', async () => {
+    await setVar('primary', '#f4b000');
+    await click(byId('patch-button'));
+    expect((byId('back-button') as HTMLButtonElement).hasAttribute('disabled')).toBe(true);
   });
 });

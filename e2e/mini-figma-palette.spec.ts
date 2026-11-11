@@ -61,7 +61,7 @@ function pressedChips(page: Page): Promise<string[]> {
 
 const CHANGED = [rgb('#0052ff'), rgb('#0052ff'), rgb('#0052ff'), rgb('#cf202f')];
 
-test('QA-35 메인을 고르면 색 칸에 팔레트 판(칩 8개 · 지금 색 표시 · 색 입력칸 · 값 글자)이 있고 선택 상자는 없다', async ({ page }) => {
+test('QA-35 메인을 고르면 색 칸에 팔레트 판(칩 8개 · 지금 색 표시 · 색 입력칸 · 값 글자)이 있고 선택 상자는 변수 상자 하나뿐이다', async ({ page }) => {
   await page.goto(URL);
   await selectOnCanvas(page, 'main');
 
@@ -77,8 +77,9 @@ test('QA-35 메인을 고르면 색 칸에 팔레트 판(칩 8개 · 지금 색 
   expect(await input.evaluate((el) => (el as HTMLInputElement).type)).toBe('color');
   await expect(input).toHaveValue('#0052ff');
   await expect(page.getByTestId('color-hex')).toHaveText('#0052ff');
-  // 색 칸에는 <select>가 없다 (크기 · 아이콘 종류 칸에는 있음)
-  await expect(page.locator(`${'[data-testid="prop-row"][data-field="color"]'} select`)).toHaveCount(0);
+  // 색 칸의 <select>는 변수 상자(prop-variable, task_007) 하나뿐이다 (크기 · 아이콘 종류 칸에는 각각 있음)
+  await expect(page.locator(`${'[data-testid="prop-row"][data-field="color"]'} select`)).toHaveCount(1);
+  await expect(page.locator(`${'[data-testid="prop-row"][data-field="color"]'} select`)).toHaveAttribute('data-testid', 'prop-variable');
   await expect(page.locator('[data-testid="prop-row"][data-field="size"] select')).toHaveCount(1);
 });
 

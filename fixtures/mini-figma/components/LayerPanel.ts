@@ -1,22 +1,33 @@
 import { h } from '@mini-react/react';
 import type { Props, VNode } from '@mini-react/shared';
 import { instanceName } from '../model';
-import type { Instance, MainProps } from '../model';
+import type { Instance, MainProps, Variable } from '../model';
+import { VariablePanel } from './VariablePanel';
 
 interface LayerPanelProps {
   main: MainProps;
   instances: readonly Instance[];
   selectedId: string | null;
+  /** 인스턴스 목록 펼침 여부 (루트 state, 처음 펼침) */
+  open: boolean;
+  /** [▾] / [▸]: 인스턴스 목록을 접거나 편다 */
+  onToggle: () => void;
   onSelect: (id: string) => void;
   /** [↑] (-1) · [↓] (+1): 그 인스턴스를 한 칸 옮긴다 */
   onMove: (id: string, delta: -1 | 1) => void;
+  /** 변수 구역 (task_007): 처음 3개, 값 하나가 바뀌면 알린다 */
+  variables: readonly Variable[];
+  onVariableChange: (id: string, value: string) => void;
 }
 
 // [AI Note]: 레이어 창 — props만 받는 순수 함수. 메인 행 + 인스턴스 행들(이름 = 지금 글자, 빈 글자면 id, ④-3).
 // 인스턴스 행의 <ul>에는 `key: it.id`가 있는 <li>만 둔다 (메인 행은 ul 밖 별도 상자 — 형제 전부 key, dev_todo 공통 주의 1).
-// 행을 누르면 고른다(고른 행은 클래스 selected). [+ 인스턴스]는 도구 막대(Toolbar)로 옮겨 갔다 (FD-11). 인스턴스 행마다 [↑] [↓]가 있고 메인 행에는 없다 (Dev-10).
+// 행을 누르면 고른다(고른 행은 클래스 selected). [인스턴스 생성]은 속성 패널(메인을 골랐을 때)에 있다. 인스턴스 행마다 [↑] [↓]가 있고 메인 행에는 없다 (Dev-10).
+// [AI Note]: 인스턴스는 메인 아래 하위 레이어처럼 들여 써서 보이고, 메인 행의 [▾] / [▸]로 접고 편다. 접기는 <ul>의 클래스 `collapsed`만 바꾼다 —
+// 레이어 창 DOM 구조(제목 · 메인 행 · ul > li)와 경로는 그대로라 행이 몇 개든 ul 한 곳만 고친다 (+ 버튼 글자 · aria-expanded).
+// [▾] 버튼은 메인 행 안 이름 뒤에 두고(이름 span이 0번 자식 그대로) CSS order로 앞에 보인다.
 export function LayerPanel(props: Props): VNode {
-  const { main, instances, selectedId, onSelect, onMove } = props as unknown as LayerPanelProps;
+  const { main, instances, selectedId, open, onToggle, onSelect, onMove, variables, onVariableChange } = props as unknown as LayerPanelProps;
   return h(
     'section',
     { class: 'layer-panel', 'data-testid': 'layer-panel' },
@@ -30,10 +41,26 @@ export function LayerPanel(props: Props): VNode {
         onClick: () => onSelect('main'),
       },
       h('span', { class: 'layer-name', 'data-testid': 'layer-name' }, '메인 Button'),
+      // [AI Note]: 접기 버튼은 메인 행(<div>) 안이라 누르면 클릭이 행까지 올라가 메인 고르기가 불린다 → stopPropagation으로 막는다 (접기는 고르기를 안 바꿈)
+      h(
+        'button',
+        {
+          type: 'button',
+          class: 'layer-toggle',
+          'aria-label': open ? '인스턴스 접기' : '인스턴스 펼치기',
+          'aria-expanded': open ? 'true' : 'false',
+          'data-testid': 'layer-toggle',
+          onClick: (event: Event) => {
+            event.stopPropagation();
+            onToggle();
+          },
+        },
+        open ? '▾' : '▸',
+      ),
     ),
     h(
       'ul',
-      { class: 'layer-list', 'data-testid': 'layer-list' },
+      { class: open ? 'layer-list' : 'layer-list collapsed', 'data-testid': 'layer-list' },
       instances.map((it) =>
         h(
           'li',
@@ -53,5 +80,7 @@ export function LayerPanel(props: Props): VNode {
         ),
       ),
     ),
+    // [AI Note]: 변수 구역(task_007) = 레이어 창 맨 끝 자식. 위 목록(<ul>)만 접히고 변수 구역은 접히지 않는다. 앞 자식 경로(제목 · 메인 행 · ul)는 그대로다.
+    h(VariablePanel, { variables, onChange: onVariableChange }),
   );
 }

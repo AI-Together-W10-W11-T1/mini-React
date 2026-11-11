@@ -2,8 +2,13 @@
 // 입력을 고치지 않고 새 객체를 돌려준다. 바뀐 것이 없으면 "같은 Doc 객체"를 그대로 돌려줘서,
 // 루트의 setter가 같은 값(Object.is)으로 보고 다시 그리지 않게 한다 (phase2-app/todoOps.ts 방식).
 
+import { isHexColor } from './color';
+
 export type Size = 'S' | 'M' | 'L';
-/** 색 값 `#rrggbb` (소문자, FD-20). 이름('blue')이 아니라 값을 저장한다 — 칩 8개 밖의 색도 색 입력칸으로 고를 수 있어서 */
+/**
+ * 색 칸의 값: `#rrggbb` (소문자, FD-20) 또는 변수 연결 `var:<id>` (task_007 VR-02).
+ * 이름('blue')이 아니라 값을 저장한다 — 칩 8개 밖의 색도 색 입력칸으로 고를 수 있어서. `var:`는 그릴 때 `resolveColor`가 hex로 푼다.
+ */
 export type Color = string;
 /** 아이콘 종류는 문자열로만 들고 있다. 문자열 → 컴포넌트(StarIcon · HeartIcon) 변환은 Canvas가 한다 (④-12) */
 export type IconKind = 'star' | 'heart';
@@ -22,16 +27,32 @@ export type Field = keyof MainProps;
 /** 인스턴스 = id + "바꾼 칸만" 가진 객체. 키가 있으면 override, 없으면 메인을 따른다 */
 export type Instance = { readonly id: string } & Partial<MainProps>;
 
-/** 앱 문서: main · instances만. 선택(selectedId) · nextId는 doc 밖의 App 칸이다 */
+/** 색 변수 하나 (task_007 VR-01): 이름 붙은 색 값. 버튼 `color` 칸이 `var:<id>`로 가리킨다 */
+export interface Variable {
+  readonly id: string;
+  readonly name: string;
+  readonly value: Color;
+}
+
+/** 앱 문서: main · instances · variables. 선택(selectedId) · nextId는 doc 밖의 App 칸이다 */
 export interface Doc {
   readonly main: MainProps;
   readonly instances: readonly Instance[];
+  readonly variables: readonly Variable[];
 }
+
+/** VR-01: 처음 변수 3개 (팔레트 색). 순서 = 배열 순서, 추가 · 삭제 · 이름 바꾸기 없음 */
+export const INITIAL_VARIABLES: readonly Variable[] = [
+  { id: 'primary', name: 'Primary', value: '#0052ff' },
+  { id: 'danger', name: 'Danger', value: '#cf202f' },
+  { id: 'success', name: 'Success', value: '#05b169' },
+];
 
 /** MF-16: 시작 데이터. b1은 override 없음, b2는 라벨만, b3는 라벨 + 색 (FD-20: 메인 #0052ff, b3 #cf202f) */
 export const INITIAL_DOC: Doc = {
   main: { label: '버튼', size: 'M', hasIcon: false, icon: 'star', color: '#0052ff' },
   instances: [{ id: 'b1' }, { id: 'b2', label: '취소' }, { id: 'b3', label: '삭제', color: '#cf202f' }],
+  variables: INITIAL_VARIABLES,
 };
 
 /**
@@ -51,7 +72,7 @@ export function isOverridden(instance: Instance, field: Field): boolean {
 /** 메인 한 칸을 바꾼다. 같은 값이면 같은 Doc, 다르면 새 Doc (instances 배열은 같은 참조) */
 export function setMainField<F extends Field>(doc: Doc, field: F, value: MainProps[F]): Doc {
   if (Object.is(doc.main[field], value)) return doc;
-  return { main: { ...doc.main, [field]: value }, instances: doc.instances };
+  return { ...doc, main: { ...doc.main, [field]: value } };
 }
 
 /**
@@ -62,10 +83,7 @@ export function setInstanceField<F extends Field>(doc: Doc, id: string, field: F
   const target = doc.instances.find((it) => it.id === id);
   if (!target) return doc;
   if (isOverridden(target, field) && Object.is(target[field], value)) return doc;
-  return {
-    main: doc.main,
-    instances: doc.instances.map((it) => (it.id === id ? { ...it, [field]: value } : it)),
-  };
+  return { ...doc, instances: doc.instances.map((it) => (it.id === id ? { ...it, [field]: value } : it)) };
 }
 
 /**
@@ -77,10 +95,7 @@ export function resetInstanceField(doc: Doc, id: string, field: Field): Doc {
   const target = doc.instances.find((it) => it.id === id);
   if (!target || !isOverridden(target, field)) return doc;
   const { [field]: _removed, ...rest } = target;
-  return {
-    main: doc.main,
-    instances: doc.instances.map((it) => (it.id === id ? (rest as Instance) : it)),
-  };
+  return { ...doc, instances: doc.instances.map((it) => (it.id === id ? (rest as Instance) : it)) };
 }
 
 /**
@@ -89,13 +104,13 @@ export function resetInstanceField(doc: Doc, id: string, field: Field): Doc {
  * 새 인스턴스는 override 없이 `{ id }`만 가진다 → 메인을 따른다.
  */
 export function addInstance(doc: Doc, nextId: number): Doc {
-  return { main: doc.main, instances: [...doc.instances, { id: `b${nextId}` }] };
+  return { ...doc, instances: [...doc.instances, { id: `b${nextId}` }] };
 }
 
 /** 그 인스턴스를 뺀다. 없는 id · 메인('main')은 같은 Doc (메인은 지울 수 없다, MF-24) */
 export function removeInstance(doc: Doc, id: string): Doc {
   if (!doc.instances.some((it) => it.id === id)) return doc;
-  return { main: doc.main, instances: doc.instances.filter((it) => it.id !== id) };
+  return { ...doc, instances: doc.instances.filter((it) => it.id !== id) };
 }
 
 /**
@@ -109,7 +124,21 @@ export function moveInstance(doc: Doc, id: string, delta: -1 | 1): Doc {
   if (from === -1 || to < 0 || to >= doc.instances.length) return doc;
   const instances = [...doc.instances];
   [instances[from], instances[to]] = [instances[to], instances[from]];
-  return { main: doc.main, instances };
+  return { ...doc, instances };
+}
+
+/**
+ * 변수 하나의 값을 바꾼다 (VR-06). 같은 값 · 없는 id · `#rrggbb`가 아닌 값이면 같은 Doc (렌더 없음).
+ * [AI Note]: 바뀐 변수 하나만 새 객체이고 다른 변수 · main · instances는 같은 참조 — 연결 안 된 버튼은 그릴 때 입력이 같아 patch 줄이 0이다.
+ * 형식 검사는 방어용이다 (색 입력칸은 늘 소문자 `#rrggbb`를 낸다). 대문자 hex는 소문자로 바꿔 저장한다.
+ */
+export function setVariableValue(doc: Doc, id: string, value: Color): Doc {
+  const index = doc.variables.findIndex((v) => v.id === id);
+  if (index === -1 || !isHexColor(value)) return doc;
+  // [AI Note]: 대문자 hex(#F4B000)는 소문자로 바꿔 저장한다 — 값은 늘 소문자 `#rrggbb` 하나로 통일 (같은 색이면 같은 Doc)
+  const lower = value.toLowerCase();
+  if (doc.variables[index].value === lower) return doc;
+  return { ...doc, variables: doc.variables.map((v, i) => (i === index ? { ...v, value: lower } : v)) };
 }
 
 /**

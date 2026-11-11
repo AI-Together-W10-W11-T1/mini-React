@@ -28,9 +28,11 @@
       .app { display: grid; grid-template-columns: 220px minmax(0, 1fr) 300px; gap: 16px; align-items: start; }
       .app > * { min-width: 0; padding: 20px; border: 0; border-radius: 24px; background: var(--card); box-shadow: none; }
       .panel-title, .property-title { margin: 0 0 12px; font-size: 1.125rem; font-weight: 600; line-height: 1.33; color: var(--ink); overflow-wrap: anywhere; } /* 공백 없는 긴 이름(「인스턴스 · AAAA…」)도 패널 안에서 줄바꿈 — 안 하면 mobile에서 가로 스크롤이 생긴다 (QA-A2) */
-      .panel-title { font-size: 1rem; }
+      .panel-title, .property-title { font-size: 1rem; } /* 레이어 · 실제 영역 · 속성 패널 제목을 같은 16px로 — 양쪽 사이드바 제목 아래 선 높이가 맞는다 */
       /* 레이어 패널 제목: 아래 선으로 레이어 목록과 구분, 선은 패널 안쪽 여백(20px)을 넘어 사이드바 가로 전체 */
       .layer-panel .panel-title { margin: 0 -20px 12px; padding: 0 20px 12px; border-bottom: 1px solid var(--line); }
+      /* 속성 패널 제목(「메인 Button」 / 「인스턴스 · 이름」)도 같은 방식: 아래 선으로 속성 칸과 구분, 선은 사이드바 가로 전체 */
+      .property-panel .property-title { margin: 0 -20px 12px; padding: 0 20px 12px; border-bottom: 1px solid var(--line); }
 
       /* 도구 막대: 높이 64px(줄바꿈하면 늘어남), 앱 이름 + 알약 버튼 3개.
          창 기준 가로 전체: body 여백 16px을 음수 마진으로 상쇄해 창 위 · 양옆 끝에 붙인다 (카드 모양 대신 아래 선만) */
@@ -52,6 +54,26 @@
       .layer-name { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
       .layer-move { flex: 0 0 auto; min-width: 32px; min-height: 32px; padding: 0 8px; }
       .layer-row.selected { background: var(--accent-wash); outline: 2px solid var(--accent); }
+      /* 하위 레이어: 메인 행 맨 앞 [▾]/[▸](DOM은 이름 뒤, order로 앞에 보임) + 인스턴스 행은 메인 이름 줄에 맞춰 들여 씀(12 + 24 + 8 = 44px). 접힘 = ul 숨김 */
+      .layer-toggle { order: -1; flex: 0 0 auto; width: 24px; height: 24px; padding: 0; border: 0; border-radius: 6px; background: transparent; color: var(--ink-soft); font-size: 1.25rem; line-height: 1; cursor: pointer; }
+      .layer-toggle:hover { background: rgba(255, 255, 255, 0.08); color: var(--ink); }
+      .layer-list .layer-row { padding-left: 44px; }
+      .layer-list.collapsed { display: none; }
+      /* 변수 구역(task_007): 레이어 창 맨 끝 블록 (목록을 접어도 안 접힘). 위 선은 패널 가로 전체, 줄은 [칩 | 이름 · hex 두 줄 | 색 입력칸] 3칸이라 180px 폭에서도 안 넘친다 */
+      .variable-panel { margin: 16px -20px 0; padding: 16px 20px 0; border-top: 1px solid var(--line); }
+      /* 변수 칸은 레이어 창 맨 아래에 붙인다: 레이어 창 = 세로 줄, 변수 칸 위쪽 여백 auto가 남은 높이를 밀어낸다 (DOM 순서 · 경로는 그대로).
+         위 목록과의 최소 간격 16px은 목록(펼침) 또는 메인 행(접힘) 아래 여백이 맡는다 */
+      .layer-panel { display: flex; flex-direction: column; }
+      .layer-panel > .variable-panel { margin-top: auto; }
+      .layer-panel > .layer-list { margin-bottom: 16px; }
+      .layer-panel > .layer-main:has(+ .layer-list.collapsed) { margin-bottom: 16px; }
+      .variable-title { margin: 0 0 8px; font-size: 1rem; font-weight: 600; line-height: 1.5; color: var(--ink); }
+      .variable-list { display: flex; flex-direction: column; gap: 4px; margin: 0; padding: 0; list-style: none; }
+      .variable-row { display: grid; grid-template-columns: 20px minmax(0, 1fr) 44px; grid-template-areas: 'chip name input' 'chip hex input'; column-gap: 10px; align-items: center; min-height: 48px; padding: 4px 0; }
+      .variable-chip { grid-area: chip; width: 20px; height: 20px; border: 1px solid var(--line); border-radius: 50%; }
+      .variable-name { grid-area: name; min-width: 0; overflow-wrap: anywhere; font-size: 0.875rem; }
+      .variable-hex { grid-area: hex; min-width: 0; color: var(--ink-soft); font-size: 0.75rem; }
+      .variable-color { grid-area: input; width: 44px; height: 36px; }
 
       /* 캔버스: 테두리 · 점무늬 · 자체 배경 없이 카드 바탕 그대로. 메인 버튼 상자 + 인스턴스 버튼 줄. 인스턴스가 많아지면 줄바꿈 (mobile 가로 스크롤 방지, Q17-5) */
       .canvas { min-height: 320px; padding: 24px; background: transparent; border: 0; border-radius: 0; } /* 테두리 · 자체 배경 없음 — 페이지 바탕이 그대로 보인다 */
@@ -77,14 +99,17 @@
       .canvas > .area-title { margin: 0 -24px 16px; padding: 0 24px 12px; border-bottom: 1px solid var(--line); }
 
       /* 실제 영역 구역: 카드(.app > * 규칙 재사용) = 머리글(제목만) + 상자. [Patch] · [실행 취소] · [다시 실행]는 도구 막대로 옮겼다(PP-07 변경).
-         상자 = 바탕색(--bg) · 24px 모서리 · 24px 안쪽 여백, 점무늬 · 테두리 없음 (제목 아래 선으로 구분). 깜빡임 층은 상자와 같은 크기로 겹치고 마우스를 안 받는다. */
+         카드 좌우 여백 24px + 상자는 모양 없음(배경 · 테두리 · 점무늬 · 좌우 여백 없음, 위아래 24px) → 제목 · 「컴포넌트」 · 버튼이 위 테스트 영역과 같은 세로줄(카드 왼쪽 + 24px)에 선다.
+         깜빡임 층은 상자와 같은 크기로 겹치고 마우스를 안 받는다. */
       .real-section { display: flex; flex-direction: column; gap: 12px; }
-      .real-header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin: 0 -20px; padding: 0 20px 12px; border-bottom: 1px solid var(--line); } /* 캔버스 제목처럼 아래 선이 카드 가로 전체 */
+      .app > .real-section { padding: 23px; border: 1px solid var(--line); } /* 테두리 1px + 여백 23px = 카드 바깥 끝에서 안쪽 내용까지 상하좌우 24px */
+      /* 머리글 아래 선 = 머리글(real-header)과 상자(real-frame) 구분. 테스트 영역 제목 선처럼 카드 안쪽 여백(23px)을 넘어 카드 가로 전체 */
+      .real-header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin: 0 -23px; padding: 0 23px 12px; border-bottom: 1px solid var(--line); }
       .real-header .panel-title { margin: 0; }
-      .real-frame { position: relative; display: flex; flex: 1 1 auto; min-height: 0; }
-      .real-area { flex: 1 1 auto; min-width: 0; min-height: 120px; padding: 24px; background: var(--bg); border: 0; border-radius: 24px; } /* 점무늬 · 테두리 없음, 배경색은 바탕색(--bg) 상자 */
+      .real-frame { position: relative; display: flex; flex: 0 0 auto; min-height: 0; } /* 높이 = 내용에 맞춤(허그). 카드의 남은 높이로 늘어나지 않는다 */
+      .real-area { flex: 1 1 auto; min-width: 0; min-height: 0; padding: 4px 0 0; background: transparent; border: 0; border-radius: 0; } /* 위 4px + 카드 gap 12px = 선 아래 16px (테스트 영역과 같음), 아래는 카드 여백 20px만 */
       .real-area .figma-button { cursor: default; }
-      .real-overlay { position: absolute; inset: 0; pointer-events: none; overflow: hidden; border-radius: 24px; }
+      .real-overlay { position: absolute; inset: 0; pointer-events: none; overflow: hidden; border-radius: 0; }
       /* 깜빡임 박스: 바뀐 노드 위에 잠깐 뜨고 옅어져 사라진다. 파랑 버튼 위에서도 보이게 흰 테두리 + 파랑 바깥선 + 연한 흰 바탕. 그림자 · 주황 없음 (Phase 1 overlay.ts가 .viz-box를 만든다) */
       .viz-box { position: absolute; box-sizing: border-box; border: 2px solid var(--ink); outline: 2px solid var(--accent); border-radius: 12px; background: rgba(255, 255, 255, 0.22); animation: viz-flash 0.7s ease-out forwards; }
       @keyframes viz-flash { 0% { opacity: 1; } 100% { opacity: 0; } }
@@ -123,6 +148,7 @@
       .chip { width: 32px; height: 32px; padding: 0; border: 2px solid rgba(255, 255, 255, 0.24); border-radius: 50%; cursor: pointer; box-shadow: none; }
       .chip[aria-pressed='true'] { outline: 2px solid var(--accent); outline-offset: 2px; }
       .palette-custom { display: flex; align-items: center; gap: 10px; }
+      .variable-select { width: 100%; } /* 변수 상자(task_007): 팔레트 판 맨 아래, 판 폭을 꽉 채움. 모양은 다른 선택 상자(.prop-row select)와 같다 */
       .color-input { width: 44px; height: 36px; padding: 2px; border: 1px solid var(--line); border-radius: 12px; background: var(--bg); cursor: pointer; }
       /* 색 입력칸 · 체크박스 포커스도 글자 칸처럼 파랑 (키보드로 올 때만 :focus-visible) */
       .color-input:focus-visible, .prop-row input[type='checkbox']:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
@@ -143,7 +169,7 @@
            DOM 순서는 도구 막대 · 레이어 · 캔버스 · 속성 · 실제 영역 그대로(경로 접두 불변), 자리만 grid 명시 배치로 정한다 */
         .app > .layer-panel { grid-column: 1; grid-row: 2 / span 2; }
         .app > .canvas { grid-column: 2; grid-row: 2; }
-        .app > .real-section { grid-column: 2; grid-row: 3; }
+        .app > .real-section { grid-column: 2; grid-row: 3; align-self: end; max-height: 100%; } /* 카드 높이 = 내용(허그), 칸 아래 끝(화면 아래)에 붙는다. 내용이 많으면 그 칸 높이까지만 커지고 안에서 스크롤 */
         .app > .property-panel { grid-column: 3; grid-row: 2 / span 2; }
         /* 도구 막대 버튼은 desktop에서 36px로 줄여 64px 막대 안 위아래 여백(14px)을 확보한다. mobile은 누르기 쉬운 44px 그대로 */
         .toolbar .btn-primary, .toolbar .btn-secondary { min-height: 36px; padding: 0 16px; font-size: 0.875rem; }

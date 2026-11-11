@@ -11,6 +11,7 @@ import {
   resetInstanceField,
   setInstanceField,
   setMainField,
+  setVariableValue,
 } from '../model';
 import type { Doc, Field, Instance, MainProps } from '../model';
 
@@ -48,7 +49,7 @@ describe('INITIAL_DOC — 시작 데이터 (MF-16)', () => {
   });
 
   it('doc에는 main · instances 두 칸뿐이다 (nextId · 선택은 doc 밖)', () => {
-    expect(Object.keys(INITIAL_DOC)).toEqual(['main', 'instances']);
+    expect(Object.keys(INITIAL_DOC)).toEqual(['main', 'instances', 'variables']);
   });
 });
 
@@ -131,7 +132,7 @@ describe('setMainField — 메인 칸 바꾸기', () => {
   });
 
   it('입력을 고치지 않는다 (freeze)', () => {
-    const frozen = deepFreeze<Doc>({ main: { ...INITIAL_DOC.main }, instances: INITIAL_DOC.instances.map((it) => ({ ...it })) });
+    const frozen = deepFreeze<Doc>({ main: { ...INITIAL_DOC.main }, instances: INITIAL_DOC.instances.map((it) => ({ ...it })), variables: INITIAL_DOC.variables.map((v) => ({ ...v })) });
     expect(() => setMainField(frozen, 'label', '새')).not.toThrow();
     expect(frozen.main.label).toBe('버튼');
   });
@@ -186,7 +187,7 @@ describe('setInstanceField — 인스턴스 칸 바꾸기 (override 만들기)',
   });
 
   it('입력을 고치지 않는다 (freeze)', () => {
-    const frozen = deepFreeze<Doc>({ main: { ...INITIAL_DOC.main }, instances: INITIAL_DOC.instances.map((it) => ({ ...it })) });
+    const frozen = deepFreeze<Doc>({ main: { ...INITIAL_DOC.main }, instances: INITIAL_DOC.instances.map((it) => ({ ...it })), variables: INITIAL_DOC.variables.map((v) => ({ ...v })) });
     expect(() => setInstanceField(frozen, 'b1', 'size', 'L')).not.toThrow();
     expect(Object.keys(frozen.instances[0])).toEqual(['id']);
   });
@@ -232,7 +233,7 @@ describe('resetInstanceField — ↻ = 키 지우기 (MF-13)', () => {
   });
 
   it('입력을 고치지 않는다 (freeze)', () => {
-    const frozen = deepFreeze<Doc>({ main: { ...INITIAL_DOC.main }, instances: INITIAL_DOC.instances.map((it) => ({ ...it })) });
+    const frozen = deepFreeze<Doc>({ main: { ...INITIAL_DOC.main }, instances: INITIAL_DOC.instances.map((it) => ({ ...it })), variables: INITIAL_DOC.variables.map((v) => ({ ...v })) });
     expect(() => resetInstanceField(frozen, 'b2', 'label')).not.toThrow();
     expect(frozen.instances[1].label).toBe('취소');
   });
@@ -300,7 +301,7 @@ describe('addInstance — 추가 (MF-22, 정책: 새 인스턴스 = override 없
   });
 
   it('doc에는 nextId가 없다 (번호는 App이 세어 넘긴다)', () => {
-    expect(Object.keys(addInstance(INITIAL_DOC, 4))).toEqual(['main', 'instances']);
+    expect(Object.keys(addInstance(INITIAL_DOC, 4))).toEqual(['main', 'instances', 'variables']);
   });
 
   it('메인 값이 바뀐 상태에서 추가해도 새 인스턴스는 메인을 따른다', () => {
@@ -310,7 +311,7 @@ describe('addInstance — 추가 (MF-22, 정책: 새 인스턴스 = override 없
   });
 
   it('입력을 고치지 않는다 (freeze)', () => {
-    const frozen = deepFreeze<Doc>({ main: { ...INITIAL_DOC.main }, instances: INITIAL_DOC.instances.map((it) => ({ ...it })) });
+    const frozen = deepFreeze<Doc>({ main: { ...INITIAL_DOC.main }, instances: INITIAL_DOC.instances.map((it) => ({ ...it })), variables: INITIAL_DOC.variables.map((v) => ({ ...v })) });
     expect(() => addInstance(frozen, 4)).not.toThrow();
     expect(frozen.instances).toHaveLength(3);
   });
@@ -338,7 +339,7 @@ describe('removeInstance — 삭제 (MF-23 · MF-24)', () => {
   });
 
   it('입력을 고치지 않는다 (freeze)', () => {
-    const frozen = deepFreeze<Doc>({ main: { ...INITIAL_DOC.main }, instances: INITIAL_DOC.instances.map((it) => ({ ...it })) });
+    const frozen = deepFreeze<Doc>({ main: { ...INITIAL_DOC.main }, instances: INITIAL_DOC.instances.map((it) => ({ ...it })), variables: INITIAL_DOC.variables.map((v) => ({ ...v })) });
     expect(() => removeInstance(frozen, 'b1')).not.toThrow();
     expect(frozen.instances).toHaveLength(3);
   });
@@ -369,7 +370,7 @@ describe('moveInstance — 순서 바꾸기 (MF-25)', () => {
   });
 
   it('입력을 고치지 않는다 (freeze)', () => {
-    const frozen = deepFreeze<Doc>({ main: { ...INITIAL_DOC.main }, instances: INITIAL_DOC.instances.map((it) => ({ ...it })) });
+    const frozen = deepFreeze<Doc>({ main: { ...INITIAL_DOC.main }, instances: INITIAL_DOC.instances.map((it) => ({ ...it })), variables: INITIAL_DOC.variables.map((v) => ({ ...v })) });
     expect(() => moveInstance(frozen, 'b1', 1)).not.toThrow();
     expect(ids(frozen)).toEqual(['b1', 'b2', 'b3']);
   });
@@ -416,5 +417,68 @@ describe('instanceName — 레이어 행 · 패널 머리의 이름 (④-3)', ()
 
   it("메인이 ''여도 override 글자가 있으면 그 글자다", () => {
     expect(instanceName({ ...main, label: '' }, { id: 'b3', label: '삭제' })).toBe('삭제');
+  });
+});
+
+// [AI Note]: task_007 변수 (VR-01 · 02). V-1 ~ V-5 + A56(형식 밖 값 · 없는 id).
+describe('변수 (V-1 ~ V-5, A56)', () => {
+  const cloneDoc = (): Doc =>
+    deepFreeze<Doc>({ main: { ...INITIAL_DOC.main }, instances: INITIAL_DOC.instances.map((it) => ({ ...it })), variables: INITIAL_DOC.variables.map((v) => ({ ...v })) });
+
+  it('V-1 처음 변수 3개: 순서 · 이름 · 값 (팔레트 색)', () => {
+    expect(INITIAL_DOC.variables).toEqual([
+      { id: 'primary', name: 'Primary', value: '#0052ff' },
+      { id: 'danger', name: 'Danger', value: '#cf202f' },
+      { id: 'success', name: 'Success', value: '#05b169' },
+    ]);
+  });
+
+  it('V-2 기존 doc 함수 6개는 variables를 같은 참조로 이어받는다', () => {
+    const doc = cloneDoc();
+    const results: Doc[] = [
+      setMainField(doc, 'label', '새 글자'),
+      setInstanceField(doc, 'b1', 'label', 'x'),
+      resetInstanceField(doc, 'b3', 'color'),
+      addInstance(doc, 4),
+      removeInstance(doc, 'b1'),
+      moveInstance(doc, 'b1', 1),
+    ];
+    for (const next of results) {
+      expect(next).not.toBe(doc);
+      expect(next.variables).toBe(doc.variables);
+    }
+  });
+
+  it('V-3 setVariableValue: 다른 값이면 새 Doc, 그 변수만 새 객체, 나머지는 같은 참조', () => {
+    const doc = cloneDoc();
+    const next = setVariableValue(doc, 'primary', '#f4b000');
+    expect(next).not.toBe(doc);
+    expect(next.variables[0]).toEqual({ id: 'primary', name: 'Primary', value: '#f4b000' });
+    expect(next.variables[0]).not.toBe(doc.variables[0]);
+    expect(next.variables[1]).toBe(doc.variables[1]);
+    expect(next.variables[2]).toBe(doc.variables[2]);
+    expect(next.main).toBe(doc.main);
+    expect(next.instances).toBe(doc.instances);
+  });
+
+  it('V-3b 대문자 hex는 소문자로 저장하고, 같은 색(대소문자만 다름)이면 같은 Doc', () => {
+    const doc = cloneDoc();
+    const next = setVariableValue(doc, 'primary', '#F4B000');
+    expect(next.variables[0].value).toBe('#f4b000');
+    expect(setVariableValue(doc, 'primary', '#0052FF')).toBe(doc);
+  });
+
+  it('V-4 같은 값 · 없는 id · 형식 밖 값은 같은 Doc (A56)', () => {
+    const doc = cloneDoc();
+    expect(setVariableValue(doc, 'primary', '#0052ff')).toBe(doc);
+    expect(setVariableValue(doc, 'ghost', '#f4b000')).toBe(doc);
+    expect(setVariableValue(doc, '', '#f4b000')).toBe(doc);
+    for (const bad of ['blue', '#fff', '', 'var:primary', '#GGGGGG']) expect(setVariableValue(doc, 'primary', bad), bad).toBe(doc);
+  });
+
+  it('V-5 입력은 안 바뀐다 (깊게 동결해도 안 깨짐)', () => {
+    const doc = cloneDoc();
+    expect(() => setVariableValue(doc, 'danger', '#112233')).not.toThrow();
+    expect(doc.variables[1].value).toBe('#cf202f');
   });
 });

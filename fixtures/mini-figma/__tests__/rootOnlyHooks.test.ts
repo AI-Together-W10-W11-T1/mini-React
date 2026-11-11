@@ -61,8 +61,8 @@ describe('검사기 자체 확인 — 위반을 잡는다', () => {
 });
 
 describe('T-16 코드 확인 — 루트(App.ts)만 Hook을 쓴다', () => {
-  it('컴포넌트 파일은 정확히 8개다 (Button · Canvas · ColorPalette · Icons · LayerPanel · PreviewPanel · PropertyPanel · Toolbar) — 새 파일이 검사 밖으로 새지 않게', () => {
-    expect([...componentFiles].sort()).toEqual(['Button.ts', 'Canvas.ts', 'ColorPalette.ts', 'Icons.ts', 'LayerPanel.ts', 'PreviewPanel.ts', 'PropertyPanel.ts', 'Toolbar.ts']);
+  it('컴포넌트 파일은 정확히 9개다 (Button · Canvas · ColorPalette · Icons · LayerPanel · PreviewPanel · PropertyPanel · Toolbar · VariablePanel) — 새 파일이 검사 밖으로 새지 않게', () => {
+    expect([...componentFiles].sort()).toEqual(['Button.ts', 'Canvas.ts', 'ColorPalette.ts', 'Icons.ts', 'LayerPanel.ts', 'PreviewPanel.ts', 'PropertyPanel.ts', 'Toolbar.ts', 'VariablePanel.ts']);
   });
 
   for (const name of componentFiles) {

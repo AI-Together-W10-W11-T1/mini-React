@@ -387,3 +387,55 @@ export function realBgOf(page: Page, id: string): Promise<string> {
 export async function realClassOf(page: Page, id: string): Promise<string> {
   return (await page.locator(realButtonSel(id)).getAttribute('class')) ?? '';
 }
+
+// ---------------------------------------------------------------------------
+// 변수 (variables, task_007) — 레이어 창 안 변수 구역 · 속성 패널 변수 상자
+// ---------------------------------------------------------------------------
+
+export interface VariableRow {
+  id: string;
+  name: string;
+  /** 색 입력칸 값 */
+  value: string;
+  /** hex 글자 */
+  hex: string;
+  /** 색 칩의 배경색 (`rgb(r, g, b)`) */
+  chip: string;
+}
+
+/** 변수 줄 하나 (`data-id` = `primary` · `danger` · `success`) */
+export function variableRowSel(id: string): string {
+  return `[data-testid="variable-row"][data-id="${id}"]`;
+}
+
+/** 변수 구역의 줄들 (위에서 아래 순서) */
+export function variableRows(page: Page): Promise<VariableRow[]> {
+  return page.getByTestId('variable-row').evaluateAll((els) =>
+    els.map((el) => ({
+      id: el.getAttribute('data-id') ?? '',
+      name: el.querySelector('[data-testid="variable-name"]')?.textContent ?? '',
+      value: (el.querySelector('[data-testid="variable-color"]') as HTMLInputElement).value,
+      hex: el.querySelector('[data-testid="variable-hex"]')?.textContent ?? '',
+      chip: getComputedStyle(el.querySelector('[data-testid="variable-chip"]') as Element).backgroundColor,
+    })),
+  );
+}
+
+/** 그 이름의 변수 줄 색 입력칸에 값을 넣는다 (`fill` = `input` + `change`, 색 입력칸은 task_005 `pickColorInput`과 같은 방식) */
+export async function setVariable(page: Page, name: string, hex: string): Promise<void> {
+  await page
+    .getByTestId('variable-row')
+    .filter({ has: page.getByTestId('variable-name').getByText(name, { exact: true }) })
+    .getByTestId('variable-color')
+    .fill(hex);
+}
+
+/** 속성 패널 색 구역의 변수 상자 (`prop-variable`) */
+export function linkSelect(page: Page) {
+  return page.getByTestId('prop-variable');
+}
+
+/** 변수 상자에서 고른다 (`name` = 변수 이름 또는 「없음」). Playwright `selectOption`은 `input` 이벤트를 보낸다 */
+export async function linkTo(page: Page, name: string): Promise<void> {
+  await linkSelect(page).selectOption({ label: name });
+}

@@ -1,0 +1,2137 @@
+diff --git a/e2e/mini-figma-design.spec.ts b/e2e/mini-figma-design.spec.ts
+index 3dca33a..f907a2a 100644
+--- a/e2e/mini-figma-design.spec.ts
++++ b/e2e/mini-figma-design.spec.ts
+@@ -59,11 +59,14 @@ test('QA-40 어두운 바탕 · 한 단계 밝은 카드 24px(desktop 사이드
+   expect(cv['background-image']).toBe('none');
+   expect(cv['background-color']).toBe('rgba(0, 0, 0, 0)');
+   expect(cv['border-top-width']).toBe('0px');
+-  // 실제 영역 상자: 점무늬 · 테두리 없음, 배경색은 바탕색(--bg)
++  // 실제 영역 상자: 모양 없음(점무늬 · 테두리 · 자체 배경 없음) — 카드 바탕 위에 바로 놓인다
+   const ra = await styleOf(page, tid('real-area'), ['background-image', 'background-color', 'border-top-width']);
+   expect(ra['background-image'], '실제 영역 점무늬 없음').toBe('none');
+-  expect(ra['background-color'], '실제 영역 배경 = 바탕색').toBe(CARD);
++  expect(ra['background-color'], '실제 영역 자체 배경 없음').toBe('rgba(0, 0, 0, 0)');
+   expect(ra['border-top-width'], '실제 영역 테두리 없음').toBe('0px');
++  // 위아래 정렬: 실제 영역 메인 버튼의 왼쪽 = 테스트 영역 메인 버튼의 왼쪽 (±1px)
++  const leftOf = async (sel: string): Promise<number> => (await page.locator(sel).boundingBox())?.x ?? -1;
++  expect(Math.abs((await leftOf('[data-testid="real-area"] [data-id="main"]')) - (await leftOf('[data-testid="canvas"] [data-id="main"]'))), '두 영역 버튼 시작 x').toBeLessThanOrEqual(1);
+ 
+   // 알약 버튼: [+ 인스턴스](메인을 골랐을 때 속성 패널 오른쪽 아래) 파랑 배경 · 흰 글자 · 100px · 그림자 없음, [실행 취소] [다시 실행]도 100px
+   await selectOnCanvas(page, 'main');
+@@ -265,10 +268,12 @@ test('QA-43 전체 높이: desktop은 레이어 · 캔버스 · 속성이 화면
+     // 캔버스는 도구 막대 바로 아래(칸 사이 간격 16px)에서 시작하고 아래 끝은 실제 영역 위
+     expect(canvas.y - toolbar.bottom, '도구 막대와 캔버스 사이 간격').toBeLessThanOrEqual(20);
+     expect(canvas.bottom, '캔버스 아래 끝이 실제 영역 시작 위').toBeLessThanOrEqual(real.y);
+-    // 두 영역이 남은 높이를 반반 (각각 250px 이상, 차이 40px 이내)
++    // 캔버스는 위 칸을 채우고(250px 이상), 실제 영역 카드는 내용 높이만큼(허그) 아래 칸의 아래 끝에 붙는다 — 카드 안에 남는 빈 높이 · 스크롤 없음
+     expect(canvas.height).toBeGreaterThanOrEqual(250);
+-    expect(real.height).toBeGreaterThanOrEqual(250);
+-    expect(Math.abs(canvas.height - real.height), '두 영역 높이 차이').toBeLessThanOrEqual(40);
++    const realInner = await page.getByTestId('real-section').evaluate((el) => ({ scrollHeight: el.scrollHeight, clientHeight: el.clientHeight }));
++    expect(realInner.scrollHeight, '실제 영역 카드 = 내용 높이').toBeLessThanOrEqual(realInner.clientHeight + 1);
++    const realLast = await page.locator('[data-testid="real-area"] [data-testid="real-canvas-instances"]').boundingBox();
++    expect(real.bottom - ((realLast?.y ?? 0) + (realLast?.height ?? 0)), '카드 아래 여백 = 24px (테두리 1 + 여백 23)').toBeLessThanOrEqual(25);
+     expect(scrollHeight, '페이지 세로 스크롤 없음').toBeLessThanOrEqual(innerHeight);
+   } else {
+     // mobile: 위아래 쌓기 그대로 — 캔버스는 지금처럼 내용 높이(최소 320px)이고 패널 안 스크롤이 없다
+diff --git a/e2e/mini-figma-helpers.ts b/e2e/mini-figma-helpers.ts
+index 83631b7..0b3131a 100644
+--- a/e2e/mini-figma-helpers.ts
++++ b/e2e/mini-figma-helpers.ts
+@@ -387,3 +387,55 @@ export function realBgOf(page: Page, id: string): Promise<string> {
+ export async function realClassOf(page: Page, id: string): Promise<string> {
+   return (await page.locator(realButtonSel(id)).getAttribute('class')) ?? '';
+ }
++
++// ---------------------------------------------------------------------------
++// 변수 (variables, task_007) — 레이어 창 안 변수 구역 · 속성 패널 변수 상자
++// ---------------------------------------------------------------------------
++
++export interface VariableRow {
++  id: string;
++  name: string;
++  /** 색 입력칸 값 */
++  value: string;
++  /** hex 글자 */
++  hex: string;
++  /** 색 칩의 배경색 (`rgb(r, g, b)`) */
++  chip: string;
++}
++
++/** 변수 줄 하나 (`data-id` = `primary` · `danger` · `success`) */
++export function variableRowSel(id: string): string {
++  return `[data-testid="variable-row"][data-id="${id}"]`;
++}
++
++/** 변수 구역의 줄들 (위에서 아래 순서) */
++export function variableRows(page: Page): Promise<VariableRow[]> {
++  return page.getByTestId('variable-row').evaluateAll((els) =>
++    els.map((el) => ({
++      id: el.getAttribute('data-id') ?? '',
++      name: el.querySelector('[data-testid="variable-name"]')?.textContent ?? '',
++      value: (el.querySelector('[data-testid="variable-color"]') as HTMLInputElement).value,
++      hex: el.querySelector('[data-testid="variable-hex"]')?.textContent ?? '',
++      chip: getComputedStyle(el.querySelector('[data-testid="variable-chip"]') as Element).backgroundColor,
++    })),
++  );
++}
++
++/** 그 이름의 변수 줄 색 입력칸에 값을 넣는다 (`fill` = `input` + `change`, 색 입력칸은 task_005 `pickColorInput`과 같은 방식) */
++export async function setVariable(page: Page, name: string, hex: string): Promise<void> {
++  await page
++    .getByTestId('variable-row')
++    .filter({ has: page.getByTestId('variable-name').getByText(name, { exact: true }) })
++    .getByTestId('variable-color')
++    .fill(hex);
++}
++
++/** 속성 패널 색 구역의 변수 상자 (`prop-variable`) */
++export function linkSelect(page: Page) {
++  return page.getByTestId('prop-variable');
++}
++
++/** 변수 상자에서 고른다 (`name` = 변수 이름 또는 「없음」). Playwright `selectOption`은 `input` 이벤트를 보낸다 */
++export async function linkTo(page: Page, name: string): Promise<void> {
++  await linkSelect(page).selectOption({ label: name });
++}
+diff --git a/e2e/mini-figma-palette.spec.ts b/e2e/mini-figma-palette.spec.ts
+index f47c23e..68d5f08 100644
+--- a/e2e/mini-figma-palette.spec.ts
++++ b/e2e/mini-figma-palette.spec.ts
+@@ -61,7 +61,7 @@ function pressedChips(page: Page): Promise<string[]> {
+ 
+ const CHANGED = [rgb('#0052ff'), rgb('#0052ff'), rgb('#0052ff'), rgb('#cf202f')];
+ 
+-test('QA-35 메인을 고르면 색 칸에 팔레트 판(칩 8개 · 지금 색 표시 · 색 입력칸 · 값 글자)이 있고 선택 상자는 없다', async ({ page }) => {
++test('QA-35 메인을 고르면 색 칸에 팔레트 판(칩 8개 · 지금 색 표시 · 색 입력칸 · 값 글자)이 있고 선택 상자는 변수 상자 하나뿐이다', async ({ page }) => {
+   await page.goto(URL);
+   await selectOnCanvas(page, 'main');
+ 
+@@ -77,8 +77,9 @@ test('QA-35 메인을 고르면 색 칸에 팔레트 판(칩 8개 · 지금 색
+   expect(await input.evaluate((el) => (el as HTMLInputElement).type)).toBe('color');
+   await expect(input).toHaveValue('#0052ff');
+   await expect(page.getByTestId('color-hex')).toHaveText('#0052ff');
+-  // 색 칸에는 <select>가 없다 (크기 · 아이콘 종류 칸에는 있음)
+-  await expect(page.locator(`${'[data-testid="prop-row"][data-field="color"]'} select`)).toHaveCount(0);
++  // 색 칸의 <select>는 변수 상자(prop-variable, task_007) 하나뿐이다 (크기 · 아이콘 종류 칸에는 각각 있음)
++  await expect(page.locator(`${'[data-testid="prop-row"][data-field="color"]'} select`)).toHaveCount(1);
++  await expect(page.locator(`${'[data-testid="prop-row"][data-field="color"]'} select`)).toHaveAttribute('data-testid', 'prop-variable');
+   await expect(page.locator('[data-testid="prop-row"][data-field="size"] select')).toHaveCount(1);
+ });
+ 
+diff --git a/e2e/mini-figma-variables.spec.ts b/e2e/mini-figma-variables.spec.ts
+new file mode 100644
+index 0000000..56a46f3
+--- /dev/null
++++ b/e2e/mini-figma-variables.spec.ts
+@@ -0,0 +1,614 @@
++import type { Page } from '@playwright/test';
++import {
++  test,
++  expect,
++  URL,
++  holdNodes,
++  sameNode,
++  watchApp,
++  watchSel,
++  buttonSel,
++  layerSel,
++  colorsOf,
++  rgb,
++  bgOf,
++  textOf,
++  variableRows,
++  setVariable,
++  linkSelect,
++  linkTo,
++  noHorizontalScroll,
++  selectOnCanvas,
++  selectInLayer,
++  selectedOnCanvas,
++  pickColor,
++  pickColorInput,
++  inRow,
++  overriddenFields,
++  clickAdd,
++  moveInLayer,
++  canvasOrder,
++  areaSnapshot,
++  watchFlash,
++  boxSame,
++  boxOverlap,
++  navState,
++  realBgOf,
++  variableRowSel,
++} from './mini-figma-helpers';
++
++// [AI Note]: 색 변수 Variables (task_007). QA-63 · 76 · A46 (Dev-3: 변수 구역) · QA-64 ~ 71 · A43 · A44 · A47 ~ A51 · A54 · A58 (Dev-4: 연결 UI, 같은 준비를 쓰는 것은 한 test로 묶고 이름에 번호를 모두 적음) — 이 스펙의 테스트는 desktop · mobile 두 프로젝트에서 모두 돈다.
++// 모든 시나리오는 /mini-figma/를 새로 열어 시작한다 (변수 · 연결은 저장 안 됨).
++
++const ORIGINAL = [rgb('#0052ff'), rgb('#0052ff'), rgb('#0052ff'), rgb('#cf202f')];
++
++test('QA-63 처음 화면: layer-panel 안 인스턴스 목록 아래에 「변수」 구역 3줄(Primary · Danger · Success)과 값, 버튼 색은 그대로', async ({ page }) => {
++  await page.goto(URL);
++
++  await expect(page.getByTestId('variable-panel')).toHaveCount(1);
++  // 레이어 창 안, 인스턴스 목록(layer-list) 뒤에 온다
++  const placed = await page.getByTestId('layer-panel').evaluate((panel) => {
++    const variable = panel.querySelector('[data-testid="variable-panel"]');
++    const list = panel.querySelector('[data-testid="layer-list"]');
++    if (variable === null || list === null) return false;
++    return Boolean(list.compareDocumentPosition(variable) & Node.DOCUMENT_POSITION_FOLLOWING) && variable.parentElement === panel;
++  });
++  expect(placed, 'variable-panel이 layer-panel의 직접 자식이고 layer-list 뒤').toBe(true);
++  await expect(page.getByTestId('variable-title')).toHaveText('변수');
++
++  expect(await variableRows(page)).toEqual([
++    { id: 'primary', name: 'Primary', value: '#0052ff', hex: '#0052ff', chip: rgb('#0052ff') },
++    { id: 'danger', name: 'Danger', value: '#cf202f', hex: '#cf202f', chip: rgb('#cf202f') },
++    { id: 'success', name: 'Success', value: '#05b169', hex: '#05b169', chip: rgb('#05b169') },
++  ]);
++  expect(await colorsOf(page), '캔버스 버튼 4개 색은 처음 그대로 (VR-08)').toEqual(ORIGINAL);
++  // div.app 최상위 자식은 그대로 5개 (경로 접두 불변)
++  expect(await page.locator('[data-testid="app-root"] > .app > *').count()).toBe(5);
++});
++
++test('QA-76 변수 구역 배치: layer-panel 박스 안(넘침 0) · 가로 스크롤 없음 · 입력칸 터치 목표 32px 이상 · 줄 3개가 화면 폭 안', async ({ page }, testInfo) => {
++  await page.goto(URL);
++  const mobile = testInfo.project.name === 'mobile';
++
++  const m = await page.evaluate(() => {
++    const box = (sel: string) => document.querySelector(sel)!.getBoundingClientRect();
++    const panel = box('[data-testid="layer-panel"]');
++    const variable = box('[data-testid="variable-panel"]');
++    const list = box('[data-testid="layer-list"]');
++    const rows = Array.from(document.querySelectorAll('[data-testid="variable-row"]')).map((r) => r.getBoundingClientRect());
++    const inputs = Array.from(document.querySelectorAll('[data-testid="variable-color"]')).map((r) => r.getBoundingClientRect());
++    const layer = document.querySelector('[data-testid="layer-panel"]') as HTMLElement;
++    const vp = document.querySelector('[data-testid="variable-panel"]') as HTMLElement;
++    return {
++      panel,
++      variable,
++      list,
++      rows,
++      inputs,
++      layerOverflow: layer.scrollWidth - layer.clientWidth,
++      variableOverflow: vp.scrollWidth - vp.clientWidth,
++      pageV: document.documentElement.scrollHeight - document.documentElement.clientHeight,
++      vw: document.documentElement.clientWidth,
++      vh: document.documentElement.clientHeight,
++    };
++  });
++  expect(m.variable.top, '인스턴스 목록 아래').toBeGreaterThanOrEqual(m.list.bottom - 1);
++  expect(m.variable.left).toBeGreaterThanOrEqual(m.panel.left - 1);
++  expect(m.variable.right).toBeLessThanOrEqual(m.panel.right + 1);
++  expect(m.layerOverflow, '레이어 창 가로 넘침 0').toBeLessThanOrEqual(0);
++  expect(m.variableOverflow, '변수 구역 가로 넘침 0').toBeLessThanOrEqual(0);
++  expect(await noHorizontalScroll(page)).toBe(true);
++  expect(m.rows).toHaveLength(3);
++  for (const r of m.rows) {
++    expect(r.left).toBeGreaterThanOrEqual(0);
++    expect(r.right).toBeLessThanOrEqual(m.vw + 0.5);
++  }
++  for (const r of m.inputs) {
++    expect(r.width, '색 입력칸 터치 목표').toBeGreaterThanOrEqual(32);
++    expect(r.height, '색 입력칸 터치 목표').toBeGreaterThanOrEqual(32);
++  }
++  if (mobile) {
++    // 한 줄씩 위아래로 (줄끼리 안 겹침)
++    expect(m.rows[1].top).toBeGreaterThanOrEqual(m.rows[0].bottom - 1);
++    expect(m.rows[2].top).toBeGreaterThanOrEqual(m.rows[1].bottom - 1);
++  } else {
++    expect(m.panel.bottom, '레이어 창 아래 끝이 화면 아래 20px 안').toBeGreaterThanOrEqual(m.vh - 20 - 1);
++    expect(m.panel.bottom).toBeLessThanOrEqual(m.vh + 1);
++    expect(m.pageV, '페이지 세로 스크롤 없음').toBeLessThanOrEqual(0);
++  }
++});
++
++test('A46 연결이 없는 채 Primary 값을 바꾸면 변수 줄만 바뀌고 캔버스 버튼 노드 · style 변경은 0이다 (VP-11)', async ({ page }) => {
++  await page.goto(URL);
++  const ids = ['main', 'b1', 'b2', 'b3'];
++  const nodes = Object.fromEntries(ids.map((id) => [id, buttonSel(id)]));
++  await holdNodes(page, nodes);
++  const watchers = await Promise.all(ids.map((id) => watchSel(page, id, buttonSel(id))));
++  await watchApp(page);
++
++  await setVariable(page, 'Primary', '#f4b000');
++
++  const rows = await variableRows(page);
++  expect(rows[0]).toEqual({ id: 'primary', name: 'Primary', value: '#f4b000', hex: '#f4b000', chip: rgb('#f4b000') });
++  expect(rows[1].value, 'Danger 그대로').toBe('#cf202f');
++  expect(rows[2].value, 'Success 그대로').toBe('#05b169');
++  expect(await colorsOf(page)).toEqual(ORIGINAL);
++  for (const id of ids) {
++    expect(await sameNode(page, id, buttonSel(id)), `${id} 노드 같은 참조`).toBe(true);
++  }
++  for (const w of watchers) expect((await w.take()).total, '캔버스 버튼 DOM 변경 0').toBe(0);
++  expect(await bgOf(page, 'main')).toBe(rgb('#0052ff'));
++});
++
++// ---------------------------------------------------------------------------
++// Dev-4: 연결 UI (속성 패널 색 구역의 「변수」 선택 상자)
++// ---------------------------------------------------------------------------
++
++const BLUE = '#0052ff';
++const INK = rgb('#0a0b0d');
++const WHITE = rgb('#ffffff');
++const IDS = ['main', 'b1', 'b2', 'b3'];
++
++/** 지금 aria-pressed="true"인 칩들의 색 */
++function pressedChips(page: Page): Promise<string[]> {
++  return page.locator('[data-testid="color-chip"][aria-pressed="true"]').evaluateAll((els) => els.map((el) => el.getAttribute('data-color') ?? ''));
++}
++const colorHex = (page: Page): Promise<string> => page.getByTestId('color-hex').evaluate((el) => el.textContent ?? '');
++
++/** 메인을 골라 변수 상자에서 이름을 고른다 */
++async function linkMain(page: Page, name: string): Promise<void> {
++  await selectOnCanvas(page, 'main');
++  await linkTo(page, name);
++}
++
++/** 캔버스 버튼 4개 · 레이어 행 4개 노드를 붙잡고 캔버스 버튼마다 변경 관찰기를 심는다 */
++async function holdAll(page: Page) {
++  const nodes: Record<string, string> = {};
++  for (const id of IDS) {
++    nodes[`btn-${id}`] = buttonSel(id);
++    nodes[`layer-${id}`] = layerSel(id);
++  }
++  await holdNodes(page, nodes);
++  const watchers: Record<string, Awaited<ReturnType<typeof watchSel>>> = {};
++  for (const id of IDS) watchers[id] = await watchSel(page, `w-${id}`, buttonSel(id));
++  return watchers;
++}
++async function expectSame(page: Page, ids: string[], where: string): Promise<void> {
++  for (const id of ids) {
++    expect(await sameNode(page, `btn-${id}`, buttonSel(id)), `${where}: ${id} 버튼 노드`).toBe(true);
++    expect(await sameNode(page, `layer-${id}`, layerSel(id)), `${where}: ${id} 레이어 행 노드`).toBe(true);
++  }
++}
++
++test('QA-64 메인 · 인스턴스를 고르면 색 구역에 「변수」 상자(없음 · Primary · Danger · Success)가 있고 처음 값은 「없음」, 칩은 지금 색 하나만 pressed', async ({ page }) => {
++  await page.goto(URL);
++  await selectOnCanvas(page, 'main');
++  await expect(linkSelect(page)).toHaveCount(1);
++  expect(await page.locator('[data-testid="prop-row"][data-field="color"] [data-testid="prop-variable"]').count()).toBe(1);
++  expect(await linkSelect(page).locator('option').allTextContents()).toEqual(['없음', 'Primary', 'Danger', 'Success']);
++  await expect(linkSelect(page)).toHaveValue('');
++  expect(await pressedChips(page)).toEqual([BLUE]);
++
++  await selectOnCanvas(page, 'b3');
++  await expect(linkSelect(page)).toHaveCount(1);
++  expect(await linkSelect(page).locator('option').allTextContents()).toEqual(['없음', 'Primary', 'Danger', 'Success']);
++  await expect(linkSelect(page)).toHaveValue('');
++  expect(await pressedChips(page)).toEqual(['#cf202f']);
++});
++
++test('QA-65 메인을 Primary에 연결 → 상자 Primary · 칩 pressed 0개 · 값 글자 「Primary」 · 색 입력칸 #0052ff, 버튼 색은 그대로(캔버스 변경 0)', async ({ page }) => {
++  await page.goto(URL);
++  await selectOnCanvas(page, 'main');
++  const watchers = await holdAll(page);
++
++  await linkTo(page, 'Primary');
++
++  await expect(linkSelect(page)).toHaveValue('primary');
++  expect(await page.locator('[data-testid="color-chip"][aria-pressed="false"]').count()).toBe(8);
++  expect(await pressedChips(page)).toEqual([]);
++  expect(await colorHex(page)).toBe('Primary');
++  await expect(page.getByTestId('prop-color')).toHaveValue(BLUE);
++  expect(await colorsOf(page)).toEqual([rgb(BLUE), rgb(BLUE), rgb(BLUE), rgb('#cf202f')]);
++  await expectSame(page, IDS, '연결만');
++  for (const id of IDS) expect((await watchers[id].take()).total, `${id} 캔버스 변경 0`).toBe(0);
++});
++
++test('QA-66 · A50 메인 Primary 연결 + b2 override #05b169 → Primary 값 #f4b000: 메인 · b1만 바뀌고(글자 먹) b2 · b3 · 레이어 행은 그대로, 나중에 추가한 b4도 메인을 따라 바뀐다', async ({ page }) => {
++  await page.goto(URL);
++  await linkMain(page, 'Primary');
++  await selectOnCanvas(page, 'b2');
++  await pickColor(page, '#05b169');
++  const watchers = await holdAll(page);
++
++  await setVariable(page, 'Primary', '#f4b000');
++
++  expect(await colorsOf(page)).toEqual([rgb('#f4b000'), rgb('#f4b000'), rgb('#05b169'), rgb('#cf202f')]);
++  expect(await textOf(page, 'main')).toBe(INK);
++  expect(await textOf(page, 'b1')).toBe(INK);
++  await expectSame(page, IDS, '값 변경');
++  expect((await watchers.b2.take()).total, 'b2 style 변경 0').toBe(0);
++  expect((await watchers.b3.take()).total, 'b3 style 변경 0').toBe(0);
++  expect((await watchers.main.take()).attributes, '메인 style만').toBeGreaterThan(0);
++  expect((await variableRows(page))[0]).toEqual({ id: 'primary', name: 'Primary', value: '#f4b000', hex: '#f4b000', chip: rgb('#f4b000') });
++  // A50: 연결된 메인이 있을 때 추가한 인스턴스 b4는 메인을 따르므로 Primary를 따라 바뀐다
++  await clickAdd(page);
++  expect(await bgOf(page, 'b4')).toBe(rgb('#f4b000'));
++  await setVariable(page, 'Primary', '#112233');
++  expect(await bgOf(page, 'b4')).toBe(rgb('#112233'));
++  expect(await textOf(page, 'b4')).toBe(WHITE);
++  expect(await bgOf(page, 'b2')).toBe(rgb('#05b169'));
++  expect(await bgOf(page, 'b3')).toBe(rgb('#cf202f'));
++});
++
++test('QA-67 · A54 b3를 Danger에 연결 → Danger 값 #05b169: b3만 바뀌고(글자 먹) 다른 버튼 · 변수 줄은 그대로, 선택 · 속성 패널 · 변수 입력칸 포커스가 유지된다', async ({ page }) => {
++  await page.goto(URL);
++  await selectOnCanvas(page, 'b3');
++  await linkTo(page, 'Danger');
++  const watchers = await holdAll(page);
++  const varInput = '[data-testid="variable-row"][data-id="danger"] [data-testid="variable-color"]';
++  await holdNodes(page, { 'var-input': varInput, 'link-select': '[data-testid="prop-variable"]' });
++
++  await setVariable(page, 'Danger', '#05b169');
++
++  expect(await colorsOf(page)).toEqual([rgb(BLUE), rgb(BLUE), rgb(BLUE), rgb('#05b169')]);
++  expect(await textOf(page, 'b3')).toBe(INK);
++  await expectSame(page, IDS, 'b3만');
++  for (const id of ['main', 'b1', 'b2']) expect((await watchers[id].take()).total, `${id} 변경 0`).toBe(0);
++  expect((await variableRows(page)).map((r) => r.value)).toEqual([BLUE, '#05b169', '#05b169']);
++  // A54: 선택은 b3 그대로, 속성 패널 색 입력칸이 푼 색을 따라가고 상자 · 이름 글자는 그대로, 변수 입력칸 포커스 유지
++  expect(await selectedOnCanvas(page)).toEqual(['b3']);
++  await expect(page.getByTestId('prop-color')).toHaveValue('#05b169');
++  await expect(linkSelect(page)).toHaveValue('danger');
++  expect(await colorHex(page)).toBe('Danger');
++  expect(await sameNode(page, 'var-input', varInput)).toBe(true);
++  expect(await sameNode(page, 'link-select', '[data-testid="prop-variable"]')).toBe(true);
++  expect(await page.evaluate(() => document.activeElement?.getAttribute('data-testid'))).toBe('variable-color');
++});
++
++test('QA-68 연결 중 같은 색 칩(#0052ff)을 눌러도 연결이 풀린다 — 상자 「없음」 · 칩 pressed · 값 글자 hex, 이후 Primary 값이 바뀌어도 안 따라간다', async ({ page }) => {
++  await page.goto(URL);
++  await linkMain(page, 'Primary');
++  await pickColor(page, BLUE);
++  await expect(linkSelect(page)).toHaveValue('');
++  expect(await pressedChips(page)).toEqual([BLUE]);
++  expect(await colorHex(page)).toBe(BLUE);
++  await setVariable(page, 'Primary', '#f4b000');
++  expect(await colorsOf(page)).toEqual([rgb(BLUE), rgb(BLUE), rgb(BLUE), rgb('#cf202f')]);
++});
++
++test('QA-69 연결 중 「색 직접 고르기」 입력칸으로 #112233을 고르면 연결이 풀리고(상자 없음) 메인 · b1 · b2가 #112233 · 흰 글자, 이후 Primary 값에 안 따라간다', async ({ page }) => {
++  await page.goto(URL);
++  await linkMain(page, 'Primary');
++  await pickColorInput(page, '#112233');
++  await expect(linkSelect(page)).toHaveValue('');
++  expect(await colorsOf(page)).toEqual([rgb('#112233'), rgb('#112233'), rgb('#112233'), rgb('#cf202f')]);
++  expect(await textOf(page, 'main')).toBe(WHITE);
++  await setVariable(page, 'Primary', '#f4b000');
++  expect(await colorsOf(page)).toEqual([rgb('#112233'), rgb('#112233'), rgb('#112233'), rgb('#cf202f')]);
++});
++
++test('QA-70 상자에서 「없음」을 고르면 지금 푼 색(#f4b000)을 그대로 두고 연결만 풀린다 — 값 글자 hex · 칩 #f4b000(팔레트 4번째)만 pressed, 이후 Primary 값이 바뀌어도 그대로', async ({ page }) => {
++  await page.goto(URL);
++  await linkMain(page, 'Primary');
++  await setVariable(page, 'Primary', '#f4b000');
++  await linkTo(page, '없음');
++  await expect(linkSelect(page)).toHaveValue('');
++  expect(await colorsOf(page)).toEqual([rgb('#f4b000'), rgb('#f4b000'), rgb('#f4b000'), rgb('#cf202f')]);
++  expect(await textOf(page, 'main')).toBe(INK);
++  expect(await colorHex(page)).toBe('#f4b000');
++  expect(await pressedChips(page)).toEqual(['#f4b000']);
++  await setVariable(page, 'Primary', BLUE);
++  expect(await colorsOf(page)).toEqual([rgb('#f4b000'), rgb('#f4b000'), rgb('#f4b000'), rgb('#cf202f')]);
++});
++
++test('QA-71 · A49 b3 Danger 연결(override) + 메인 Primary: 순서 · 추가 · 삭제 뒤에도 b3 연결 유지(새 b4는 메인을 따름), b3 ↻ → 메인을 따름(푼 Primary · 이름 Primary · ↻ 사라짐)', async ({ page }) => {
++  await page.goto(URL);
++  await linkMain(page, 'Primary');
++  await selectOnCanvas(page, 'b3');
++  await linkTo(page, 'Danger');
++  expect(await overriddenFields(page)).toEqual(['label', 'color']);
++  // A49: ① 순서 바꾸기 ② 추가 ③ b1 삭제 ④ Danger 값 변경 — b3 연결 유지
++  await moveInLayer(page, 'b3', 'up');
++  expect(await canvasOrder(page)).toEqual(['b1', 'b3', 'b2']);
++  await clickAdd(page);
++  await selectInLayer(page, 'b1');
++  await page.getByTestId('delete-instance').click();
++  expect(await canvasOrder(page)).toEqual(['b3', 'b2', 'b4']);
++  await setVariable(page, 'Danger', '#112233');
++  expect(await bgOf(page, 'b3')).toBe(rgb('#112233'));
++  expect(await bgOf(page, 'b4'), 'b4는 메인을 따르므로 Danger에 안 바뀜').toBe(rgb(BLUE));
++  await setVariable(page, 'Danger', '#cf202f');
++
++  // ↻
++  await selectOnCanvas(page, 'b3');
++  await expect(linkSelect(page)).toHaveValue('danger');
++  await page.locator(inRow('color', 'prop-reset')).click();
++  expect(await bgOf(page, 'b3')).toBe(rgb(BLUE));
++  expect(await colorHex(page)).toBe('Primary');
++  await expect(linkSelect(page)).toHaveValue('primary');
++  expect(await overriddenFields(page)).toEqual(['label']);
++  await setVariable(page, 'Primary', '#f4b000');
++  expect(await bgOf(page, 'b3')).toBe(rgb('#f4b000'));
++});
++
++test('A43 · A44 메인 Primary 연결 중 입력칸에 input 6번 연타 → 마지막 값만 남고 입력칸 노드 같은 참조, 같은 값을 다시 넣으면 렌더 0번(DOM 변경 0 · 렌더 예약 0)', async ({ page }) => {
++  // 렌더는 setter가 queueMicrotask로 예약한다(Batching) → 그 호출 수로 「렌더 0번」을 센다 (같은 모습으로 다시 그려도 DOM 변경은 0이라 DOM만으로는 못 가른다)
++  await page.addInitScript(() => {
++    const w = window as unknown as { __mc: number };
++    w.__mc = 0;
++    const q = window.queueMicrotask.bind(window);
++    window.queueMicrotask = (cb: VoidFunction) => {
++      w.__mc += 1;
++      q(cb);
++    };
++  });
++  const scheduled = (): Promise<number> => page.evaluate(() => (window as unknown as { __mc: number }).__mc);
++  await page.goto(URL);
++  await linkMain(page, 'Primary');
++  const varInput = '[data-testid="variable-row"][data-id="primary"] [data-testid="variable-color"]';
++  await holdNodes(page, { 'var-input': varInput });
++
++  for (const hex of ['#111111', '#222222', '#333333', '#444444', '#555555', '#f4b000']) await setVariable(page, 'Primary', hex);
++
++  expect(await colorsOf(page)).toEqual([rgb('#f4b000'), rgb('#f4b000'), rgb('#f4b000'), rgb('#cf202f')]);
++  expect((await variableRows(page))[0]).toEqual({ id: 'primary', name: 'Primary', value: '#f4b000', hex: '#f4b000', chip: rgb('#f4b000') });
++  await expect(page.getByTestId('prop-color')).toHaveValue('#f4b000');
++  expect(await sameNode(page, 'var-input', varInput)).toBe(true);
++
++  // A44: 같은 값을 다시 input → 렌더 0번 = DOM 변경 0
++  const mut = await watchApp(page);
++  const before = await scheduled();
++  await setVariable(page, 'Primary', '#f4b000');
++  expect((await mut.take()).body.total).toBe(0);
++  expect(await scheduled() - before, '렌더 예약 0번').toBe(0);
++  // 대조: 다른 값이면 렌더가 예약된다 (센 방법이 맞는지)
++  await setVariable(page, 'Primary', '#112233');
++  expect(await scheduled() - before, '다른 값은 렌더 예약').toBeGreaterThan(0);
++});
++
++test('A47 · A48 변수 상자를 Primary ↔ 없음으로 20번 번갈아 고르면 끝 상태가 마지막 선택과 같고 상자 노드가 그대로이며, 같은 Primary를 다시 고르면 DOM 변경 0', async ({ page }) => {
++  await page.goto(URL);
++  await selectOnCanvas(page, 'main');
++  await holdNodes(page, { 'link-select': '[data-testid="prop-variable"]' });
++  for (let i = 0; i < 20; i++) await linkTo(page, i % 2 === 0 ? 'Primary' : '없음');
++  // 20번째(i = 19)는 「없음」
++  await expect(linkSelect(page)).toHaveValue('');
++  expect(await colorHex(page)).toBe(BLUE);
++  expect(await pressedChips(page)).toEqual([BLUE]);
++  await linkTo(page, 'Primary');
++  await expect(linkSelect(page)).toHaveValue('primary');
++  expect(await colorHex(page)).toBe('Primary');
++  expect(await pressedChips(page)).toEqual([]);
++  expect(await sameNode(page, 'link-select', '[data-testid="prop-variable"]')).toBe(true);
++
++  const mut = await watchApp(page);
++  await linkTo(page, 'Primary');
++  expect((await mut.take()).body.total).toBe(0);
++});
++
++test('A51 연결된 버튼의 글자색은 푼 색 기준이다 — #eef0f3 먹 · #0a0b0d 흰 · #777777 흰 · #787878 먹', async ({ page }) => {
++  await page.goto(URL);
++  await linkMain(page, 'Primary');
++  const table: [string, string][] = [
++    ['#eef0f3', INK],
++    ['#0a0b0d', WHITE],
++    ['#777777', WHITE],
++    ['#787878', INK],
++  ];
++  for (const [hex, text] of table) {
++    await setVariable(page, 'Primary', hex);
++    expect(await bgOf(page, 'main'), hex).toBe(rgb(hex));
++    expect(await textOf(page, 'main'), `${hex} 글자색`).toBe(text);
++    expect(await textOf(page, 'b1'), `${hex} b1 글자색`).toBe(text);
++  }
++});
++
++test('A58 연결 상태에서 속성 패널 · 레이어 창 · 변수 구역이 가로로 안 넘치고 상자 · 입력칸 터치 목표가 32px 이상이다', async ({ page }) => {
++  await page.goto(URL);
++  await linkMain(page, 'Primary');
++  const m = await page.evaluate(() => {
++    const over = (id: string) => {
++      const el = document.querySelector(`[data-testid="${id}"]`) as HTMLElement;
++      return el.scrollWidth - el.clientWidth;
++    };
++    const rect = (sel: string) => document.querySelector(sel)!.getBoundingClientRect();
++    const sel = rect('[data-testid="prop-variable"]');
++    const panel = rect('[data-testid="property-panel"]');
++    return {
++      overs: [over('property-panel'), over('layer-panel'), over('variable-panel')],
++      selHeight: sel.height,
++      selInside: sel.left >= panel.left - 1 && sel.right <= panel.right + 1,
++      inputH: rect('[data-testid="prop-color"]').height,
++      varInputH: rect('[data-testid="variable-color"]').height,
++    };
++  });
++  for (const o of m.overs) expect(o, '가로 넘침').toBeLessThanOrEqual(0);
++  expect(await noHorizontalScroll(page)).toBe(true);
++  expect(m.selInside, '변수 상자가 속성 패널 안').toBe(true);
++  expect(m.selHeight).toBeGreaterThanOrEqual(32);
++  expect(m.inputH).toBeGreaterThanOrEqual(32);
++  expect(m.varInputH).toBeGreaterThanOrEqual(32);
++});
++
++// ---------------------------------------------------------------------------
++// Dev-5: Patch · 되돌리기 · 새로고침 · 키보드 · 회귀 (VR-07 · 08)
++// ---------------------------------------------------------------------------
++
++const patchNow = (page: Page) => page.getByTestId('patch-button').click();
++const backNow = (page: Page) => page.getByTestId('back-button').click();
++const forwardNow = (page: Page) => page.getByTestId('forward-button').click();
++
++async function expectAreasSame(page: Page, where: string): Promise<void> {
++  expect(await areaSnapshot(page, 'real'), `${where}: 두 영역 모습`).toEqual(await areaSnapshot(page, 'test'));
++}
++
++test('QA-72 · QA-73 메인 Primary 연결 + #f4b000 → [Patch]: 실제 영역은 푼 색(var: 글자 없음) + 바뀐 세 버튼 위에만 박스, [실행 취소] = 두 영역 · 연결 · 변수 값 되돌림, [다시 실행] = 다시 적용', async ({ page }) => {
++  await page.goto(URL);
++  await linkMain(page, 'Primary');
++  await setVariable(page, 'Primary', '#f4b000');
++  const flash = await watchFlash(page);
++
++  await patchNow(page);
++
++  const real = await areaSnapshot(page, 'real');
++  expect(real.map((b) => b.bg)).toEqual([rgb('#f4b000'), rgb('#f4b000'), rgb('#f4b000'), rgb('#cf202f')]);
++  expect(real.map((b) => b.fg)).toEqual([INK, INK, INK, WHITE]);
++  await expectAreasSame(page, 'Patch 뒤');
++  expect(await page.getByTestId('real-area').innerHTML(), 'real-area에 var: 없음').not.toContain('var:');
++  const { boxes, buttons } = await flash.take();
++  for (const id of ['main', 'b1', 'b2']) expect(boxes.some((b) => boxSame(b, buttons[id], 2)), `${id} 위 박스`).toBe(true);
++  for (const b of boxes) expect(boxOverlap(b, buttons.b3), 'b3 위에는 박스 없음').toBe(false);
++
++  // QA-73 ① [실행 취소]
++  await backNow(page);
++  expect(await colorsOf(page)).toEqual([rgb(BLUE), rgb(BLUE), rgb(BLUE), rgb('#cf202f')]);
++  expect((await areaSnapshot(page, 'real')).map((b) => b.bg)).toEqual([rgb(BLUE), rgb(BLUE), rgb(BLUE), rgb('#cf202f')]);
++  await expectAreasSame(page, '실행 취소');
++  expect((await variableRows(page)).map((r) => r.value)).toEqual([BLUE, '#cf202f', '#05b169']);
++  expect((await variableRows(page))[0].hex).toBe(BLUE);
++  await expect(linkSelect(page)).toHaveValue('');
++  expect(await colorHex(page)).toBe(BLUE);
++  expect(await navState(page)).toEqual({ patch: true, back: false, forward: true });
++  // ② [다시 실행]
++  await forwardNow(page);
++  expect(await colorsOf(page)).toEqual([rgb('#f4b000'), rgb('#f4b000'), rgb('#f4b000'), rgb('#cf202f')]);
++  expect(await realBgOf(page, 'main')).toBe(rgb('#f4b000'));
++  await expectAreasSame(page, '다시 실행');
++  await expect(linkSelect(page)).toHaveValue('primary');
++  expect(await colorHex(page)).toBe('Primary');
++  expect((await variableRows(page))[0].value).toBe('#f4b000');
++  expect(await navState(page)).toEqual({ patch: true, back: true, forward: false });
++});
++
++test('QA-74 Patch 안 한 변수 · 연결 편집은 [실행 취소] 때 버려지고 [다시 실행]해도 안 돌아온다', async ({ page }) => {
++  await page.goto(URL);
++  await linkMain(page, 'Primary');
++  await setVariable(page, 'Primary', '#f4b000');
++  await patchNow(page);
++  await setVariable(page, 'Primary', '#05b169');
++  await linkTo(page, '없음');
++
++  await backNow(page);
++  expect(await colorsOf(page)).toEqual([rgb(BLUE), rgb(BLUE), rgb(BLUE), rgb('#cf202f')]);
++  await expectAreasSame(page, '실행 취소');
++  expect((await variableRows(page))[0].value).toBe(BLUE);
++  await expect(linkSelect(page)).toHaveValue('');
++  await forwardNow(page);
++  expect((await variableRows(page))[0].value).toBe('#f4b000');
++  expect(await colorsOf(page)).toEqual([rgb('#f4b000'), rgb('#f4b000'), rgb('#f4b000'), rgb('#cf202f')]);
++  await expect(linkSelect(page)).toHaveValue('primary');
++});
++
++test('QA-75 변수를 안 쓰는 대표 흐름은 그대로다: b3 override 표시 · 칩 · Patch · 실행 취소 · 인스턴스 추가 · 처음 화면 자식 5개 (기존 mini-figma 스펙 전부가 회귀로 증명)', async ({ page }) => {
++  await page.goto(URL);
++  expect(await page.locator('[data-testid="app-root"] > .app > *').count()).toBe(5);
++  await selectOnCanvas(page, 'b3');
++  expect(await overriddenFields(page)).toEqual(['label', 'color']);
++  expect(await pressedChips(page)).toEqual(['#cf202f']);
++  await pickColor(page, '#05b169');
++  await patchNow(page);
++  await expectAreasSame(page, 'Patch');
++  expect(await realBgOf(page, 'b3')).toBe(rgb('#05b169'));
++  await backNow(page);
++  expect(await bgOf(page, 'b3')).toBe(rgb('#cf202f'));
++  await clickAdd(page);
++  expect(await canvasOrder(page)).toEqual(['b1', 'b2', 'b3', 'b4']);
++});
++
++test('A45 값을 바꿨다 원래대로 되돌리고 [Patch]하면 무변경 Patch (기록 안 쌓임, [실행 취소] 꺼짐)', async ({ page }) => {
++  await page.goto(URL);
++  await linkMain(page, 'Primary');
++  await setVariable(page, 'Primary', '#f4b000');
++  await setVariable(page, 'Primary', BLUE);
++  await patchNow(page);
++  expect(await colorsOf(page)).toEqual([rgb(BLUE), rgb(BLUE), rgb(BLUE), rgb('#cf202f')]);
++  await expectAreasSame(page, '무변경 Patch');
++  expect(await navState(page)).toEqual({ patch: true, back: false, forward: false });
++});
++
++test('A52 변수 · 연결을 바꾸고 새로고침하면 처음 doc이다 (저장 안 됨)', async ({ page }) => {
++  await page.goto(URL);
++  await linkMain(page, 'Primary');
++  await setVariable(page, 'Primary', '#f4b000');
++  await patchNow(page);
++  await page.reload();
++  expect((await variableRows(page)).map((r) => r.value)).toEqual([BLUE, '#cf202f', '#05b169']);
++  expect(await colorsOf(page)).toEqual([rgb(BLUE), rgb(BLUE), rgb(BLUE), rgb('#cf202f')]);
++  await selectOnCanvas(page, 'main');
++  await expect(linkSelect(page)).toHaveValue('');
++  expect((await areaSnapshot(page, 'real')).map((b) => b.bg)).toEqual([rgb(BLUE), rgb(BLUE), rgb(BLUE), rgb('#cf202f')]);
++});
++
++test('A53 Patch 3번 뒤 [실행 취소] ×3 · [다시 실행] ×3: 칸마다 두 영역 · 변수 줄 · 연결이 그 칸의 사본과 같다', async ({ page }) => {
++  await page.goto(URL);
++  // ① 메인 Primary 연결 + #f4b000 ② b3 Danger 연결 + #05b169 ③ 메인 「없음」 + 칩 #cf202f
++  await linkMain(page, 'Primary');
++  await setVariable(page, 'Primary', '#f4b000');
++  await patchNow(page);
++  await selectOnCanvas(page, 'b3');
++  await linkTo(page, 'Danger');
++  await setVariable(page, 'Danger', '#05b169');
++  await patchNow(page);
++  await selectOnCanvas(page, 'main');
++  await linkTo(page, '없음');
++  await pickColor(page, '#cf202f');
++  await patchNow(page);
++
++  const R = rgb('#cf202f');
++  const G = rgb('#05b169');
++  const Y = rgb('#f4b000');
++  const B = rgb(BLUE);
++  const states = [
++    { bgs: [B, B, B, R], vars: [BLUE, '#cf202f', '#05b169'], main: '', b3: '' },
++    { bgs: [Y, Y, Y, R], vars: ['#f4b000', '#cf202f', '#05b169'], main: 'primary', b3: '' },
++    { bgs: [Y, Y, Y, G], vars: ['#f4b000', '#05b169', '#05b169'], main: 'primary', b3: 'danger' },
++    { bgs: [R, R, R, G], vars: ['#f4b000', '#05b169', '#05b169'], main: '', b3: 'danger' },
++  ];
++  const check = async (index: number): Promise<void> => {
++    const s = states[index];
++    expect(await colorsOf(page), `칸 ${index} 테스트 영역`).toEqual(s.bgs);
++    expect((await areaSnapshot(page, 'real')).map((b) => b.bg), `칸 ${index} 실제 영역`).toEqual(s.bgs);
++    await expectAreasSame(page, `칸 ${index}`);
++    expect((await variableRows(page)).map((r) => r.value), `칸 ${index} 변수 줄`).toEqual(s.vars);
++    await selectOnCanvas(page, 'main');
++    await expect(linkSelect(page), `칸 ${index} 메인 상자`).toHaveValue(s.main);
++    await selectOnCanvas(page, 'b3');
++    await expect(linkSelect(page), `칸 ${index} b3 상자`).toHaveValue(s.b3);
++  };
++  await check(3);
++  await backNow(page);
++  await check(2);
++  await backNow(page);
++  await check(1);
++  await backNow(page);
++  await check(0);
++  expect((await navState(page)).back, '끝에서 꺼짐').toBe(false);
++  await forwardNow(page);
++  await check(1);
++  await forwardNow(page);
++  await check(2);
++  await forwardNow(page);
++  await check(3);
++  expect((await navState(page)).forward, '끝에서 꺼짐').toBe(false);
++});
++
++test('A55 변수 색 입력칸에 포커스한 채 Ctrl+Z · Ctrl+Shift+Z는 [실행 취소] · [다시 실행]처럼 움직인다', async ({ page }) => {
++  await page.goto(URL);
++  await linkMain(page, 'Primary');
++  await setVariable(page, 'Primary', '#f4b000');
++  await patchNow(page);
++  await setVariable(page, 'Primary', '#112233');
++  await patchNow(page);
++
++  const input = page.locator(`${variableRowSel('primary')} [data-testid="variable-color"]`);
++  await input.focus();
++  await page.keyboard.press('Control+KeyZ');
++  expect(await bgOf(page, 'main')).toBe(rgb('#f4b000'));
++  expect((await variableRows(page))[0].value).toBe('#f4b000');
++  await expectAreasSame(page, 'Ctrl+Z');
++  await input.focus();
++  await page.keyboard.press('Control+Shift+KeyZ');
++  expect(await bgOf(page, 'main')).toBe(rgb('#112233'));
++  expect((await variableRows(page))[0].value).toBe('#112233');
++  await expectAreasSame(page, 'Ctrl+Shift+Z');
++});
+diff --git a/fixtures/mini-figma/App.ts b/fixtures/mini-figma/App.ts
+index c967177..148b712 100644
+--- a/fixtures/mini-figma/App.ts
++++ b/fixtures/mini-figma/App.ts
+@@ -5,7 +5,7 @@ import { LayerPanel } from './components/LayerPanel';
+ import { PreviewPanel } from './components/PreviewPanel';
+ import { PropertyPanel } from './components/PropertyPanel';
+ import { Toolbar } from './components/Toolbar';
+-import { INITIAL_DOC, addInstance, moveInstance, reconcileSelection, removeInstance, resetInstanceField, setInstanceField, setMainField } from './model';
++import { INITIAL_DOC, addInstance, moveInstance, reconcileSelection, removeInstance, resetInstanceField, setInstanceField, setMainField, setVariableValue } from './model';
+ import type { Doc, Field, MainProps } from './model';
+ import { keyAction } from './keys';
+ import { createPreview } from './preview';
+@@ -46,6 +46,9 @@ export function App(): VNode {
+     applyEdit(next);
+   };
+ 
++  // [AI Note]: 변수 값 바꾸기(task_007) = setVariableValue → applyEdit. 새 Hook 칸 없이 doc 안의 variables만 바뀐다. 같은 값 · 없는 id면 같은 Doc이라 렌더 없음. 한 동작 = setter 하나 = 렌더 1번.
++  const onVariableChange = (id: string, value: string): void => applyEdit(setVariableValue(doc, id, value));
++
+   // [AI Note]: ↻ = 그 인스턴스의 그 칸 키를 지운다 (undefined를 넣지 않음) → 메인 값을 다시 따라간다.
+   const onReset = (field: Field): void => {
+     if (selectedId === null || selectedId === 'main') return;
+@@ -175,10 +178,10 @@ export function App(): VNode {
+     { class: 'app' },
+     // [AI Note]: 자식 순서 = 도구 막대(0) · 레이어(1) · 캔버스(2) · 속성(3). 이 순서가 엔진 patch 경로 접두 [0,0] ~ [0,3]이 된다 (FD-10)
+     h(Toolbar, { canBack: canBack(nav), canForward: canForward(nav), onBack: onPreviewBack, onForward: onPreviewForward, onPatch: onPreviewPatch }),
+-    h(LayerPanel, { main: doc.main, instances: doc.instances, selectedId, open: layersOpen, onToggle: onToggleLayers, onSelect: selectAndReveal, onMove }),
+-    h(Canvas, { main: doc.main, instances: doc.instances, selectedId, onSelect: selectAndReveal }),
++    h(LayerPanel, { main: doc.main, instances: doc.instances, selectedId, open: layersOpen, onToggle: onToggleLayers, onSelect: selectAndReveal, onMove, variables: doc.variables, onVariableChange }),
++    h(Canvas, { main: doc.main, instances: doc.instances, variables: doc.variables, selectedId, onSelect: selectAndReveal }),
+     // [인스턴스 생성]은 속성 패널 오른쪽 아래(메인을 골랐을 때)에 있다 — [삭제]와 같은 자리
+-    h(PropertyPanel, { main: doc.main, instances: doc.instances, selectedId, onEdit, onReset, onDelete: deleteSelected, onAdd: addAndReveal }),
++    h(PropertyPanel, { main: doc.main, instances: doc.instances, variables: doc.variables, selectedId, onEdit, onReset, onDelete: deleteSelected, onAdd: addAndReveal }),
+     // 실제 영역 구역 = 5번째 자식 [0,4]. DOM 순서는 맨 끝, 자리는 CSS로 정한다 (앞 네 개의 경로 접두 [0,0] ~ [0,3]은 그대로)
+     h(PreviewPanel, {}),
+   );
+diff --git a/fixtures/mini-figma/__tests__/app.test.ts b/fixtures/mini-figma/__tests__/app.test.ts
+index a1ab5d9..5a1800b 100644
+--- a/fixtures/mini-figma/__tests__/app.test.ts
++++ b/fixtures/mini-figma/__tests__/app.test.ts
+@@ -660,14 +660,15 @@ describe('팔레트 판 (Dev-3)', () => {
+     }
+   });
+ 
+-  it('색 입력칸(prop-color)은 type=color이고 값은 지금 색이며, 값 글자(color-hex)도 지금 색이다. 색 칸에 <select>가 없다', () => {
++  it('색 입력칸(prop-color)은 type=color이고 값은 지금 색이며, 값 글자(color-hex)도 지금 색이다. 색 칸의 <select>는 변수 상자(prop-variable) 하나뿐이다', () => {
+     const input = byId('prop-color') as HTMLInputElement;
+     expect(input.localName).toBe('input');
+     expect(input.type).toBe('color');
+     expect(input.value).toBe('#0052ff');
+     expect(byId('color-hex').textContent).toBe('#0052ff');
+     expect(root.querySelector('[data-testid="color-palette"]')).not.toBeNull();
+-    expect(root.querySelector('[data-testid="prop-row"][data-field="color"] select')).toBeNull();
++    const selects = Array.from(root.querySelectorAll('[data-testid="prop-row"][data-field="color"] select'));
++    expect(selects.map((el) => el.getAttribute('data-testid'))).toEqual(['prop-variable']);
+   });
+ 
+   it('칩을 누르면 onEdit로 메인 값 · 버튼 배경 · 칩 표시 · 입력칸 값 · 값 글자가 같이 바뀐다 (칩 8개 전부)', async () => {
+@@ -843,7 +844,7 @@ describe('인스턴스 추가 · 삭제 (Dev-9)', () => {
+     const doc = slot(0) as typeof INITIAL_DOC;
+     expect(doc.instances[3]).toEqual({ id: 'b4' });
+     expect(Object.keys(doc.instances[3])).toEqual(['id']);
+-    expect(Object.keys(doc)).toEqual(['main', 'instances']);
++    expect(Object.keys(doc)).toEqual(['main', 'instances', 'variables']);
+     expect(doc.instances.slice(0, 3)).toEqual(INITIAL_DOC.instances);
+   });
+ 
+@@ -1805,3 +1806,341 @@ describe('실제 영역 (patch-preview, PP-01 ~ 10 · Dev-7)', () => {
+     sameAreas();
+   });
+ });
++
++// ---------------------------------------------------------------------------
++// task_007 색 변수 Variables — 변수 구역 (Dev-3: VR-04 · 06, VP-10 · 11 · 12)
++// ---------------------------------------------------------------------------
++describe('변수 구역 (VR-04 · 06)', () => {
++  const rows = (): HTMLElement[] => Array.from(root.querySelectorAll<HTMLElement>('[data-testid="variable-row"]'));
++  const rowOf = (id: string): HTMLElement => {
++    const found = rows().find((r) => r.getAttribute('data-id') === id);
++    if (found === undefined) throw new Error(`변수 줄 ${id}가 없다`);
++    return found;
++  };
++  const inputOf = (id: string): HTMLInputElement => rowOf(id).querySelector<HTMLInputElement>('[data-testid="variable-color"]')!;
++  const input = async (id: string, value: string): Promise<void> => {
++    const el = inputOf(id);
++    el.value = value;
++    el.dispatchEvent(new Event('input'));
++    await Promise.resolve();
++  };
++  const variablesOf = () => (slot(0) as typeof INITIAL_DOC).variables;
++  /** 렌더마다 새로 생기는 SET_EVENT를 뺀 줄 (task_002 알려진 한계) */
++  const meaningful = (): Patch[] => instance.lastPatches.filter((p) => p.kind !== 'SET_EVENT');
++
++  it('처음: layer-panel의 끝 자식 variable-panel 안에 변수 줄 3개 · 순서 · 값 · hex 글자', () => {
++    const panel = byId('layer-panel');
++    expect(panel.lastElementChild).toBe(byId('variable-panel'));
++    expect(byId('variable-title').textContent).toBe('변수');
++    expect(rows().map((r) => r.getAttribute('data-id'))).toEqual(['primary', 'danger', 'success']);
++    expect(rows().map((r) => r.querySelector('[data-testid="variable-name"]')?.textContent)).toEqual(['Primary', 'Danger', 'Success']);
++    expect(rows().map((r) => r.querySelector('[data-testid="variable-hex"]')?.textContent)).toEqual(['#0052ff', '#cf202f', '#05b169']);
++    expect(rows().map((r) => r.querySelector('input')!.type)).toEqual(['color', 'color', 'color']);
++    expect(['primary', 'danger', 'success'].map((id) => inputOf(id).value)).toEqual(['#0052ff', '#cf202f', '#05b169']);
++    expect(rows().map((r) => (r.querySelector<HTMLElement>('[data-testid="variable-chip"]')!).style.backgroundColor)).toEqual([rgb('#0052ff'), rgb('#cf202f'), rgb('#05b169')]);
++    // 처음 화면 버튼 색 그대로 (VR-08) · div.app 자식 5개 그대로
++    expect(bgs()).toEqual([rgb('#0052ff'), rgb('#0052ff'), rgb('#0052ff'), rgb('#cf202f')]);
++    expect(area().children).toHaveLength(5);
++  });
++
++  it('VP-11 input → slot(0).variables 해당 변수만 바뀜, 캔버스 0줄 · 변수 구역 SET_STYLE 1 + SET_PROP 1 + SET_TEXT 1, 렌더 1번', async () => {
++    const before = variablesOf();
++    const mainButton = buttonOf('main');
++    const rendersBefore = renders;
++    await input('primary', '#f4b000');
++    expect(renders - rendersBefore).toBe(1);
++    const after = variablesOf();
++    expect(after[0]).toEqual({ id: 'primary', name: 'Primary', value: '#f4b000' });
++    expect(after[1]).toBe(before[1]);
++    expect(after[2]).toBe(before[2]);
++    const meaningfulLines = meaningful();
++    expect(canvasCounts(meaningfulLines)).toEqual({});
++    expect(layerCounts(meaningfulLines)).toEqual({ SET_STYLE: 1, SET_PROP: 1, SET_TEXT: 1 });
++    expect(meaningfulLines).toHaveLength(3);
++    expect(buttonOf('main')).toBe(mainButton);
++    expect(bgs()).toEqual([rgb('#0052ff'), rgb('#0052ff'), rgb('#0052ff'), rgb('#cf202f')]);
++    expect(rowOf('primary').querySelector('[data-testid="variable-hex"]')?.textContent).toBe('#f4b000');
++  });
++
++  it('VP-10 같은 값으로 input → 렌더 0번, lastPatches 그대로', async () => {
++    await input('primary', '#f4b000');
++    const patches = instance.lastPatches;
++    const rendersBefore = renders;
++    await input('primary', '#f4b000');
++    expect(renders - rendersBefore).toBe(0);
++    expect(instance.lastPatches).toBe(patches);
++    await input('danger', '#cf202f');
++    expect(renders - rendersBefore).toBe(0);
++  });
++
++  it('VP-12 같은 틱에 input 4번 연속 → 이벤트마다 렌더 1번, 마지막 값만 남고, 입력칸 노드는 같은 참조', async () => {
++    const el = inputOf('primary');
++    const rendersBefore = renders;
++    for (const hex of ['#111111', '#222222', '#333333', '#f4b000']) await input('primary', hex);
++    expect(renders - rendersBefore).toBe(4);
++    expect(inputOf('primary')).toBe(el);
++    expect(variablesOf()[0].value).toBe('#f4b000');
++    expect(rowOf('primary').querySelector('[data-testid="variable-hex"]')?.textContent).toBe('#f4b000');
++    expect(el.value).toBe('#f4b000');
++  });
++
++  it('변수 구역에 patch 글자가 없다 (MF-05) · Hook 칸은 8칸 그대로 (새 칸 없음)', () => {
++    expect(byId('variable-panel').textContent).not.toMatch(/patch/i);
++    expect(instance.hooks).toHaveLength(8);
++  });
++});
++
++// ---------------------------------------------------------------------------
++// task_007 색 변수 Variables — 연결 UI (Dev-4: VR-02 · 05 · 06, VP-1 · 5 · 7 · 8 · 9)
++// ---------------------------------------------------------------------------
++describe('연결 UI — 변수 상자 (VR-02 · 05)', () => {
++  const linkBox = (): HTMLSelectElement => byId('prop-variable') as HTMLSelectElement;
++  const linkOptions = (): string[] => Array.from(linkBox().options).map((o) => o.textContent ?? '');
++  const hexText = (): string => byId('color-hex').textContent ?? '';
++  const meaningful = (): Patch[] => instance.lastPatches.filter((p) => p.kind !== 'SET_EVENT');
++  const panelCounts = (): Record<string, number> => countsUnder(instance.lastPatches, PANEL_PREFIX_ALL);
++  const setVar = async (id: string, value: string): Promise<void> => {
++    const el = root.querySelector<HTMLInputElement>(`[data-testid="variable-row"][data-id="${id}"] [data-testid="variable-color"]`)!;
++    el.value = value;
++    el.dispatchEvent(new Event('input'));
++    await Promise.resolve();
++  };
++  const doc = (): typeof INITIAL_DOC => slot(0) as typeof INITIAL_DOC;
++  const linkMain = async (id: string): Promise<void> => {
++    await click(buttonOf('main'));
++    await choose('prop-variable', id);
++  };
++
++  it('색 칸에 <select>는 prop-variable 하나뿐이다 (옵션 없음 · Primary · Danger · Success, 값은 변수 id)', async () => {
++    await click(buttonOf('main'));
++    const selects = root.querySelectorAll('[data-testid="prop-row"][data-field="color"] select');
++    expect(selects).toHaveLength(1);
++    expect(selects[0]).toBe(linkBox());
++    expect(linkOptions()).toEqual(['없음', 'Primary', 'Danger', 'Success']);
++    expect(Array.from(linkBox().options).map((o) => o.value)).toEqual(['', 'primary', 'danger', 'success']);
++    expect(linkBox().value).toBe('');
++    expect(pressedChips()).toEqual(['#0052ff']);
++    await click(buttonOf('b3'));
++    expect(linkBox().value).toBe('');
++    expect(pressedChips()).toEqual(['#cf202f']);
++  });
++
++  it('VP-1 메인(선택)을 Primary에 연결: main.color = var:primary, 캔버스 · 변수 구역 0줄, 속성 패널 { SET_PROP 1 + SET_ATTR 1 + SET_TEXT 1 }, 렌더 1번', async () => {
++    await click(buttonOf('main'));
++    const other = doc();
++    const before = renders;
++    await choose('prop-variable', 'primary');
++    expect(renders - before).toBe(1);
++    expect(doc().main.color).toBe('var:primary');
++    expect(doc().instances).toBe(other.instances);
++    expect(doc().variables).toBe(other.variables);
++    expect(canvasCounts(meaningful())).toEqual({});
++    expect(layerCounts(meaningful())).toEqual({});
++    expect(panelCounts()).toEqual({ SET_PROP: 1, SET_ATTR: 1, SET_TEXT: 1 });
++    expect(pressedChips()).toEqual([]);
++    expect(hexText()).toBe('Primary');
++    expect((byId('prop-color') as HTMLInputElement).value).toBe('#0052ff');
++    expect(linkBox().value).toBe('primary');
++    expect(bgs()).toEqual([rgb('#0052ff'), rgb('#0052ff'), rgb('#0052ff'), rgb('#cf202f')]);
++  });
++
++  it('VP-2 · 3 (VP-1 뒤) Primary #f4b000 → 캔버스 SET_STYLE 6 · b3 줄 0 · 레이어 노드 0 · 변수 구역 3줄 · 속성 패널 SET_PROP 1 / #0066ff → SET_STYLE 3', async () => {
++    await linkMain('primary');
++    const b3 = buttonOf('b3');
++    const layerBefore = layerRow('b1');
++    await setVar('primary', '#f4b000');
++    expect(canvasCounts(meaningful())).toEqual({ SET_STYLE: 6 });
++    expect(buttonOf('b3')).toBe(b3);
++    expect(layerRow('b1')).toBe(layerBefore);
++    expect(layerCounts(meaningful())).toEqual({ SET_STYLE: 1, SET_PROP: 1, SET_TEXT: 1 });
++    expect(panelCounts()).toEqual({ SET_PROP: 1 });
++    expect(bgs()).toEqual([rgb('#f4b000'), rgb('#f4b000'), rgb('#f4b000'), rgb('#cf202f')]);
++    expect(fgOf('main')).toBe(rgb('#0a0b0d'));
++    expect(linkBox().value).toBe('primary');
++    expect(hexText()).toBe('Primary');
++    await setVar('primary', '#0066ff');
++    // #f4b000 (먹 글자) → #0066ff (흰 글자)라 이번엔 글자색도 바뀐다 — 글자색이 안 바뀌는 VP-3(3줄)은 아래에서 따로 센다
++    expect(canvasCounts(meaningful())).toEqual({ SET_STYLE: 6 });
++  });
++
++  it('VP-3 (VP-1 뒤) Primary #0066ff (글자색 흰 그대로) → 캔버스 SET_STYLE 3 (메인 · b1 · b2 배경만)', async () => {
++    await linkMain('primary');
++    await setVar('primary', '#0066ff');
++    expect(canvasCounts(meaningful())).toEqual({ SET_STYLE: 3 });
++  });
++
++  it('VP-4 (VP-1 뒤) b2에 칩 #05b169(override) → Primary #f4b000: 캔버스 SET_STYLE 4(메인 · b1), b2 · b3 줄 0 · b2 노드 같은 참조', async () => {
++    await linkMain('primary');
++    await click(buttonOf('b2'));
++    await pick('#05b169');
++    const b2 = buttonOf('b2');
++    await setVar('primary', '#f4b000');
++    expect(canvasCounts(meaningful())).toEqual({ SET_STYLE: 4 });
++    expect(buttonOf('b2')).toBe(b2);
++    expect(bgOf('b2')).toBe(rgb('#05b169'));
++    expect(panelCounts()).toEqual({});
++  });
++
++  it('VP-5 · 6 b3(선택)를 Danger에 연결(푼 색 같음) → 캔버스 0줄 · 속성 패널 3줄, Danger #05b169 → b3만 SET_STYLE 2, 다른 버튼 노드 같은 참조', async () => {
++    await click(buttonOf('b3'));
++    await choose('prop-variable', 'danger');
++    expect(doc().instances.find((it) => it.id === 'b3')?.color).toBe('var:danger');
++    expect(canvasCounts(meaningful())).toEqual({});
++    expect(panelCounts()).toEqual({ SET_PROP: 1, SET_ATTR: 1, SET_TEXT: 1 });
++    expect(hexText()).toBe('Danger');
++    const [m, b1, b2] = [buttonOf('main'), buttonOf('b1'), buttonOf('b2')];
++    await setVar('danger', '#05b169');
++    expect(canvasCounts(meaningful())).toEqual({ SET_STYLE: 2 });
++    expect([buttonOf('main'), buttonOf('b1'), buttonOf('b2')]).toEqual([m, b1, b2]);
++    expect(bgOf('b3')).toBe(rgb('#05b169'));
++    expect(fgOf('b3')).toBe(rgb('#0a0b0d'));
++    expect(panelCounts()).toEqual({ SET_PROP: 1 });
++    expect(hexText()).toBe('Danger');
++  });
++
++  it('VP-7 (VP-1 뒤) 같은 색 칩 #0052ff 클릭 = 연결 풀림: main.color = #0052ff, 캔버스 0줄, 속성 패널 3줄, 렌더 1번 · 이후 Primary 값이 안 따라감', async () => {
++    await linkMain('primary');
++    const before = renders;
++    await pick('#0052ff');
++    expect(renders - before).toBe(1);
++    expect(doc().main.color).toBe('#0052ff');
++    expect(canvasCounts(meaningful())).toEqual({});
++    expect(panelCounts()).toEqual({ SET_PROP: 1, SET_ATTR: 1, SET_TEXT: 1 });
++    expect(linkBox().value).toBe('');
++    expect(pressedChips()).toEqual(['#0052ff']);
++    expect(hexText()).toBe('#0052ff');
++    await setVar('primary', '#f4b000');
++    expect(canvasCounts(meaningful())).toEqual({});
++  });
++
++  it('VP-8 (VP-1 뒤) 상자 「없음」 → 지금 푼 hex로 저장: 겉모습 그대로 · 캔버스 0줄. Primary가 #f4b000일 때 「없음」이면 #f4b000이 저장됨', async () => {
++    await linkMain('primary');
++    await setVar('primary', '#f4b000');
++    await choose('prop-variable', '');
++    expect(doc().main.color).toBe('#f4b000');
++    expect(canvasCounts(meaningful())).toEqual({});
++    expect(pressedChips()).toEqual(['#f4b000']); // #f4b000은 팔레트 4번째 칩이라 연결이 풀리면 그 칩이 눌림 (qa_todo는 「팔레트에 없다」고 틀리게 적었다)
++    expect(hexText()).toBe('#f4b000');
++    await setVar('primary', '#0052ff');
++    expect(bgOf('main')).toBe(rgb('#f4b000'));
++  });
++
++  it('VP-9 (VP-5 뒤, b3 선택) ↻ → b3가 메인(Primary 연결)을 따름: 캔버스 SET_STYLE 1 (배경 #cf202f → #0052ff), 이름 글자 Primary', async () => {
++    await linkMain('primary');
++    await click(buttonOf('b3'));
++    await choose('prop-variable', 'danger');
++    const reset = root.querySelector<HTMLElement>('[data-testid="prop-row"][data-field="color"] [data-testid="prop-reset"]');
++    expect(reset).not.toBeNull();
++    await click(reset!);
++    expect(doc().instances.find((it) => it.id === 'b3')).toEqual({ id: 'b3', label: '삭제' });
++    expect(canvasCounts(meaningful())).toEqual({ SET_STYLE: 1 });
++    expect(bgOf('b3')).toBe(rgb('#0052ff'));
++    expect(fgOf('b3')).toBe(rgb('#ffffff'));
++    expect(hexText()).toBe('Primary');
++    expect(linkBox().value).toBe('primary');
++    expect(root.querySelector('[data-testid="prop-row"][data-field="color"] [data-testid="prop-reset"]')).toBeNull();
++  });
++
++  it('같은 변수 상자 값을 다시 고르면 렌더 0번 · 같은 doc', async () => {
++    await linkMain('primary');
++    const before = renders;
++    const d = doc();
++    await choose('prop-variable', 'primary');
++    expect(renders - before).toBe(0);
++    expect(doc()).toBe(d);
++  });
++
++  it('메인이 연결일 때 추가한 b4는 메인을 따라 Primary 값에 같이 바뀐다 · 인스턴스 연결은 다른 인스턴스 · variables를 같은 참조로 둔다', async () => {
++    await linkMain('primary');
++    await clickAdd();
++    await setVar('primary', '#f4b000');
++    expect(bgOf('b4')).toBe(rgb('#f4b000'));
++    await click(buttonOf('b2'));
++    const before = doc();
++    await choose('prop-variable', 'success');
++    expect(doc().variables).toBe(before.variables);
++    expect(doc().main).toBe(before.main);
++    expect(doc().instances.find((it) => it.id === 'b1')).toBe(before.instances.find((it) => it.id === 'b1'));
++    expect(doc().instances.find((it) => it.id === 'b2')?.color).toBe('var:success');
++  });
++
++  it('A57 doc에 var:ghost가 들어 있으면 푼 색(메인 색)으로 칠하고 상자는 「없음」, 이름 글자 대신 푼 hex', async () => {
++    await click(buttonOf('b1'));
++    // UI로는 없는 id를 못 만들므로 doc 칸 값을 바꿔 다시 그려 본다
++    const hook = instance.hooks[0] as StateHook;
++    hook.value = { ...doc(), main: { ...doc().main, color: '#112233' }, instances: doc().instances.map((it) => (it.id === 'b1' ? { ...it, color: 'var:ghost' } : it)) };
++    instance.update();
++    expect(bgOf('b1')).toBe(rgb('#112233'));
++    expect(linkBox().value).toBe('');
++    expect(hexText()).toBe('#112233');
++    expect(pressedChips()).toEqual([]);
++  });
++});
++
++// ---------------------------------------------------------------------------
++// task_007 색 변수 — [Patch] · [실행 취소] · [다시 실행] (Dev-5: VR-07, U-8)
++// ---------------------------------------------------------------------------
++describe('변수 · State History (VR-07, U-8)', () => {
++  const doc = (): typeof INITIAL_DOC => slot(0) as typeof INITIAL_DOC;
++  const setVar = async (id: string, value: string): Promise<void> => {
++    const el = root.querySelector<HTMLInputElement>(`[data-testid="variable-row"][data-id="${id}"] [data-testid="variable-color"]`) as HTMLInputElement;
++    el.value = value;
++    el.dispatchEvent(new Event('input'));
++    await Promise.resolve();
++  };
++  const varValues = (): string[] => Array.from(root.querySelectorAll<HTMLInputElement>('[data-testid="variable-color"]')).map((el) => el.value);
++  const realBgsNow = (): string[] => Array.from(root.querySelectorAll<HTMLElement>('[data-testid="real-figma-button"]')).map((b) => b.style.getPropertyValue('background-color'));
++  const linkValue = (): string => (byId('prop-variable') as HTMLSelectElement).value;
++  const hexNow = (): string => byId('color-hex').textContent ?? '';
++
++  it('U-8 연결 + Primary #f4b000 → [Patch]: 실제 영역은 푼 hex(var: 없음). [실행 취소] = slot(0) 처음 doc 같은 참조 · 연결 · 변수 값 복원 · 렌더 1번, [다시 실행] = Patch 때 doc 같은 참조', async () => {
++    await click(buttonOf('main'));
++    await choose('prop-variable', 'primary');
++    await setVar('primary', '#f4b000');
++    const docA = doc();
++    await click(byId('patch-button'));
++    expect(realBgsNow()).toEqual([rgb('#f4b000'), rgb('#f4b000'), rgb('#f4b000'), rgb('#cf202f')]);
++    expect(byId('real-area').innerHTML).not.toContain('var:');
++
++    let before = renders;
++    await click(byId('back-button'));
++    expect(renders - before).toBe(1);
++    expect(doc()).toBe(INITIAL_DOC);
++    expect(bgs()).toEqual([rgb('#0052ff'), rgb('#0052ff'), rgb('#0052ff'), rgb('#cf202f')]);
++    expect(realBgsNow()).toEqual(bgs());
++    expect(varValues()).toEqual(['#0052ff', '#cf202f', '#05b169']);
++    expect(linkValue()).toBe('');
++    expect(hexNow()).toBe('#0052ff');
++
++    before = renders;
++    await click(byId('forward-button'));
++    expect(renders - before).toBe(1);
++    expect(doc()).toBe(docA);
++    expect(bgs()).toEqual([rgb('#f4b000'), rgb('#f4b000'), rgb('#f4b000'), rgb('#cf202f')]);
++    expect(realBgsNow()).toEqual(bgs());
++    expect(varValues()[0]).toBe('#f4b000');
++    expect(linkValue()).toBe('primary');
++    expect(hexNow()).toBe('Primary');
++  });
++
++  it('Patch 안 한 변수 · 연결 편집은 [실행 취소] 때 버려지고 [다시 실행]해도 안 돌아온다', async () => {
++    await click(buttonOf('main'));
++    await choose('prop-variable', 'primary');
++    await setVar('primary', '#f4b000');
++    await click(byId('patch-button'));
++    await setVar('primary', '#05b169');
++    await choose('prop-variable', '');
++    await click(byId('back-button'));
++    expect(doc()).toBe(INITIAL_DOC);
++    await click(byId('forward-button'));
++    expect(doc().variables[0].value).toBe('#f4b000');
++    expect(doc().main.color).toBe('var:primary');
++    expect(bgs()[0]).toBe(rgb('#f4b000'));
++  });
++
++  it('변수만 바꾸고(연결 없음) [Patch]는 무변경이라 기록이 안 쌓인다 (되돌리기 꺼짐)', async () => {
++    await setVar('primary', '#f4b000');
++    await click(byId('patch-button'));
++    expect((byId('back-button') as HTMLButtonElement).hasAttribute('disabled')).toBe(true);
++  });
++});
+diff --git a/fixtures/mini-figma/__tests__/canvas.test.ts b/fixtures/mini-figma/__tests__/canvas.test.ts
+new file mode 100644
+index 0000000..d8499d6
+--- /dev/null
++++ b/fixtures/mini-figma/__tests__/canvas.test.ts
+@@ -0,0 +1,125 @@
++import { afterEach, beforeEach, describe, expect, it } from 'vitest';
++import { render } from '@mini-react/react-dom';
++import type { FunctionComponent } from '@mini-react/react-reconciler';
++import type { Patch, VNode } from '@mini-react/shared';
++import { h } from '@mini-react/react';
++import { Canvas } from '../components/Canvas';
++import { INITIAL_DOC, setInstanceField, setMainField, setVariableValue } from '../model';
++import type { Doc } from '../model';
++
++// [AI Note]: Canvas 단위 테스트 (task_007 VR-03 · 06). Canvas는 props만 받는 순수 함수라 작은 루트 하나로 엔진에 그려 본다.
++// 루트는 바깥 변수 `doc`을 읽고, 값을 바꾼 뒤 instance.update()로 다시 그린다 → lastPatches가 그 한 번의 diff.
++
++let root: HTMLElement;
++let instance: FunctionComponent;
++let doc: Doc;
++const Host = (): VNode => h(Canvas, { main: doc.main, instances: doc.instances, variables: doc.variables, selectedId: null, onSelect: () => {} });
++
++const button = (id: string): HTMLElement => {
++  const found = root.querySelector<HTMLElement>(`[data-testid="figma-button"][data-id="${id}"]`);
++  if (found === null) throw new Error(`${id} 버튼이 없다`);
++  return found;
++};
++const bg = (id: string): string => button(id).style.backgroundColor;
++const fg = (id: string): string => button(id).style.color;
++const rgb = (hex: string): string => {
++  const n = parseInt(hex.slice(1), 16);
++  return `rgb(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255})`;
++};
++const redraw = (next: Doc): void => {
++  doc = next;
++  instance.update();
++};
++const styleLines = (patches: readonly Patch[]): Patch[] => patches.filter((p) => p.kind === 'SET_STYLE');
++
++beforeEach(() => {
++  root = document.createElement('div');
++  document.body.append(root);
++  doc = INITIAL_DOC;
++  instance = render(Host, root);
++});
++afterEach(() => {
++  instance.unmount();
++  root.remove();
++});
++
++describe('Canvas — 변수를 푼 색으로 칠한다 (VR-03)', () => {
++  it('연결이 없으면 처음 모습 그대로 (메인 · b1 · b2 파랑, b3 빨강)', () => {
++    expect([bg('main'), bg('b1'), bg('b2'), bg('b3')]).toEqual([rgb('#0052ff'), rgb('#0052ff'), rgb('#0052ff'), rgb('#cf202f')]);
++  });
++
++  it('메인이 var:primary → 메인 · 따르는 인스턴스가 변수 값으로 칠해지고 글자색도 푼 색 기준', () => {
++    redraw(setVariableValue(setMainField(doc, 'color', 'var:primary'), 'primary', '#f4b000'));
++    for (const id of ['main', 'b1', 'b2']) {
++      expect(bg(id), id).toBe(rgb('#f4b000'));
++      expect(fg(id), id).toBe(rgb('#0a0b0d'));
++    }
++    expect(bg('b3')).toBe(rgb('#cf202f'));
++    expect(fg('b3')).toBe(rgb('#ffffff'));
++    expect(root.innerHTML).not.toContain('var:');
++  });
++
++  it('인스턴스가 var:success → 그 변수 값', () => {
++    redraw(setInstanceField(doc, 'b3', 'color', 'var:success'));
++    expect(bg('b3')).toBe(rgb('#05b169'));
++  });
++
++  it('없는 id: 인스턴스 var:ghost → 메인 색, 메인도 var:ghost → #0052ff', () => {
++    redraw(setMainField(setInstanceField(doc, 'b1', 'color', 'var:ghost'), 'color', '#112233'));
++    expect(bg('b1')).toBe(rgb('#112233'));
++    redraw(setMainField(doc, 'color', 'var:ghost'));
++    expect(bg('main')).toBe(rgb('#0052ff'));
++    expect(bg('b1')).toBe(rgb('#0052ff'));
++  });
++});
++
++describe('Canvas — 변수 값만 바뀐 두 번째 그리기의 patch (VP-2 · 3 · 4 · 6 캔버스 줄)', () => {
++  const linkedMain = (): Doc => setMainField(INITIAL_DOC, 'color', 'var:primary');
++  beforeEach(() => {
++    redraw(linkedMain());
++  });
++
++  it('VP-1 연결만 하면 푼 색이 같아 patch 0줄', () => {
++    // beforeEach의 redraw가 이미 연결 — 그 렌더의 patch를 본다
++    expect(instance.lastPatches.filter((p) => p.kind !== 'SET_EVENT')).toEqual([]);
++  });
++
++  it('VP-2 Primary #f4b000: 메인 · b1 · b2 배경 + 글자색 = SET_STYLE 6줄, 다른 줄 0', () => {
++    const b3Before = button('b3');
++    redraw(setVariableValue(doc, 'primary', '#f4b000'));
++    const patches = instance.lastPatches.filter((p) => p.kind !== 'SET_EVENT');
++    expect(patches.every((p) => p.kind === 'SET_STYLE')).toBe(true);
++    expect(styleLines(patches)).toHaveLength(6);
++    expect(button('b3')).toBe(b3Before);
++  });
++
++  it('VP-3 Primary #0066ff: 글자색 안 바뀌어 SET_STYLE 3줄', () => {
++    redraw(setVariableValue(doc, 'primary', '#0066ff'));
++    expect(styleLines(instance.lastPatches)).toHaveLength(3);
++  });
++
++  it('VP-4 b2가 override #05b169면 b2 · b3는 0줄 (메인 · b1만 4줄)', () => {
++    redraw(setInstanceField(doc, 'b2', 'color', '#05b169'));
++    const b2 = button('b2');
++    redraw(setVariableValue(doc, 'primary', '#f4b000'));
++    expect(styleLines(instance.lastPatches)).toHaveLength(4);
++    expect(button('b2')).toBe(b2);
++    expect(bg('b2')).toBe(rgb('#05b169'));
++  });
++
++  it('VP-6 b3만 Danger에 연결 → Danger 값 변경은 b3 SET_STYLE 2줄뿐', () => {
++    redraw(setInstanceField(doc, 'b3', 'color', 'var:danger'));
++    const [mainEl, b1El] = [button('main'), button('b1')];
++    redraw(setVariableValue(doc, 'danger', '#05b169'));
++    expect(styleLines(instance.lastPatches)).toHaveLength(2);
++    expect(bg('b3')).toBe(rgb('#05b169'));
++    expect(button('main')).toBe(mainEl);
++    expect(button('b1')).toBe(b1El);
++  });
++
++  it('연결 없는 변수 값 바꾸기(VP-11)는 캔버스 줄 0', () => {
++    redraw(setMainField(doc, 'color', '#0052ff'));
++    redraw(setVariableValue(doc, 'success', '#112233'));
++    expect(instance.lastPatches.filter((p) => p.kind !== 'SET_EVENT')).toEqual([]);
++  });
++});
+diff --git a/fixtures/mini-figma/__tests__/color.test.ts b/fixtures/mini-figma/__tests__/color.test.ts
+index eaeed10..6ab4ce6 100644
+--- a/fixtures/mini-figma/__tests__/color.test.ts
++++ b/fixtures/mini-figma/__tests__/color.test.ts
+@@ -1,5 +1,5 @@
+ import { describe, expect, it } from 'vitest';
+-import { PALETTE, buttonStyle, isHexColor, textColorFor } from '../color';
++import { PALETTE, buttonStyle, isHexColor, isVarRef, resolveColor, textColorFor, varIdOf, varRef } from '../color';
+ 
+ // [AI Note]: 색 순수 함수 단위 테스트 (FD-21 · 23 · 24). 글자 색은 ④-1 A = 흰색 · 먹색(#0a0b0d) 중 WCAG 대비가 큰 쪽.
+ const WHITE = '#ffffff';
+@@ -101,3 +101,48 @@ describe('buttonStyle (FD-23)', () => {
+     expect(a).toEqual(b);
+   });
+ });
++
++// [AI Note]: task_007 변수 연결 (VR-02 · 03). RC-1 ~ RC-8 + A57.
++describe('resolveColor · 연결 표현 (RC-1 ~ RC-8, A57)', () => {
++  const vars = [
++    { id: 'primary', name: 'Primary', value: '#f4b000' },
++    { id: 'danger', name: 'Danger', value: '#cf202f' },
++  ];
++
++  it('RC-1 hex는 그대로', () => {
++    expect(resolveColor('#112233', vars)).toBe('#112233');
++  });
++  it('RC-2 var:id는 그 변수 값 (값이 바뀌면 같이 바뀜)', () => {
++    expect(resolveColor('var:primary', vars)).toBe('#f4b000');
++    expect(resolveColor('var:primary', [{ id: 'primary', name: 'Primary', value: '#111111' }])).toBe('#111111');
++  });
++  it('RC-3 없는 id는 fallback이 hex면 그것', () => {
++    expect(resolveColor('var:ghost', vars, '#05b169')).toBe('#05b169');
++  });
++  it('RC-4 fallback이 var:이면 풀어서', () => {
++    expect(resolveColor('var:ghost', vars, 'var:danger')).toBe('#cf202f');
++  });
++  it('RC-5 fallback도 못 풀거나 없으면 #0052ff', () => {
++    expect(resolveColor('var:ghost', vars, 'var:ghost')).toBe('#0052ff');
++    expect(resolveColor('var:ghost', vars)).toBe('#0052ff');
++    expect(resolveColor('var:primary', [])).toBe('#0052ff');
++  });
++  it('RC-6 빈 id · 대소문자 다른 id · 공백 낀 id는 없는 id 취급', () => {
++    for (const bad of ['var:', 'var:Primary', 'var:primary ']) {
++      expect(resolveColor(bad, vars), bad).toBe('#0052ff');
++      expect(resolveColor(bad, vars, '#05b169'), bad).toBe('#05b169');
++    }
++  });
++  it('RC-7 varRef · varIdOf · isVarRef 왕복, hex는 연결이 아님', () => {
++    expect(varRef('primary')).toBe('var:primary');
++    expect(isVarRef('var:primary')).toBe(true);
++    expect(varIdOf('var:primary')).toBe('primary');
++    expect(isVarRef('#0052ff')).toBe(false);
++    expect(varIdOf('#0052ff')).toBeNull();
++  });
++  it('RC-8 var:는 hex가 아니고, 푼 색에 textColorFor가 대비를 정한다', () => {
++    expect(isHexColor('var:primary')).toBe(false);
++    expect(textColorFor(resolveColor('var:primary', vars))).toBe(INK);
++    expect(textColorFor(resolveColor('var:primary', [{ id: 'primary', name: 'Primary', value: '#0052ff' }]))).toBe(WHITE);
++  });
++});
+diff --git a/fixtures/mini-figma/__tests__/model.test.ts b/fixtures/mini-figma/__tests__/model.test.ts
+index e7e7366..422bd07 100644
+--- a/fixtures/mini-figma/__tests__/model.test.ts
++++ b/fixtures/mini-figma/__tests__/model.test.ts
+@@ -11,6 +11,7 @@ import {
+   resetInstanceField,
+   setInstanceField,
+   setMainField,
++  setVariableValue,
+ } from '../model';
+ import type { Doc, Field, Instance, MainProps } from '../model';
+ 
+@@ -48,7 +49,7 @@ describe('INITIAL_DOC — 시작 데이터 (MF-16)', () => {
+   });
+ 
+   it('doc에는 main · instances 두 칸뿐이다 (nextId · 선택은 doc 밖)', () => {
+-    expect(Object.keys(INITIAL_DOC)).toEqual(['main', 'instances']);
++    expect(Object.keys(INITIAL_DOC)).toEqual(['main', 'instances', 'variables']);
+   });
+ });
+ 
+@@ -131,7 +132,7 @@ describe('setMainField — 메인 칸 바꾸기', () => {
+   });
+ 
+   it('입력을 고치지 않는다 (freeze)', () => {
+-    const frozen = deepFreeze<Doc>({ main: { ...INITIAL_DOC.main }, instances: INITIAL_DOC.instances.map((it) => ({ ...it })) });
++    const frozen = deepFreeze<Doc>({ main: { ...INITIAL_DOC.main }, instances: INITIAL_DOC.instances.map((it) => ({ ...it })), variables: INITIAL_DOC.variables.map((v) => ({ ...v })) });
+     expect(() => setMainField(frozen, 'label', '새')).not.toThrow();
+     expect(frozen.main.label).toBe('버튼');
+   });
+@@ -186,7 +187,7 @@ describe('setInstanceField — 인스턴스 칸 바꾸기 (override 만들기)',
+   });
+ 
+   it('입력을 고치지 않는다 (freeze)', () => {
+-    const frozen = deepFreeze<Doc>({ main: { ...INITIAL_DOC.main }, instances: INITIAL_DOC.instances.map((it) => ({ ...it })) });
++    const frozen = deepFreeze<Doc>({ main: { ...INITIAL_DOC.main }, instances: INITIAL_DOC.instances.map((it) => ({ ...it })), variables: INITIAL_DOC.variables.map((v) => ({ ...v })) });
+     expect(() => setInstanceField(frozen, 'b1', 'size', 'L')).not.toThrow();
+     expect(Object.keys(frozen.instances[0])).toEqual(['id']);
+   });
+@@ -232,7 +233,7 @@ describe('resetInstanceField — ↻ = 키 지우기 (MF-13)', () => {
+   });
+ 
+   it('입력을 고치지 않는다 (freeze)', () => {
+-    const frozen = deepFreeze<Doc>({ main: { ...INITIAL_DOC.main }, instances: INITIAL_DOC.instances.map((it) => ({ ...it })) });
++    const frozen = deepFreeze<Doc>({ main: { ...INITIAL_DOC.main }, instances: INITIAL_DOC.instances.map((it) => ({ ...it })), variables: INITIAL_DOC.variables.map((v) => ({ ...v })) });
+     expect(() => resetInstanceField(frozen, 'b2', 'label')).not.toThrow();
+     expect(frozen.instances[1].label).toBe('취소');
+   });
+@@ -300,7 +301,7 @@ describe('addInstance — 추가 (MF-22, 정책: 새 인스턴스 = override 없
+   });
+ 
+   it('doc에는 nextId가 없다 (번호는 App이 세어 넘긴다)', () => {
+-    expect(Object.keys(addInstance(INITIAL_DOC, 4))).toEqual(['main', 'instances']);
++    expect(Object.keys(addInstance(INITIAL_DOC, 4))).toEqual(['main', 'instances', 'variables']);
+   });
+ 
+   it('메인 값이 바뀐 상태에서 추가해도 새 인스턴스는 메인을 따른다', () => {
+@@ -310,7 +311,7 @@ describe('addInstance — 추가 (MF-22, 정책: 새 인스턴스 = override 없
+   });
+ 
+   it('입력을 고치지 않는다 (freeze)', () => {
+-    const frozen = deepFreeze<Doc>({ main: { ...INITIAL_DOC.main }, instances: INITIAL_DOC.instances.map((it) => ({ ...it })) });
++    const frozen = deepFreeze<Doc>({ main: { ...INITIAL_DOC.main }, instances: INITIAL_DOC.instances.map((it) => ({ ...it })), variables: INITIAL_DOC.variables.map((v) => ({ ...v })) });
+     expect(() => addInstance(frozen, 4)).not.toThrow();
+     expect(frozen.instances).toHaveLength(3);
+   });
+@@ -338,7 +339,7 @@ describe('removeInstance — 삭제 (MF-23 · MF-24)', () => {
+   });
+ 
+   it('입력을 고치지 않는다 (freeze)', () => {
+-    const frozen = deepFreeze<Doc>({ main: { ...INITIAL_DOC.main }, instances: INITIAL_DOC.instances.map((it) => ({ ...it })) });
++    const frozen = deepFreeze<Doc>({ main: { ...INITIAL_DOC.main }, instances: INITIAL_DOC.instances.map((it) => ({ ...it })), variables: INITIAL_DOC.variables.map((v) => ({ ...v })) });
+     expect(() => removeInstance(frozen, 'b1')).not.toThrow();
+     expect(frozen.instances).toHaveLength(3);
+   });
+@@ -369,7 +370,7 @@ describe('moveInstance — 순서 바꾸기 (MF-25)', () => {
+   });
+ 
+   it('입력을 고치지 않는다 (freeze)', () => {
+-    const frozen = deepFreeze<Doc>({ main: { ...INITIAL_DOC.main }, instances: INITIAL_DOC.instances.map((it) => ({ ...it })) });
++    const frozen = deepFreeze<Doc>({ main: { ...INITIAL_DOC.main }, instances: INITIAL_DOC.instances.map((it) => ({ ...it })), variables: INITIAL_DOC.variables.map((v) => ({ ...v })) });
+     expect(() => moveInstance(frozen, 'b1', 1)).not.toThrow();
+     expect(ids(frozen)).toEqual(['b1', 'b2', 'b3']);
+   });
+@@ -418,3 +419,59 @@ describe('instanceName — 레이어 행 · 패널 머리의 이름 (④-3)', ()
+     expect(instanceName({ ...main, label: '' }, { id: 'b3', label: '삭제' })).toBe('삭제');
+   });
+ });
++
++// [AI Note]: task_007 변수 (VR-01 · 02). V-1 ~ V-5 + A56(형식 밖 값 · 없는 id).
++describe('변수 (V-1 ~ V-5, A56)', () => {
++  const cloneDoc = (): Doc =>
++    deepFreeze<Doc>({ main: { ...INITIAL_DOC.main }, instances: INITIAL_DOC.instances.map((it) => ({ ...it })), variables: INITIAL_DOC.variables.map((v) => ({ ...v })) });
++
++  it('V-1 처음 변수 3개: 순서 · 이름 · 값 (팔레트 색)', () => {
++    expect(INITIAL_DOC.variables).toEqual([
++      { id: 'primary', name: 'Primary', value: '#0052ff' },
++      { id: 'danger', name: 'Danger', value: '#cf202f' },
++      { id: 'success', name: 'Success', value: '#05b169' },
++    ]);
++  });
++
++  it('V-2 기존 doc 함수 6개는 variables를 같은 참조로 이어받는다', () => {
++    const doc = cloneDoc();
++    const results: Doc[] = [
++      setMainField(doc, 'label', '새 글자'),
++      setInstanceField(doc, 'b1', 'label', 'x'),
++      resetInstanceField(doc, 'b3', 'color'),
++      addInstance(doc, 4),
++      removeInstance(doc, 'b1'),
++      moveInstance(doc, 'b1', 1),
++    ];
++    for (const next of results) {
++      expect(next).not.toBe(doc);
++      expect(next.variables).toBe(doc.variables);
++    }
++  });
++
++  it('V-3 setVariableValue: 다른 값이면 새 Doc, 그 변수만 새 객체, 나머지는 같은 참조', () => {
++    const doc = cloneDoc();
++    const next = setVariableValue(doc, 'primary', '#f4b000');
++    expect(next).not.toBe(doc);
++    expect(next.variables[0]).toEqual({ id: 'primary', name: 'Primary', value: '#f4b000' });
++    expect(next.variables[0]).not.toBe(doc.variables[0]);
++    expect(next.variables[1]).toBe(doc.variables[1]);
++    expect(next.variables[2]).toBe(doc.variables[2]);
++    expect(next.main).toBe(doc.main);
++    expect(next.instances).toBe(doc.instances);
++  });
++
++  it('V-4 같은 값 · 없는 id · 형식 밖 값은 같은 Doc (A56)', () => {
++    const doc = cloneDoc();
++    expect(setVariableValue(doc, 'primary', '#0052ff')).toBe(doc);
++    expect(setVariableValue(doc, 'ghost', '#f4b000')).toBe(doc);
++    expect(setVariableValue(doc, '', '#f4b000')).toBe(doc);
++    for (const bad of ['blue', '#fff', '', 'var:primary', '#GGGGGG']) expect(setVariableValue(doc, 'primary', bad), bad).toBe(doc);
++  });
++
++  it('V-5 입력은 안 바뀐다 (깊게 동결해도 안 깨짐)', () => {
++    const doc = cloneDoc();
++    expect(() => setVariableValue(doc, 'danger', '#112233')).not.toThrow();
++    expect(doc.variables[1].value).toBe('#cf202f');
++  });
++});
+diff --git a/fixtures/mini-figma/__tests__/preview.test.ts b/fixtures/mini-figma/__tests__/preview.test.ts
+index e73b52f..1b0464e 100644
+--- a/fixtures/mini-figma/__tests__/preview.test.ts
++++ b/fixtures/mini-figma/__tests__/preview.test.ts
+@@ -392,3 +392,65 @@ describe('테스트 영역 불변', () => {
+     expect(records).toHaveLength(0);
+   });
+ });
++
++// ---------------------------------------------------------------------------
++// task_007 색 변수 — 실제 영역 patch (RV-1 ~ 4, VR-07). 푼 hex만 실제 영역으로 간다 (var: 글자 없음)
++// ---------------------------------------------------------------------------
++describe('변수 · 실제 영역 (RV-1 ~ 4)', () => {
++  const setVar = async (id: string, value: string): Promise<void> => {
++    const el = root.querySelector<HTMLInputElement>(`[data-testid="variable-row"][data-id="${id}"] [data-testid="variable-color"]`) as HTMLInputElement;
++    el.value = value;
++    el.dispatchEvent(new Event('input'));
++    await tick();
++  };
++  const linkMain = async (): Promise<void> => {
++    await selectMain();
++    await choose('prop-variable', 'primary');
++  };
++
++  it('RV-1 연결만 하고 [Patch] → 무변경 (patch 없음, false)', async () => {
++    await linkMain();
++    seen = [];
++    expect(preview.patch()).toBe(false);
++    expect(take()).toEqual({});
++    expect(real.innerHTML).not.toContain('var:');
++  });
++
++  it('RV-2 연결 + Primary #f4b000 → [Patch]: 메인 · b1 · b2 SET_STYLE 6줄, 경로 [0,0] [1,0] [1,1], DOM에 var: 없음, 두 영역 같은 모습', async () => {
++    await linkMain();
++    await setVar('primary', '#f4b000');
++    seen = [];
++    expect(preview.patch()).toBe(true);
++    const lines = seen.filter((p) => p.kind === 'SET_STYLE');
++    expect(take()).toEqual({ SET_STYLE: 6 });
++    const paths = new Set(lines.map((p) => ('path' in p ? p.path.join(',') : '')));
++    expect([...paths].sort()).toEqual(['0,0', '1,0', '1,1']);
++    expect(real.innerHTML).not.toContain('var:');
++    expect(realLook()).toEqual(testLook());
++    expect(realLook().map((b) => b.style)).toEqual([
++      'background-color: #f4b000; color: #0a0b0d',
++      'background-color: #f4b000; color: #0a0b0d',
++      'background-color: #f4b000; color: #0a0b0d',
++      'background-color: #cf202f; color: #ffffff',
++    ]);
++  });
++
++  it('RV-3 b3 Danger 연결 + Danger #05b169 → [Patch]: b3([1,2])만 SET_STYLE 2줄', async () => {
++    await click(testButton('b3'));
++    await choose('prop-variable', 'danger');
++    await setVar('danger', '#05b169');
++    seen = [];
++    expect(preview.patch()).toBe(true);
++    const lines = seen.filter((p) => p.kind === 'SET_STYLE');
++    expect(take()).toEqual({ SET_STYLE: 2 });
++    expect(lines.every((p) => 'path' in p && p.path.join(',') === '1,2')).toBe(true);
++    expect(real.innerHTML).not.toContain('var:');
++  });
++
++  it('RV-4 연결 없이 Primary 값만 바꾸고 [Patch] → 무변경', async () => {
++    await setVar('primary', '#f4b000');
++    seen = [];
++    expect(preview.patch()).toBe(false);
++    expect(take()).toEqual({});
++  });
++});
+diff --git a/fixtures/mini-figma/__tests__/previewDocs.test.ts b/fixtures/mini-figma/__tests__/previewDocs.test.ts
+index 920dcbb..9335a29 100644
+--- a/fixtures/mini-figma/__tests__/previewDocs.test.ts
++++ b/fixtures/mini-figma/__tests__/previewDocs.test.ts
+@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
+ import { History } from '@mini-react/react-dom';
+ import { HISTORY_LIMIT } from '@mini-react/shared';
+ import type { HistoryEntry } from '@mini-react/shared';
+-import { INITIAL_DOC } from '../model';
++import { INITIAL_DOC, setVariableValue } from '../model';
+ import type { Doc } from '../model';
+ import { initialTrack, trackBack, trackDoc, trackForward, trackPush } from '../previewDocs';
+ import type { DocTrack } from '../previewDocs';
+@@ -11,7 +11,7 @@ import type { DocTrack } from '../previewDocs';
+ // 칸 수 · 잘림 · 경계는 previewNav(navPush · navBack · navForward)가 정하고, 엔진 History에 같은 연산을 돌려 매 단계 맞춰 본다.
+ 
+ /** 번호표가 붙은 doc 사본 (label에 번호를 넣어 서로 구별한다) */
+-const docN = (n: number): Doc => ({ main: { ...INITIAL_DOC.main, label: `d${n}` }, instances: [] });
++const docN = (n: number): Doc => ({ main: { ...INITIAL_DOC.main, label: `d${n}` }, instances: [], variables: INITIAL_DOC.variables });
+ const tag = (d: Doc): string => d.main.label;
+ const entry = (n: number): HistoryEntry => ({ snapshot: [], patches: [], inverse: [{ kind: 'SET_TEXT', path: [0], before: String(n), after: String(n - 1) }] });
+ 
+@@ -169,3 +169,22 @@ describe('PD-5 무작위 불변식', () => {
+     }
+   });
+ });
++
++describe('PD-6 변수가 든 doc 사본 (task_007 VR-07)', () => {
++  it('variables · main · instances가 칸마다 같은 참조로 돌아오고, 값을 바꾼 doc과 안 바꾼 doc이 구별된다', () => {
++    const linked: Doc = { ...INITIAL_DOC, main: { ...INITIAL_DOC.main, color: 'var:primary' } };
++    const changed: Doc = setVariableValue(linked, 'primary', '#f4b000');
++    let track = initialTrack(INITIAL_DOC);
++    track = trackPush(track, changed);
++    expect(trackDoc(track)).toBe(changed);
++    expect(trackDoc(track).variables).toBe(changed.variables);
++    expect(trackDoc(track).main.color).toBe('var:primary');
++    track = trackBack(track);
++    expect(trackDoc(track)).toBe(INITIAL_DOC);
++    expect(trackDoc(track).variables).toBe(INITIAL_DOC.variables);
++    expect(trackDoc(track).main.color).toBe('#0052ff');
++    track = trackForward(track);
++    expect(trackDoc(track)).toBe(changed);
++    expect(trackDoc(track).variables[0].value).toBe('#f4b000');
++  });
++});
+diff --git a/fixtures/mini-figma/__tests__/rootOnlyHooks.test.ts b/fixtures/mini-figma/__tests__/rootOnlyHooks.test.ts
+index aa9f587..7ba32ce 100644
+--- a/fixtures/mini-figma/__tests__/rootOnlyHooks.test.ts
++++ b/fixtures/mini-figma/__tests__/rootOnlyHooks.test.ts
+@@ -61,8 +61,8 @@ describe('검사기 자체 확인 — 위반을 잡는다', () => {
+ });
+ 
+ describe('T-16 코드 확인 — 루트(App.ts)만 Hook을 쓴다', () => {
+-  it('컴포넌트 파일은 정확히 8개다 (Button · Canvas · ColorPalette · Icons · LayerPanel · PreviewPanel · PropertyPanel · Toolbar) — 새 파일이 검사 밖으로 새지 않게', () => {
+-    expect([...componentFiles].sort()).toEqual(['Button.ts', 'Canvas.ts', 'ColorPalette.ts', 'Icons.ts', 'LayerPanel.ts', 'PreviewPanel.ts', 'PropertyPanel.ts', 'Toolbar.ts']);
++  it('컴포넌트 파일은 정확히 9개다 (Button · Canvas · ColorPalette · Icons · LayerPanel · PreviewPanel · PropertyPanel · Toolbar · VariablePanel) — 새 파일이 검사 밖으로 새지 않게', () => {
++    expect([...componentFiles].sort()).toEqual(['Button.ts', 'Canvas.ts', 'ColorPalette.ts', 'Icons.ts', 'LayerPanel.ts', 'PreviewPanel.ts', 'PropertyPanel.ts', 'Toolbar.ts', 'VariablePanel.ts']);
+   });
+ 
+   for (const name of componentFiles) {
+diff --git a/fixtures/mini-figma/color.ts b/fixtures/mini-figma/color.ts
+index 12cb54e..891cd91 100644
+--- a/fixtures/mini-figma/color.ts
++++ b/fixtures/mini-figma/color.ts
+@@ -1,6 +1,8 @@
+ // [AI Note]: 색 순수 함수 모음. DOM · Hook · 엔진 import가 없다 (rootOnlyHooks.test.ts가 검사).
+ // 색은 이름('blue')이 아니라 `#rrggbb` 값으로 저장하고(FD-20), 버튼은 클래스가 아니라 `style`로 칠한다(FD-23).
+ 
++import type { Variable } from './model';
++
+ /** 칩 8개 (FD-21). 이 순서대로 팔레트 판에 그려진다 */
+ export const PALETTE: readonly string[] = ['#0052ff', '#cf202f', '#05b169', '#f4b000', '#0a0b0d', '#5b616e', '#a8acb3', '#eef0f3'];
+ 
+@@ -43,3 +45,41 @@ export function textColorFor(bg: string): '#ffffff' | '#0a0b0d' {
+ export function buttonStyle(color: string): { 'background-color': string; color: string } {
+   return { 'background-color': color, color: textColorFor(color) };
+ }
++
++// ---------------------------------------------------------------------------
++// 변수 연결 (task_007): 버튼 `color` 칸에 hex 대신 `'var:<id>'`를 저장하면 그 변수를 가리킨다 (VR-02)
++// ---------------------------------------------------------------------------
++
++const VAR_PREFIX = 'var:';
++const DEFAULT_COLOR = '#0052ff';
++
++/** 변수 id → 연결 표현 `var:<id>` */
++export function varRef(id: string): string {
++  return VAR_PREFIX + id;
++}
++
++/** 연결 표현인가 (`var:` 로 시작). 변수가 실제로 있는지는 보지 않는다 */
++export function isVarRef(color: string): boolean {
++  return color.startsWith(VAR_PREFIX);
++}
++
++/** 연결이면 변수 id, 아니면 null */
++export function varIdOf(color: string): string | null {
++  return isVarRef(color) ? color.slice(VAR_PREFIX.length) : null;
++}
++
++/**
++ * 그리기 직전에 색을 hex로 푼다 (VR-03). 순서: ① hex면 그대로 ② `var:<id>`면 그 변수 값 ③ 없는 id면 fallback(메인 색, 그것도 연결이면 같은 규칙으로 한 번 풀기) ④ `#0052ff`.
++ * [AI Note]: id는 정확히 일치해야 한다 (대소문자 · 공백 다르면 없는 id). 변수끼리 연결(alias)은 없어서 재귀 · 순환 검사가 필요 없다.
++ */
++export function resolveColor(color: string, variables: readonly Variable[], fallback?: string): string {
++  const id = varIdOf(color);
++  if (id === null) return color;
++  const found = variables.find((v) => v.id === id);
++  if (found !== undefined && isHexColor(found.value)) return found.value;
++  if (fallback === undefined) return DEFAULT_COLOR;
++  const fallbackId = varIdOf(fallback);
++  if (fallbackId === null) return fallback;
++  const viaFallback = variables.find((v) => v.id === fallbackId);
++  return viaFallback !== undefined && isHexColor(viaFallback.value) ? viaFallback.value : DEFAULT_COLOR;
++}
+diff --git a/fixtures/mini-figma/components/Canvas.ts b/fixtures/mini-figma/components/Canvas.ts
+index 44c6e8f..42e6ca0 100644
+--- a/fixtures/mini-figma/components/Canvas.ts
++++ b/fixtures/mini-figma/components/Canvas.ts
+@@ -1,13 +1,15 @@
+ import { h } from '@mini-react/react';
+ import type { Component, Props, VNode } from '@mini-react/shared';
++import { resolveColor } from '../color';
+ import { mergeProps } from '../model';
+-import type { IconKind, Instance, MainProps } from '../model';
++import type { IconKind, Instance, MainProps, Variable } from '../model';
+ import { Button } from './Button';
+ import { HeartIcon, StarIcon } from './Icons';
+ 
+ interface CanvasProps {
+   main: MainProps;
+   instances: readonly Instance[];
++  variables: readonly Variable[];
+   selectedId: string | null;
+   onSelect: (id: string) => void;
+ }
+@@ -20,7 +22,7 @@ const ICONS: Readonly<Record<IconKind, Component>> = { star: StarIcon, heart: He
+ // 목록에 key 없는 자식이 섞이면 엔진 diff가 위치 비교로 돌아가 순서 바꾸기(MOVE)가 안 나온다 (dev_todo 공통 주의 1).
+ // 인스턴스는 `{ key: it.id, ...main, ...it }` 모양 = 메인 값 위에 인스턴스가 가진 키만 덮어씌운 것(mergeProps)을 Button에 넘긴다.
+ export function Canvas(props: Props): VNode {
+-  const { main, instances, selectedId, onSelect } = props as unknown as CanvasProps;
++  const { main, instances, variables, selectedId, onSelect } = props as unknown as CanvasProps;
+   const draw = (id: string, merged: MainProps) => ({
+     id,
+     label: merged.label,
+@@ -28,7 +30,9 @@ export function Canvas(props: Props): VNode {
+     hasIcon: merged.hasIcon,
+     // 아이콘 종류 문자열 → 컴포넌트 (Instance swap: 컴포넌트를 prop 값으로 넘긴다)
+     icon: ICONS[merged.icon],
+-    color: merged.color,
++    // [AI Note]: 연결(`var:<id>`)은 여기서 hex로 푼다 — Button · buttonStyle은 hex만 안다 (글자색 대비도 푼 색 기준). doc에는 연결이 남고, 실제 영역은 DOM에서 읽으므로 푼 hex만 본다 (VR-07).
++    // 없는 id는 메인 색으로 (메인 자신이 없는 id면 #0052ff). 메인에는 fallback이 없다.
++    color: resolveColor(merged.color, variables, id === 'main' ? undefined : main.color),
+     // 누르면 루트가 내려 준 콜백으로 알린다 (state는 루트만 바꿈)
+     selected: selectedId === id,
+     onSelect: () => onSelect(id),
+diff --git a/fixtures/mini-figma/components/ColorPalette.ts b/fixtures/mini-figma/components/ColorPalette.ts
+index ed0562e..3c7acf9 100644
+--- a/fixtures/mini-figma/components/ColorPalette.ts
++++ b/fixtures/mini-figma/components/ColorPalette.ts
+@@ -1,12 +1,16 @@
+ import { h } from '@mini-react/react';
+ import type { Props, VNode } from '@mini-react/shared';
+-import { PALETTE } from '../color';
++import { PALETTE, varRef } from '../color';
++import type { Variable } from '../model';
+ 
+ interface ColorPaletteProps {
+-  /** 지금 색 `#rrggbb` */
++  /** 지금 보이는 색 `#rrggbb` (연결 중이면 푼 색) */
+   value: string;
+-  /** 칩을 누르거나 색 입력칸 값이 바뀌면 그 색으로 알린다 */
+-  onPick: (hex: string) => void;
++  /** 연결 중인 변수 id (연결 안 됨 · 없는 id면 null) */
++  link: string | null;
++  variables: readonly Variable[];
++  /** 칩 · 색 입력칸 · 변수 상자: hex(연결 풀림) 또는 `var:<id>`(연결)로 알린다 */
++  onPick: (color: string) => void;
+ }
+ 
+ // [AI Note]: 팔레트 판 — props만 받는 순수 함수 (Hook 없음, P2-09). 칩 8개(PALETTE 순서) + 직접 고르기 <input type="color"> + 현재 색 값 글자.
+@@ -15,8 +19,11 @@ interface ColorPaletteProps {
+ // - 색 입력칸의 `value`는 DOM 프로퍼티라 엔진이 실제 값과 다를 때만 대입한다 (입력칸은 다시 만들지 않음). 브라우저가 값을 `#rrggbb` 소문자로 정리한다 (공통 주의 4).
+ // - 입력칸은 `onInput`만 쓴다: 엔진 이벤트는 click · input뿐이고, Chromium은 고르는 동안 input을 연달아 낸다 → 입력 이벤트마다 같은 onPick을 불러 한 칸(`color`)의 값만 바꾼다 (MF-31).
+ // 칩과 입력칸 모두 같은 onPick을 부르므로 한 색 칸(`color`)으로 합쳐진다 (④-5).
++// [AI Note]: 변수 상자(task_007 VR-05) = 같은 onPick으로 `var:<id>`(연결)를 올린다. 「없음」은 지금 푼 hex(value)를 올려 겉모습은 두고 연결만 푼다.
++// 연결 중이면 칩은 전부 눌림 표시 없음 · 값 글자는 변수 이름 · 색 입력칸 value는 푼 hex. 칩 · 입력칸을 고르면 hex가 올라가 연결이 풀린다 (같은 색이어도 문자열이 달라 doc은 바뀐다).
+ export function ColorPalette(props: Props): VNode {
+-  const { value, onPick } = props as unknown as ColorPaletteProps;
++  const { value, link, variables, onPick } = props as unknown as ColorPaletteProps;
++  const linked = link === null ? undefined : variables.find((v) => v.id === link);
+   return h(
+     'div',
+     { class: 'palette', 'data-testid': 'color-palette' },
+@@ -29,7 +36,7 @@ export function ColorPalette(props: Props): VNode {
+           class: 'chip',
+           'data-testid': 'color-chip',
+           'data-color': hex,
+-          'aria-pressed': value === hex ? 'true' : 'false',
++          'aria-pressed': link === null && value === hex ? 'true' : 'false',
+           'aria-label': `색 ${hex}`,
+           style: { 'background-color': hex },
+           onClick: () => onPick(hex),
+@@ -47,7 +54,22 @@ export function ColorPalette(props: Props): VNode {
+         value,
+         onInput: (event: Event) => onPick((event.target as HTMLInputElement).value),
+       }),
+-      h('span', { class: 'color-hex', 'data-testid': 'color-hex' }, value),
++      h('span', { class: 'color-hex', 'data-testid': 'color-hex' }, linked === undefined ? value : linked.name),
++    ),
++    h(
++      'select',
++      {
++        class: 'variable-select',
++        'aria-label': '변수',
++        'data-testid': 'prop-variable',
++        value: link ?? '',
++        onInput: (event: Event) => {
++          const id = (event.target as HTMLSelectElement).value;
++          onPick(id === '' ? value : varRef(id));
++        },
++      },
++      h('option', { value: '' }, '없음'),
++      variables.map((v) => h('option', { value: v.id }, v.name)),
+     ),
+   );
+ }
+diff --git a/fixtures/mini-figma/components/LayerPanel.ts b/fixtures/mini-figma/components/LayerPanel.ts
+index 0d90373..6ffca59 100644
+--- a/fixtures/mini-figma/components/LayerPanel.ts
++++ b/fixtures/mini-figma/components/LayerPanel.ts
+@@ -1,7 +1,8 @@
+ import { h } from '@mini-react/react';
+ import type { Props, VNode } from '@mini-react/shared';
+ import { instanceName } from '../model';
+-import type { Instance, MainProps } from '../model';
++import type { Instance, MainProps, Variable } from '../model';
++import { VariablePanel } from './VariablePanel';
+ 
+ interface LayerPanelProps {
+   main: MainProps;
+@@ -14,6 +15,9 @@ interface LayerPanelProps {
+   onSelect: (id: string) => void;
+   /** [↑] (-1) · [↓] (+1): 그 인스턴스를 한 칸 옮긴다 */
+   onMove: (id: string, delta: -1 | 1) => void;
++  /** 변수 구역 (task_007): 처음 3개, 값 하나가 바뀌면 알린다 */
++  variables: readonly Variable[];
++  onVariableChange: (id: string, value: string) => void;
+ }
+ 
+ // [AI Note]: 레이어 창 — props만 받는 순수 함수. 메인 행 + 인스턴스 행들(이름 = 지금 글자, 빈 글자면 id, ④-3).
+@@ -23,7 +27,7 @@ interface LayerPanelProps {
+ // 레이어 창 DOM 구조(제목 · 메인 행 · ul > li)와 경로는 그대로라 행이 몇 개든 ul 한 곳만 고친다 (+ 버튼 글자 · aria-expanded).
+ // [▾] 버튼은 메인 행 안 이름 뒤에 두고(이름 span이 0번 자식 그대로) CSS order로 앞에 보인다.
+ export function LayerPanel(props: Props): VNode {
+-  const { main, instances, selectedId, open, onToggle, onSelect, onMove } = props as unknown as LayerPanelProps;
++  const { main, instances, selectedId, open, onToggle, onSelect, onMove, variables, onVariableChange } = props as unknown as LayerPanelProps;
+   return h(
+     'section',
+     { class: 'layer-panel', 'data-testid': 'layer-panel' },
+@@ -76,5 +80,7 @@ export function LayerPanel(props: Props): VNode {
+         ),
+       ),
+     ),
++    // [AI Note]: 변수 구역(task_007) = 레이어 창 맨 끝 자식. 위 목록(<ul>)만 접히고 변수 구역은 접히지 않는다. 앞 자식 경로(제목 · 메인 행 · ul)는 그대로다.
++    h(VariablePanel, { variables, onChange: onVariableChange }),
+   );
+ }
+diff --git a/fixtures/mini-figma/components/PropertyPanel.ts b/fixtures/mini-figma/components/PropertyPanel.ts
+index 40765fb..4983f53 100644
+--- a/fixtures/mini-figma/components/PropertyPanel.ts
++++ b/fixtures/mini-figma/components/PropertyPanel.ts
+@@ -1,12 +1,14 @@
+ import { h } from '@mini-react/react';
+ import type { Props, VNode } from '@mini-react/shared';
++import { resolveColor, varIdOf } from '../color';
+ import { instanceName, isOverridden, mergeProps } from '../model';
+-import type { Field, IconKind, Instance, MainProps, Size } from '../model';
++import type { Field, IconKind, Instance, MainProps, Size, Variable } from '../model';
+ import { ColorPalette } from './ColorPalette';
+ 
+ interface PropertyPanelProps {
+   main: MainProps;
+   instances: readonly Instance[];
++  variables: readonly Variable[];
+   selectedId: string | null;
+   /** 한 칸의 값이 바뀌었다고 루트에 알린다 (루트가 고른 대상에 맞게 메인 · 인스턴스를 고친다) */
+   onEdit: (field: Field, value: MainProps[Field]) => void;
+@@ -53,7 +55,7 @@ function propRow(field: Field, name: string, control: VNode, override: OverrideI
+ // [AI Note]: 선택 상자 · 체크박스 · 글자 칸은 모두 `onInput`으로만 받는다 — 엔진 이벤트는 click · input뿐이고, 선택 상자를 onClick으로 받으면
+ // 열 때마다 불린다 (Chromium은 select · checkbox도 input 이벤트를 낸다, dev_todo 공통 주의 4). 값은 `value` / `checked` 프로퍼티로 그려서
+ // 입력칸을 다시 만들지 않고 그 자리에서 고친다 → 한 글자마다 바로 반영돼도 포커스 · 커서가 유지된다 (MF-15).
+-function propRows(values: MainProps, onEdit: PropertyPanelProps['onEdit'], override: OverrideInfo | null): VNode[] {
++function propRows(values: MainProps, onEdit: PropertyPanelProps['onEdit'], override: OverrideInfo | null, variables: readonly Variable[], fallback: string | undefined): VNode[] {
+   const select = <T extends string>(field: Field, testId: string, label: string, current: T, options: readonly (readonly [T, string])[]): VNode =>
+     propRow(
+       field,
+@@ -94,7 +96,22 @@ function propRows(values: MainProps, onEdit: PropertyPanelProps['onEdit'], overr
+     ),
+     select('icon', 'prop-icon', '아이콘 종류', values.icon, ICON_OPTIONS),
+     // [AI Note]: 색 칸 = 팔레트 판(칩 8개 + 직접 고르기). 고른 색 `#rrggbb`를 그대로 onEdit('color', hex)로 올린다 — 다른 칸과 같은 경로 (FD-21 · 22 · 25).
+-    propRow('color', '색', h(ColorPalette, { value: values.color, onPick: (hex: string) => onEdit('color', hex) }), override, 'row'),
++    // [AI Note]: 값 칸에는 푼 hex를 보이고, 연결 중이면 변수 id를 `link`로 알린다 (없는 id는 연결 아닌 것처럼 — 푼 색 · 상자 「없음」). 팔레트가 올리는 `var:<id>` · hex를 그대로 onEdit('color', …)로 올린다.
++    (() => {
++      const linkId = varIdOf(values.color);
++      return propRow(
++        'color',
++        '색',
++        h(ColorPalette, {
++          value: resolveColor(values.color, variables, fallback),
++          link: linkId !== null && variables.some((v) => v.id === linkId) ? linkId : null,
++          variables,
++          onPick: (color: string) => onEdit('color', color),
++        }),
++        override,
++        'row',
++      );
++    })(),
+   ];
+ }
+ 
+@@ -103,7 +120,7 @@ function propRows(values: MainProps, onEdit: PropertyPanelProps['onEdit'], overr
+ // 인스턴스 이름은 그 인스턴스의 지금 글자이고 빈 글자면 id (④-3). 인스턴스를 골랐을 때 칸에 보이는 값은 mergeProps(메인 값 위에 인스턴스 값) 결과다.
+ // 메인 · 인스턴스가 같은 5칸 부품을 쓰고, 인스턴스의 override 칸에만 파랑 표시 + ↻가 붙는다.
+ export function PropertyPanel(props: Props): VNode {
+-  const { main, instances, selectedId, onEdit, onReset, onDelete, onAdd } = props as unknown as PropertyPanelProps;
++  const { main, instances, variables, selectedId, onEdit, onReset, onDelete, onAdd } = props as unknown as PropertyPanelProps;
+   const target = selectedId === 'main' ? null : instances.find((it) => it.id === selectedId);
+   const title = selectedId === 'main' ? '메인 Button' : target === undefined || target === null ? null : `인스턴스 · ${instanceName(main, target)}`;
+   return h(
+@@ -113,10 +130,10 @@ export function PropertyPanel(props: Props): VNode {
+       ? h('p', { class: 'property-empty', 'data-testid': 'property-empty' }, '캔버스나 레이어에서 하나를 골라 보세요')
+       : h('h2', { class: 'property-title', 'data-testid': 'property-title' }, title),
+     selectedId === 'main'
+-      ? h('div', { class: 'prop-rows', 'data-testid': 'prop-rows' }, propRows(main, onEdit, null))
++      ? h('div', { class: 'prop-rows', 'data-testid': 'prop-rows' }, propRows(main, onEdit, null, variables, undefined))
+       : target === undefined || target === null
+         ? null
+-        : h('div', { class: 'prop-rows', 'data-testid': 'prop-rows' }, propRows(mergeProps(main, target), onEdit, { instance: target, onReset })),
++        : h('div', { class: 'prop-rows', 'data-testid': 'prop-rows' }, propRows(mergeProps(main, target), onEdit, { instance: target, onReset }, variables, main.color)),
+     // [AI Note]: 패널 오른쪽 아래 버튼 자리 하나 — 메인을 고르면 [인스턴스 생성], 인스턴스를 고르면 [삭제](MF-24, 메인은 못 지움), 아무것도 안 골랐으면 없음.
+     // 두 버튼은 같은 자리 · 같은 태그라 메인 ↔ 인스턴스로 고르기를 바꾸면 엔진이 노드를 다시 만들지 않고 속성 · 글자 · 핸들러만 고친다.
+     title === null
+diff --git a/fixtures/mini-figma/components/VariablePanel.ts b/fixtures/mini-figma/components/VariablePanel.ts
+new file mode 100644
+index 0000000..34a785a
+--- /dev/null
++++ b/fixtures/mini-figma/components/VariablePanel.ts
+@@ -0,0 +1,43 @@
++import { h } from '@mini-react/react';
++import type { Props, VNode } from '@mini-react/shared';
++import type { Variable } from '../model';
++
++interface VariablePanelProps {
++  variables: readonly Variable[];
++  /** 변수 하나의 값이 바뀌었다고 루트에 알린다 (루트가 setVariableValue → setDoc 한 번) */
++  onChange: (id: string, value: string) => void;
++}
++
++// [AI Note]: 변수 구역 — props만 받는 순수 함수 (Hook 없음). 레이어 창 맨 끝 자식이라 레이어 목록을 접어도 함께 접히지 않는다.
++// 줄 = `li key=변수 id` > 색 칩 · 이름 · 색 입력칸(<input type="color">) · hex 글자. 입력칸은 `onInput`만 쓴다 (엔진 이벤트는 click · input뿐,
++// Chromium은 고르는 동안 input을 연달아 낸다). `value`는 DOM 프로퍼티라 입력칸을 다시 만들지 않고 그 자리에서 고쳐 포커스가 유지된다.
++// 같은 값이면 루트의 setVariableValue가 같은 Doc을 돌려줘 렌더가 안 일어난다.
++export function VariablePanel(props: Props): VNode {
++  const { variables, onChange } = props as unknown as VariablePanelProps;
++  return h(
++    'div',
++    { class: 'variable-panel', 'data-testid': 'variable-panel' },
++    h('h3', { class: 'variable-title', 'data-testid': 'variable-title' }, '변수'),
++    h(
++      'ul',
++      { class: 'variable-list', 'data-testid': 'variable-list' },
++      variables.map((v) =>
++        h(
++          'li',
++          { key: v.id, class: 'variable-row', 'data-id': v.id, 'data-testid': 'variable-row' },
++          h('span', { class: 'variable-chip', 'data-testid': 'variable-chip', style: { 'background-color': v.value } }),
++          h('span', { class: 'variable-name', 'data-testid': 'variable-name' }, v.name),
++          h('input', {
++            type: 'color',
++            class: 'color-input variable-color',
++            'aria-label': `${v.name} 값`,
++            'data-testid': 'variable-color',
++            value: v.value,
++            onInput: (event: Event) => onChange(v.id, (event.target as HTMLInputElement).value),
++          }),
++          h('span', { class: 'variable-hex color-hex', 'data-testid': 'variable-hex' }, v.value),
++        ),
++      ),
++    ),
++  );
++}
+diff --git a/fixtures/mini-figma/index.html b/fixtures/mini-figma/index.html
+index 948ac31..3863bdc 100644
+--- a/fixtures/mini-figma/index.html
++++ b/fixtures/mini-figma/index.html
+@@ -59,6 +59,21 @@
+       .layer-toggle:hover { background: rgba(255, 255, 255, 0.08); color: var(--ink); }
+       .layer-list .layer-row { padding-left: 44px; }
+       .layer-list.collapsed { display: none; }
++      /* 변수 구역(task_007): 레이어 창 맨 끝 블록 (목록을 접어도 안 접힘). 위 선은 패널 가로 전체, 줄은 [칩 | 이름 · hex 두 줄 | 색 입력칸] 3칸이라 180px 폭에서도 안 넘친다 */
++      .variable-panel { margin: 16px -20px 0; padding: 16px 20px 0; border-top: 1px solid var(--line); }
++      /* 변수 칸은 레이어 창 맨 아래에 붙인다: 레이어 창 = 세로 줄, 변수 칸 위쪽 여백 auto가 남은 높이를 밀어낸다 (DOM 순서 · 경로는 그대로).
++         위 목록과의 최소 간격 16px은 목록(펼침) 또는 메인 행(접힘) 아래 여백이 맡는다 */
++      .layer-panel { display: flex; flex-direction: column; }
++      .layer-panel > .variable-panel { margin-top: auto; }
++      .layer-panel > .layer-list { margin-bottom: 16px; }
++      .layer-panel > .layer-main:has(+ .layer-list.collapsed) { margin-bottom: 16px; }
++      .variable-title { margin: 0 0 8px; font-size: 1rem; font-weight: 600; line-height: 1.5; color: var(--ink); }
++      .variable-list { display: flex; flex-direction: column; gap: 4px; margin: 0; padding: 0; list-style: none; }
++      .variable-row { display: grid; grid-template-columns: 20px minmax(0, 1fr) 44px; grid-template-areas: 'chip name input' 'chip hex input'; column-gap: 10px; align-items: center; min-height: 48px; padding: 4px 0; }
++      .variable-chip { grid-area: chip; width: 20px; height: 20px; border: 1px solid var(--line); border-radius: 50%; }
++      .variable-name { grid-area: name; min-width: 0; overflow-wrap: anywhere; font-size: 0.875rem; }
++      .variable-hex { grid-area: hex; min-width: 0; color: var(--ink-soft); font-size: 0.75rem; }
++      .variable-color { grid-area: input; width: 44px; height: 36px; }
+ 
+       /* 캔버스: 테두리 · 점무늬 · 자체 배경 없이 카드 바탕 그대로. 메인 버튼 상자 + 인스턴스 버튼 줄. 인스턴스가 많아지면 줄바꿈 (mobile 가로 스크롤 방지, Q17-5) */
+       .canvas { min-height: 320px; padding: 24px; background: transparent; border: 0; border-radius: 0; } /* 테두리 · 자체 배경 없음 — 페이지 바탕이 그대로 보인다 */
+@@ -84,14 +99,17 @@
+       .canvas > .area-title { margin: 0 -24px 16px; padding: 0 24px 12px; border-bottom: 1px solid var(--line); }
+ 
+       /* 실제 영역 구역: 카드(.app > * 규칙 재사용) = 머리글(제목만) + 상자. [Patch] · [실행 취소] · [다시 실행]는 도구 막대로 옮겼다(PP-07 변경).
+-         상자 = 바탕색(--bg) · 24px 모서리 · 24px 안쪽 여백, 점무늬 · 테두리 없음 (제목 아래 선으로 구분). 깜빡임 층은 상자와 같은 크기로 겹치고 마우스를 안 받는다. */
++         카드 좌우 여백 24px + 상자는 모양 없음(배경 · 테두리 · 점무늬 · 좌우 여백 없음, 위아래 24px) → 제목 · 「컴포넌트」 · 버튼이 위 테스트 영역과 같은 세로줄(카드 왼쪽 + 24px)에 선다.
++         깜빡임 층은 상자와 같은 크기로 겹치고 마우스를 안 받는다. */
+       .real-section { display: flex; flex-direction: column; gap: 12px; }
+-      .real-header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; } /* 제목 아래 선 없음 — 카드 · 상자 모양으로 이미 구분된다 */
++      .app > .real-section { padding: 23px; border: 1px solid var(--line); } /* 테두리 1px + 여백 23px = 카드 바깥 끝에서 안쪽 내용까지 상하좌우 24px */
++      /* 머리글 아래 선 = 머리글(real-header)과 상자(real-frame) 구분. 테스트 영역 제목 선처럼 카드 안쪽 여백(23px)을 넘어 카드 가로 전체 */
++      .real-header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin: 0 -23px; padding: 0 23px 12px; border-bottom: 1px solid var(--line); }
+       .real-header .panel-title { margin: 0; }
+-      .real-frame { position: relative; display: flex; flex: 1 1 auto; min-height: 0; }
+-      .real-area { flex: 1 1 auto; min-width: 0; min-height: 120px; padding: 24px; background: var(--bg); border: 0; border-radius: 24px; } /* 점무늬 · 테두리 없음, 배경색은 바탕색(--bg) 상자 */
++      .real-frame { position: relative; display: flex; flex: 0 0 auto; min-height: 0; } /* 높이 = 내용에 맞춤(허그). 카드의 남은 높이로 늘어나지 않는다 */
++      .real-area { flex: 1 1 auto; min-width: 0; min-height: 0; padding: 4px 0 0; background: transparent; border: 0; border-radius: 0; } /* 위 4px + 카드 gap 12px = 선 아래 16px (테스트 영역과 같음), 아래는 카드 여백 20px만 */
+       .real-area .figma-button { cursor: default; }
+-      .real-overlay { position: absolute; inset: 0; pointer-events: none; overflow: hidden; border-radius: 24px; }
++      .real-overlay { position: absolute; inset: 0; pointer-events: none; overflow: hidden; border-radius: 0; }
+       /* 깜빡임 박스: 바뀐 노드 위에 잠깐 뜨고 옅어져 사라진다. 파랑 버튼 위에서도 보이게 흰 테두리 + 파랑 바깥선 + 연한 흰 바탕. 그림자 · 주황 없음 (Phase 1 overlay.ts가 .viz-box를 만든다) */
+       .viz-box { position: absolute; box-sizing: border-box; border: 2px solid var(--ink); outline: 2px solid var(--accent); border-radius: 12px; background: rgba(255, 255, 255, 0.22); animation: viz-flash 0.7s ease-out forwards; }
+       @keyframes viz-flash { 0% { opacity: 1; } 100% { opacity: 0; } }
+@@ -130,6 +148,7 @@
+       .chip { width: 32px; height: 32px; padding: 0; border: 2px solid rgba(255, 255, 255, 0.24); border-radius: 50%; cursor: pointer; box-shadow: none; }
+       .chip[aria-pressed='true'] { outline: 2px solid var(--accent); outline-offset: 2px; }
+       .palette-custom { display: flex; align-items: center; gap: 10px; }
++      .variable-select { width: 100%; } /* 변수 상자(task_007): 팔레트 판 맨 아래, 판 폭을 꽉 채움. 모양은 다른 선택 상자(.prop-row select)와 같다 */
+       .color-input { width: 44px; height: 36px; padding: 2px; border: 1px solid var(--line); border-radius: 12px; background: var(--bg); cursor: pointer; }
+       /* 색 입력칸 · 체크박스 포커스도 글자 칸처럼 파랑 (키보드로 올 때만 :focus-visible) */
+       .color-input:focus-visible, .prop-row input[type='checkbox']:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+@@ -150,7 +169,7 @@
+            DOM 순서는 도구 막대 · 레이어 · 캔버스 · 속성 · 실제 영역 그대로(경로 접두 불변), 자리만 grid 명시 배치로 정한다 */
+         .app > .layer-panel { grid-column: 1; grid-row: 2 / span 2; }
+         .app > .canvas { grid-column: 2; grid-row: 2; }
+-        .app > .real-section { grid-column: 2; grid-row: 3; }
++        .app > .real-section { grid-column: 2; grid-row: 3; align-self: end; max-height: 100%; } /* 카드 높이 = 내용(허그), 칸 아래 끝(화면 아래)에 붙는다. 내용이 많으면 그 칸 높이까지만 커지고 안에서 스크롤 */
+         .app > .property-panel { grid-column: 3; grid-row: 2 / span 2; }
+         /* 도구 막대 버튼은 desktop에서 36px로 줄여 64px 막대 안 위아래 여백(14px)을 확보한다. mobile은 누르기 쉬운 44px 그대로 */
+         .toolbar .btn-primary, .toolbar .btn-secondary { min-height: 36px; padding: 0 16px; font-size: 0.875rem; }
+diff --git a/fixtures/mini-figma/model.ts b/fixtures/mini-figma/model.ts
+index d2eaa60..fb2ad2f 100644
+--- a/fixtures/mini-figma/model.ts
++++ b/fixtures/mini-figma/model.ts
+@@ -2,8 +2,13 @@
+ // 입력을 고치지 않고 새 객체를 돌려준다. 바뀐 것이 없으면 "같은 Doc 객체"를 그대로 돌려줘서,
+ // 루트의 setter가 같은 값(Object.is)으로 보고 다시 그리지 않게 한다 (phase2-app/todoOps.ts 방식).
+ 
++import { isHexColor } from './color';
++
+ export type Size = 'S' | 'M' | 'L';
+-/** 색 값 `#rrggbb` (소문자, FD-20). 이름('blue')이 아니라 값을 저장한다 — 칩 8개 밖의 색도 색 입력칸으로 고를 수 있어서 */
++/**
++ * 색 칸의 값: `#rrggbb` (소문자, FD-20) 또는 변수 연결 `var:<id>` (task_007 VR-02).
++ * 이름('blue')이 아니라 값을 저장한다 — 칩 8개 밖의 색도 색 입력칸으로 고를 수 있어서. `var:`는 그릴 때 `resolveColor`가 hex로 푼다.
++ */
+ export type Color = string;
+ /** 아이콘 종류는 문자열로만 들고 있다. 문자열 → 컴포넌트(StarIcon · HeartIcon) 변환은 Canvas가 한다 (④-12) */
+ export type IconKind = 'star' | 'heart';
+@@ -22,16 +27,32 @@ export type Field = keyof MainProps;
+ /** 인스턴스 = id + "바꾼 칸만" 가진 객체. 키가 있으면 override, 없으면 메인을 따른다 */
+ export type Instance = { readonly id: string } & Partial<MainProps>;
+ 
+-/** 앱 문서: main · instances만. 선택(selectedId) · nextId는 doc 밖의 App 칸이다 */
++/** 색 변수 하나 (task_007 VR-01): 이름 붙은 색 값. 버튼 `color` 칸이 `var:<id>`로 가리킨다 */
++export interface Variable {
++  readonly id: string;
++  readonly name: string;
++  readonly value: Color;
++}
++
++/** 앱 문서: main · instances · variables. 선택(selectedId) · nextId는 doc 밖의 App 칸이다 */
+ export interface Doc {
+   readonly main: MainProps;
+   readonly instances: readonly Instance[];
++  readonly variables: readonly Variable[];
+ }
+ 
++/** VR-01: 처음 변수 3개 (팔레트 색). 순서 = 배열 순서, 추가 · 삭제 · 이름 바꾸기 없음 */
++export const INITIAL_VARIABLES: readonly Variable[] = [
++  { id: 'primary', name: 'Primary', value: '#0052ff' },
++  { id: 'danger', name: 'Danger', value: '#cf202f' },
++  { id: 'success', name: 'Success', value: '#05b169' },
++];
++
+ /** MF-16: 시작 데이터. b1은 override 없음, b2는 라벨만, b3는 라벨 + 색 (FD-20: 메인 #0052ff, b3 #cf202f) */
+ export const INITIAL_DOC: Doc = {
+   main: { label: '버튼', size: 'M', hasIcon: false, icon: 'star', color: '#0052ff' },
+   instances: [{ id: 'b1' }, { id: 'b2', label: '취소' }, { id: 'b3', label: '삭제', color: '#cf202f' }],
++  variables: INITIAL_VARIABLES,
+ };
+ 
+ /**
+@@ -51,7 +72,7 @@ export function isOverridden(instance: Instance, field: Field): boolean {
+ /** 메인 한 칸을 바꾼다. 같은 값이면 같은 Doc, 다르면 새 Doc (instances 배열은 같은 참조) */
+ export function setMainField<F extends Field>(doc: Doc, field: F, value: MainProps[F]): Doc {
+   if (Object.is(doc.main[field], value)) return doc;
+-  return { main: { ...doc.main, [field]: value }, instances: doc.instances };
++  return { ...doc, main: { ...doc.main, [field]: value } };
+ }
+ 
+ /**
+@@ -62,10 +83,7 @@ export function setInstanceField<F extends Field>(doc: Doc, id: string, field: F
+   const target = doc.instances.find((it) => it.id === id);
+   if (!target) return doc;
+   if (isOverridden(target, field) && Object.is(target[field], value)) return doc;
+-  return {
+-    main: doc.main,
+-    instances: doc.instances.map((it) => (it.id === id ? { ...it, [field]: value } : it)),
+-  };
++  return { ...doc, instances: doc.instances.map((it) => (it.id === id ? { ...it, [field]: value } : it)) };
+ }
+ 
+ /**
+@@ -77,10 +95,7 @@ export function resetInstanceField(doc: Doc, id: string, field: Field): Doc {
+   const target = doc.instances.find((it) => it.id === id);
+   if (!target || !isOverridden(target, field)) return doc;
+   const { [field]: _removed, ...rest } = target;
+-  return {
+-    main: doc.main,
+-    instances: doc.instances.map((it) => (it.id === id ? (rest as Instance) : it)),
+-  };
++  return { ...doc, instances: doc.instances.map((it) => (it.id === id ? (rest as Instance) : it)) };
+ }
+ 
+ /**
+@@ -89,13 +104,13 @@ export function resetInstanceField(doc: Doc, id: string, field: Field): Doc {
+  * 새 인스턴스는 override 없이 `{ id }`만 가진다 → 메인을 따른다.
+  */
+ export function addInstance(doc: Doc, nextId: number): Doc {
+-  return { main: doc.main, instances: [...doc.instances, { id: `b${nextId}` }] };
++  return { ...doc, instances: [...doc.instances, { id: `b${nextId}` }] };
+ }
+ 
+ /** 그 인스턴스를 뺀다. 없는 id · 메인('main')은 같은 Doc (메인은 지울 수 없다, MF-24) */
+ export function removeInstance(doc: Doc, id: string): Doc {
+   if (!doc.instances.some((it) => it.id === id)) return doc;
+-  return { main: doc.main, instances: doc.instances.filter((it) => it.id !== id) };
++  return { ...doc, instances: doc.instances.filter((it) => it.id !== id) };
+ }
+ 
+ /**
+@@ -109,7 +124,18 @@ export function moveInstance(doc: Doc, id: string, delta: -1 | 1): Doc {
+   if (from === -1 || to < 0 || to >= doc.instances.length) return doc;
+   const instances = [...doc.instances];
+   [instances[from], instances[to]] = [instances[to], instances[from]];
+-  return { main: doc.main, instances };
++  return { ...doc, instances };
++}
++
++/**
++ * 변수 하나의 값을 바꾼다 (VR-06). 같은 값 · 없는 id · `#rrggbb`가 아닌 값이면 같은 Doc (렌더 없음).
++ * [AI Note]: 바뀐 변수 하나만 새 객체이고 다른 변수 · main · instances는 같은 참조 — 연결 안 된 버튼은 그릴 때 입력이 같아 patch 줄이 0이다.
++ * 형식 검사는 방어용이다 (색 입력칸은 늘 소문자 `#rrggbb`를 낸다).
++ */
++export function setVariableValue(doc: Doc, id: string, value: Color): Doc {
++  const index = doc.variables.findIndex((v) => v.id === id);
++  if (index === -1 || !isHexColor(value) || doc.variables[index].value === value) return doc;
++  return { ...doc, variables: doc.variables.map((v, i) => (i === index ? { ...v, value } : v)) };
+ }
+ 
+ /**

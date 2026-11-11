@@ -1,13 +1,15 @@
 import { h } from '@mini-react/react';
 import type { Component, Props, VNode } from '@mini-react/shared';
+import { resolveColor } from '../color';
 import { mergeProps } from '../model';
-import type { IconKind, Instance, MainProps } from '../model';
+import type { IconKind, Instance, MainProps, Variable } from '../model';
 import { Button } from './Button';
 import { HeartIcon, StarIcon } from './Icons';
 
 interface CanvasProps {
   main: MainProps;
   instances: readonly Instance[];
+  variables: readonly Variable[];
   selectedId: string | null;
   onSelect: (id: string) => void;
 }
@@ -20,7 +22,7 @@ const ICONS: Readonly<Record<IconKind, Component>> = { star: StarIcon, heart: He
 // 목록에 key 없는 자식이 섞이면 엔진 diff가 위치 비교로 돌아가 순서 바꾸기(MOVE)가 안 나온다 (dev_todo 공통 주의 1).
 // 인스턴스는 `{ key: it.id, ...main, ...it }` 모양 = 메인 값 위에 인스턴스가 가진 키만 덮어씌운 것(mergeProps)을 Button에 넘긴다.
 export function Canvas(props: Props): VNode {
-  const { main, instances, selectedId, onSelect } = props as unknown as CanvasProps;
+  const { main, instances, variables, selectedId, onSelect } = props as unknown as CanvasProps;
   const draw = (id: string, merged: MainProps) => ({
     id,
     label: merged.label,
@@ -28,7 +30,9 @@ export function Canvas(props: Props): VNode {
     hasIcon: merged.hasIcon,
     // 아이콘 종류 문자열 → 컴포넌트 (Instance swap: 컴포넌트를 prop 값으로 넘긴다)
     icon: ICONS[merged.icon],
-    color: merged.color,
+    // [AI Note]: 연결(`var:<id>`)은 여기서 hex로 푼다 — Button · buttonStyle은 hex만 안다 (글자색 대비도 푼 색 기준). doc에는 연결이 남고, 실제 영역은 DOM에서 읽으므로 푼 hex만 본다 (VR-07).
+    // 없는 id는 메인 색으로 (메인 자신이 없는 id면 #0052ff). 메인에는 fallback이 없다.
+    color: resolveColor(merged.color, variables, id === 'main' ? undefined : main.color),
     // 누르면 루트가 내려 준 콜백으로 알린다 (state는 루트만 바꿈)
     selected: selectedId === id,
     onSelect: () => onSelect(id),
