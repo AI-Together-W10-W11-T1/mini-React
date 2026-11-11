@@ -1,0 +1,198 @@
+diff --git a/fixtures/perf-bench/__tests__/format.test.ts b/fixtures/perf-bench/__tests__/format.test.ts
+index 7ae683d..3bd3cc9 100644
+--- a/fixtures/perf-bench/__tests__/format.test.ts
++++ b/fixtures/perf-bench/__tests__/format.test.ts
+@@ -68,6 +68,21 @@ describe('cellsOf — 한 행의 칸 글 (QA-20이 읽는 data-col)', () => {
+     expect(cellsOf(row({ dom: { patchLines: 0, byKind: {}, mutationRecords: 0, nodesAdded: 0, nodesRemoved: 0 } })).dom).toBe('patch 0줄');
+   });
+ 
++  it('기록판 직접 쓰기(logPanelWrites)가 있으면 비고에 따로 적고 기본 집계에서 뺀 것임을 밝힌다', () => {
++    const base = row({ id: 'B-07', run: { ...row().run, counts: { actions: 13, renders: 16 } } });
++    const dom = { patchLines: 212, byKind: { SET_TEXT: 30 }, mutationRecords: 36, nodesAdded: 4, nodesRemoved: 2, logPanelWrites: 48 };
++    const cells = cellsOf({ ...base, dom });
++    expect(cells.extra).toContain('기록판 직접 쓰기 48건');
++    expect(cells.extra).toContain('기록 · 추가 · 제거 노드에서 뺌');
++    expect(cells.mutations).toBe('기록 36 · 추가 노드 4 · 제거 노드 2');
++    expect(cellsOf(base).extra).not.toContain('기록판');
++    expect(cellsOf({ ...base, dom: { ...dom, logPanelWrites: 0 } }).extra).not.toContain('기록판');
++  });
++
++  it('집계 실행이 실패해 fixture가 null이면 항목 · 노드 · 깊이 칸은 0이 아니라 "집계 실패"', () => {
++    expect(cellsOf(row({ fixture: null, dom: null, preserved: null, stateMatches: null, countError: 'x' })).fixture).toBe('집계 실패');
++  });
++
+   it('노드 참조 유지 · 최종 상태', () => {
+     expect(cellsOf(row()).preserved).toBe('507 / 507');
+     expect(cellsOf(row()).correct).toBe('일치');
+diff --git a/fixtures/perf-bench/__tests__/scenarios.test.ts b/fixtures/perf-bench/__tests__/scenarios.test.ts
+index 479caf0..8d01e4d 100644
+--- a/fixtures/perf-bench/__tests__/scenarios.test.ts
++++ b/fixtures/perf-bench/__tests__/scenarios.test.ts
+@@ -235,6 +235,32 @@ describe('B-07 개인 앱 대표 동작 (검증 페이지 App: [+1] · 입력 ·
+     expect(row.phases).toBe(false);
+   });
+ 
++  it('기록판(log-panel)에 앱 effect가 직접 쓴 변경은 따로 세고, 기본 집계에는 patch가 만든 변경만 남는다', () => {
++    const row = runEngineScenario(makeArea(), engineById('B-07'), { warmup: 0, runs: 1 });
++    // 렌더 16번 × 기록판 3칸(effect · patch · patch 이벤트) = 직접 쓰기 48건 (patch를 거치지 않는다). 렌더 횟수 · memo 칸은 VNode라 patch 몫으로 남는다
++    expect(row.run.counts.renders).toBe(16);
++    expect(row.dom?.logPanelWrites).toBe(16 * 3);
++    // 기본 집계 = patch 몫만: 렌더가 만든 노드 추가(INSERT 2 + REPLACE 1 + 목록 항목 …)와 제거(REPLACE · MOVE)
++    expect(row.dom).toMatchObject({ mutationRecords: 36, nodesAdded: 4, nodesRemoved: 2 });
++  });
++
++  it('집계 실행이 실패하면 fixture는 0으로 채우지 않고 null (측정값처럼 보이지 않게)', () => {
++    const broken: EngineScenario = {
++      ...engineById('B-06'),
++      create: () => {
++        throw new Error('고장');
++      },
++    };
++    const row = runEngineScenario(makeArea(), broken, { warmup: 0, runs: 1 });
++    expect(row.countError).toBe('고장');
++    expect(row.fixture).toBeNull();
++    expect(row.dom).toBeNull();
++  });
++
++  it('기록판이 없는 B-06은 직접 쓰기 0건', () => {
++    expect(runEngineScenario(makeArea(), engineById('B-06'), { warmup: 0, runs: 1 }).dom?.logPanelWrites).toBe(0);
++  });
++
+   it('끝나면 영역을 비우고 탭 제목(document.title)을 원래대로 돌려 놓는다', () => {
+     const before = document.title;
+     const area = makeArea();
+@@ -245,9 +271,9 @@ describe('B-07 개인 앱 대표 동작 (검증 페이지 App: [+1] · 입력 ·
+ 
+   it('처음 항목 수는 0이고 노드 수 · 깊이가 결과에 들어간다', () => {
+     const row = runEngineScenario(makeArea(), engineById('B-07'), { warmup: 0, runs: 1 });
+-    expect(row.fixture.items).toBe(0);
+-    expect(row.fixture.nodes).toBeGreaterThan(10);
+-    expect(row.fixture.depth).toBeGreaterThan(3);
++    expect(row.fixture?.items).toBe(0);
++    expect(row.fixture?.nodes).toBeGreaterThan(10);
++    expect(row.fixture?.depth).toBeGreaterThan(3);
+   });
+ });
+ 
+diff --git a/fixtures/perf-bench/format.ts b/fixtures/perf-bench/format.ts
+index 81ec14f..83ff1e2 100644
+--- a/fixtures/perf-bench/format.ts
++++ b/fixtures/perf-bench/format.ts
+@@ -50,6 +50,8 @@ function extraCell(row: BenchRow): string {
+   if (row.id === 'B-06') parts.push(`setter ${counts.setters ?? '?'}번 → 렌더 ${counts.renders ?? '?'}번`);
+   else if (row.id === 'B-07') parts.push(`동작 ${counts.actions ?? '?'}번 → 렌더 ${counts.renders ?? '?'}번`);
+   else parts.push(`측정 반복마다 patch ${counts.patches ?? '?'}줄`);
++  const panelWrites = row.dom?.logPanelWrites ?? 0;
++  if (panelWrites > 0) parts.push(`기록판 직접 쓰기 ${panelWrites}건 (앱 effect가 쓴 것 — patch 아님, MutationObserver 기록 · 추가 · 제거 노드에서 뺌)`);
+   if (!countsStable) parts.push('반복마다 개수가 달라졌습니다');
+   if (row.countError !== null) parts.push(`집계 실행 오류: ${row.countError}`);
+   return parts.join(' · ');
+@@ -60,7 +62,7 @@ export function cellsOf(row: BenchRow): Record<ColumnKey, string> {
+   const phase = (key: string): string => (row.phases && row.run.metrics[key] !== undefined ? fmtPair(row.run.metrics[key]) : '—');
+   return {
+     name: `${row.id} ${row.title}`,
+-    fixture: `항목 ${row.fixture.items} · 노드 ${row.fixture.nodes} · 깊이 ${row.fixture.depth}`,
++    fixture: row.fixture === null ? FAILED : `항목 ${row.fixture.items} · 노드 ${row.fixture.nodes} · 깊이 ${row.fixture.depth}`,
+     repeat: `준비 ${row.run.warmup} · 측정 ${row.run.runs}`,
+     errors: errorCell(row),
+     total: fmtPair(row.run.metrics.total),
+diff --git a/fixtures/perf-bench/index.html b/fixtures/perf-bench/index.html
+index b38fe2a..3113ded 100644
+--- a/fixtures/perf-bench/index.html
++++ b/fixtures/perf-bench/index.html
+@@ -106,6 +106,7 @@
+         <li>M-04 · M-05 · M-06은 B-01 ~ B-05에서 단계 함수(VNode 생성 → diff → patch)를 엔진 <code>update()</code>와 같은 순서로 직접 불러 따로 잽니다. B-06 · B-07은 엔진 경로(setter · 이벤트 → 렌더)를 그대로 지나므로 단계별 시간이 없고(—) 전체 시간만 있습니다.</li>
+         <li>M-02 DOM 작업 = patch 한 줄(복합 작업 하나: INSERT는 하위 트리를 통째로 만들어 붙임)의 종류별 개수입니다. 다른 구현의 DOM API 호출 1개와 같은 단위가 아닙니다. MutationObserver 기록 수 · 추가/제거된 노드 수는 따로 적습니다 (복합 INSERT는 하위 노드까지 한 덩어리로 1개).</li>
+         <li>DOM 작업 집계 · 노드 참조 유지(M-03) · 최종 화면 정확성은 시간을 재지 않는 "집계 실행" 한 번에서만 구합니다. 시간 측정 반복에는 관찰 콜백 · MutationObserver를 붙이지 않아 patch 시간에 섞이지 않습니다.</li>
++        <li>B-07의 M-07에는 앱 자신의 effect(탭 제목 · 기록판 쓰기) 시간이 들어갑니다. 기록판에 effect가 직접 쓴 변경은 patch가 아니므로 M-02 · MutationObserver 집계에서 빼고, 비고에 "기록판 직접 쓰기 N건"으로 따로 적습니다.</li>
+         <li>B-01 ~ B-05의 이벤트 핸들러는 항상 같은 함수라 핸들러 교체(SET_EVENT) 비용은 이 측정에 들어가지 않습니다.</li>
+         <li>항목 수 ≠ 노드 수입니다 (항목 1개 = 노드 5개). 이 결과만으로 알고리즘 우열 · "Virtual DOM이 항상 빠르다"를 판단하지 않습니다. 측정하지 않은 수치는 쓰지 않습니다.</li>
+       </ul>
+diff --git a/fixtures/perf-bench/scenarios.ts b/fixtures/perf-bench/scenarios.ts
+index a469826..8925f83 100644
+--- a/fixtures/perf-bench/scenarios.ts
++++ b/fixtures/perf-bench/scenarios.ts
+@@ -119,14 +119,19 @@ export interface DomCounts {
+   /** 기록에 실린 추가된 노드 수 · 제거된 노드 수 (복합 INSERT는 하위 노드까지 한 덩어리로 1개) */
+   readonly nodesAdded: number;
+   readonly nodesRemoved: number;
++  /**
++   * 엔진 시나리오만: 앱 자신의 effect가 기록판의 세 칸(effect · patch · 이벤트 교체 줄 수)에 직접 쓴 변경 기록 수.
++   * patch가 만든 변경이 아니므로 위 `mutationRecords` · `nodesAdded` · `nodesRemoved`에서 뺀 값이다 (M-02는 엔진이 만든 DOM 작업만 센다)
++   */
++  readonly logPanelWrites?: number;
+ }
+ 
+ export interface BenchRow {
+   readonly id: ScenarioId;
+   readonly title: string;
+   readonly what: string;
+-  /** 항목 수 · 노드 수 · 깊이 (섞어 쓰지 않으려고 따로 적는다) */
+-  readonly fixture: TreeInfo & { readonly items: number };
++  /** 항목 수 · 노드 수 · 깊이 (섞어 쓰지 않으려고 따로 적는다). 집계 실행이 실패하면 null — 0으로 채우면 측정값처럼 보인다 */
++  readonly fixture: (TreeInfo & { readonly items: number }) | null;
+   /** 시간 요약 · 반복 횟수 · 오류 */
+   readonly run: ScenarioResult;
+   /** M-04 ~ M-06 단계별 시간을 따로 쟀는가 (엔진 update() 한 덩어리로만 잰 시나리오는 false) */
+@@ -476,6 +481,9 @@ const B07: EngineScenario = {
+ export const ENGINE_SCENARIOS: readonly EngineScenario[] = [B06, B07];
+ export const ALL_SCENARIOS: readonly (StageScenario | EngineScenario)[] = [...STAGE_SCENARIOS, ...ENGINE_SCENARIOS];
+ 
++// 검증 페이지 App의 의존성 없는 effect가 렌더마다 직접 글자를 쓰는 기록판 칸 (fixtures/phase2-app App.ts `writeLog`)
++const LOG_PANEL_DIRECT_CELLS = ['log-effect', 'log-patch', 'log-patch-events'] as const;
++
+ interface EngineCount {
+   readonly fixture: BenchRow['fixture'];
+   readonly dom: DomCounts;
+@@ -502,7 +510,17 @@ function countEnginePass(area: Element, scenario: EngineScenario, itemCount: num
+     const records = observer.takeRecords();
+     let nodesAdded = 0;
+     let nodesRemoved = 0;
++    let logPanelWrites = 0;
++    // [AI Note]: 기록판 중 앱 effect가 textContent로 직접 쓰는 세 칸은 patch와 무관하다. 엔진 DOM 작업 집계(M-02)에 섞지 않고 따로 센다.
++    // 기록판 전체가 아니라 이 칸들만 뺀다: 같은 기록판의 렌더 횟수 · memo 횟수 칸은 VNode가 그리는 것이라 patch(SET_TEXT)가 맞다.
++    const directCells = LOG_PANEL_DIRECT_CELLS.map((id) => area.querySelector(`[data-testid="log-panel"] [data-testid="${id}"]`)).filter(
++      (cell): cell is Element => cell !== null,
++    );
+     for (const record of records) {
++      if (directCells.some((cell) => cell.contains(record.target))) {
++        logPanelWrites++;
++        continue;
++      }
+       nodesAdded += record.addedNodes.length;
+       nodesRemoved += record.removedNodes.length;
+     }
+@@ -511,9 +529,10 @@ function countEnginePass(area: Element, scenario: EngineScenario, itemCount: num
+       dom: {
+         patchLines: Object.values(byKind).reduce((a, b) => a + b, 0),
+         byKind,
+-        mutationRecords: records.length,
++        mutationRecords: records.length - logPanelWrites,
+         nodesAdded,
+         nodesRemoved,
++        logPanelWrites,
+       },
+       preserved: { same: targets.filter((node) => area.contains(node)).length, targets: targets.length },
+       stateMatches: run.verify(area),
+@@ -556,7 +575,7 @@ export function runEngineScenario(area: Element, scenario: EngineScenario, optio
+     id: scenario.id,
+     title: scenario.title,
+     what: scenario.what,
+-    fixture: counted?.fixture ?? { items: 0, nodes: 0, elements: 0, texts: 0, depth: 0 },
++    fixture: counted?.fixture ?? null,
+     run,
+     phases: false,
+     dom: counted?.dom ?? null,
+diff --git a/packages/react-reconciler/src/__tests__/hookErrors.test.ts b/packages/react-reconciler/src/__tests__/hookErrors.test.ts
+index ad1116a..a51d831 100644
+--- a/packages/react-reconciler/src/__tests__/hookErrors.test.ts
++++ b/packages/react-reconciler/src/__tests__/hookErrors.test.ts
+@@ -356,7 +356,7 @@ describe('렌더 중 setter 호출은 오류 (검수 1회차 NB-1 · 정책 「
+     expect(updater).not.toHaveBeenCalled();
+   });
+ 
+-  it('렌더 중 setter 오류 뒤에도 앱이 산다 (깊이 · 렌더 표시 복구, 이후 setter 정상)', () => {
++  it('렌더 중 setter 오류 뒤에도 새 컴포넌트 인스턴스는 정상으로 마운트되고 setter가 patch를 낸다 (전역 깊이 · 렌더 표시 복구)', () => {
+     let boom = true;
+     let setN: Setter<number> = () => {};
+     const { host, patches } = makeHost();

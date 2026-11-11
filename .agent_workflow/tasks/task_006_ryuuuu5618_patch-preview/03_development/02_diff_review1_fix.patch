@@ -1,0 +1,229 @@
+diff --git a/.agent_workflow/tasks/task_006_ryuuuu5618_patch-preview/03_development/dev_todo.md b/.agent_workflow/tasks/task_006_ryuuuu5618_patch-preview/03_development/dev_todo.md
+index c85d508..e4f9809 100644
+--- a/.agent_workflow/tasks/task_006_ryuuuu5618_patch-preview/03_development/dev_todo.md
++++ b/.agent_workflow/tasks/task_006_ryuuuu5618_patch-preview/03_development/dev_todo.md
+@@ -1,6 +1,6 @@
+ # dev_todo: patch-preview
+ 
+-- 명세: `../01_request_spec.md` (PP-01 ~ 10) · 브랜치: `feature/patch-preview` · 테스트 케이스: `../04_qa_evidence/qa_todo.md`
++- 명세: `../01_request_spec.md` (PP-01 ~ 12) · 브랜치: `feature/patch-preview` · 테스트 케이스: `../04_qa_evidence/qa_todo.md`
+ - 규칙: 항목 하나 = 커밋 하나. 체크할 때 완료 근거 필수 (근거 없는 체크는 무효). 커밋 메시지 `<type>(mini-figma): <요약> (Dev-N)`, push 안 함
+ - 범위: `fixtures/mini-figma/` · `e2e/mini-figma-*.spec.ts` · `e2e/mini-figma-helpers.ts`뿐. **`packages/`는 한 줄도 바꾸지 않는다.** `types.ts` 변경 없음. 완료 때 `git diff --stat main -- packages/`가 비어 있음을 근거에 붙인다
+ - 바깥 루프(ATDD): 인수 시나리오가 있는 Dev(4 ~ 7)는 `qa_todo.md`의 해당 QA를 **먼저 e2e로 써서 desktop에서 실패하는 것을 확인**한 뒤 구현한다. 안쪽 루프는 Vitest (`fixtures/mini-figma/__tests__/`)
+@@ -140,6 +140,7 @@ e2e/mini-figma-helpers.ts        실제 영역 도우미 추가 / 기존 render
+       - 단위 `keys.test.ts`: `'undo'` → `'back'`, `'redo'` → `'forward'` (규칙 표 100건 그대로 통과) / `rootOnlyHooks.test.ts`: 순수 모듈 목록에서 `undo.ts` 제거 / `undo.test.ts` 파일 삭제(Undo 모델 자체가 사라짐)
+       - e2e: `mini-figma-undo.spec.ts` 통째 삭제(QA-19 ~ 25 · 29 · 30) / `mini-figma-toolbar.spec.ts`: QA-32 · 33 · A20(2건) · A21 삭제(Undo 버튼 전용), QA-31 → 도구 막대 순서 · [실행 취소] [다시 실행] 꺼짐 · [Patch] 켜짐 · [↶] [↷] 없음, QA-34 끝의 `[↶] 켜짐` 단언 제거 / `mini-figma-attack.spec.ts`: A9 · A19 · A15 · A17 · A27 삭제(Undo 한도 · 묶음 · 선택 · 새로고침 Undo), A6 → Delete로 선택이 풀림만, A8 → 선택 상자 · 체크박스 Ctrl+Z가 실제 영역 [실행 취소](+ 라벨 칸 안은 안 움직임), A10 → 키 핸들러가 옛 state를 안 읽음 · 리스너 1개(Ctrl+Z가 실제 영역 가장 최근 [Patch] 단계), A18 → 「삭제 후 추가 = b5 · b6」, A13 · A14 → Undo 단언만 제거 / `mini-figma-palette.spec.ts`: QA-37 · A22 · A24의 Undo 단언 제거, A25 삭제, A28 → 색 입력칸에서 Ctrl+Z · Shift+Z = 실제 영역 [실행 취소] · [다시 실행] / `mini-figma-render.spec.ts`(QA-1) · `mini-figma-design.spec.ts`(QA-40 · A26): [↶] [↷] → [실행 취소] [다시 실행] · [Patch] 기준
+     - **회귀 명령 (최종)**: `npx vitest run` 45 files · **1178 passed** (이 전 1231 − 삭제 Undo 테스트 + 새 테스트), `npx tsc --noEmit` 오류 0, `npx playwright test` **308 passed** (desktop · mobile, Phase 1 · 2 · mini-figma 전체 포함), `git diff --stat main -- packages/` 출력 없음(0줄)
++    - **검수 1회차 반영 (REJECT → 수정)**: `04_qa_evidence/qa_todo.md`를 PP-07 · 11 · 12 최신본과 실제 e2e에 맞춤(QA-52 · 54 · 화면 약속 표 · 바뀌는 기존 단언 표(Hook 7칸 · `slot(5)` · `undo` 모듈 삭제 · 삭제 · 변경 QA/A 번호를 e2e `git diff 969edc4..HEAD`의 test 이름과 대조) · PP → QA 연결). `rootOnlyHooks.test.ts:101` 정규식 템플릿 안 `\b`(백스페이스) → `\\b`(고친 뒤 통과, preview.ts에 `useState` · `useEffect`를 일부러 넣으면 3건 실패 확인 후 되돌림). 옛 앱 Undo 설명 주석만 정리(`Toolbar.ts` · `App.ts` · `model.ts` · `ColorPalette.ts` · `PropertyPanel.ts`, 동작 변경 없음). 확인: `npx vitest run` 45 files · 1178 passed, `npx tsc --noEmit` 오류 0, `git diff --stat main -- packages/` 출력 없음
+     - **mobile 375px 도구 막대**: QA-47 · QA-A26 이 mobile에서 통과 — 도구 막대 버튼 5개가 화면 밖으로 안 나가고(줄바꿈) 가로 스크롤 없음
+     - 포트 5199: Playwright가 `reuseExistingServer: false`로 띄우고 끝에 내리므로 남은 LISTEN 서버 없음 (확인: `netstat`에 LISTEN 행 없음)
+     - 커밋: 60f0fb3 · 8110e51 · 6d44b13 (feat) · c369905 (test 단위) · 0a6bd0e (test e2e)
+diff --git a/.agent_workflow/tasks/task_006_ryuuuu5618_patch-preview/04_qa_evidence/qa_todo.md b/.agent_workflow/tasks/task_006_ryuuuu5618_patch-preview/04_qa_evidence/qa_todo.md
+index 9bbcb5f..13d5180 100644
+--- a/.agent_workflow/tasks/task_006_ryuuuu5618_patch-preview/04_qa_evidence/qa_todo.md
++++ b/.agent_workflow/tasks/task_006_ryuuuu5618_patch-preview/04_qa_evidence/qa_todo.md
+@@ -1,6 +1,7 @@
+ # qa_todo: patch-preview
+ 
+-- 명세: `../01_request_spec.md` (PP-01 ~ 10) · Dev 목록: `../03_development/dev_todo.md`
++- 명세: `../01_request_spec.md` (PP-01 ~ 12) · Dev 목록: `../03_development/dev_todo.md`
++- **PP → QA 연결**: PP-01 = QA-46 (계획 A37) / PP-02 · 03 = QA-47 / PP-04 = QA-48 ~ 51 · A30 · A32 (계획 A33 · A35) / PP-05 = QA-47 · 51 · A32 / PP-06 = QA-52 · 53 · A30 · A31 (계획 A34 · A35 · A36, A36은 단위) / PP-07 = QA-47 · 52 · 54 · QA-31(toolbar) / PP-08 = QA-48 · 49 · 52 / PP-09 = QA-54 + 단위 `rootOnlyHooks.test.ts` · `app.test.ts` / PP-10 = QA-54 + 기존 e2e 회귀 / **PP-11 = QA-52 · 54 · A31(단축키 경로) · 기존 A8 · A10 · A28(Ctrl+Z가 실제 영역 [실행 취소])** / **PP-12 = QA-19 ~ 25 · 29 · 30 · 32 · 33 · A9 · A15 · A17 · A19 · A20 · A21 · A25 · A27 삭제, QA-54 · 31 · 34 · A6 · A8 · A10 · A18 에서 「앱 [↶] [↷] · 앱 Undo 없음」 단언 (아래 「바뀌는 기존 단언」)**
+ - 실행: `npx playwright test e2e/mini-figma-preview.spec.ts` (desktop 1280x800 · mobile 375x812 두 프로젝트, 모든 시나리오가 두 프로젝트에서 돈다). 기존 Phase 1 · 2 e2e와 task_004 · 005 e2e(`mini-figma-*.spec.ts`)는 회귀로 모두 통과해야 한다 (아래 「바뀌는 기존 단언」만 고침)
+ - 시나리오 하나 = `e2e/*.spec.ts` 테스트 하나. 테스트 이름은 시나리오 문장 그대로. **번호는 task_005에서 이어 쓴다** (새 인수 = QA-46 ~ , 새 공격 = QA-A30 ~ )
+ - 근거 ID: 이 task의 `PP-xx` · task_004 `MF-xx` · task_005 `FD-xx` · Diff 기본 케이스 `D-01 ~ 05`(앱 화면에서 본 대응. 엔진은 안 바꾸므로 엔진 단위 테스트가 회귀로 덮음)
+@@ -17,7 +18,7 @@
+ | 영역 상자 최상위 | `app-root` > `div.app` | 자식 5개: `toolbar` · `layer-panel` · `canvas` · `property-panel` · **`real-section`**. 앞 네 개의 경로 접두 `[0,0]` ~ `[0,3]` 불변, `real-section` = `[0,4]`. 자리는 CSS (desktop = 가운데 열 아래, mobile = 캔버스 다음) |
+ | 테스트 영역 제목 | `test-area-title` | `canvas`의 첫 자식 `<h2>` 「테스트 영역」 (캔버스 안 경로 +1) |
+ | 실제 영역 구역 | `real-section` · `real-title` | 구역 전체 · 머리글 `<h2>` 「실제 영역」 |
+-| 버튼 3개 | `patch-button` · `back-button` · `forward-button` | 「Patch」(파랑 알약) · 「실행 취소」 · 「다시 실행」(보조 알약). 처음 = Patch 켜짐, 실행 취소 · 다시 실행 `disabled`. 머리글 오른쪽 |
++| 버튼 3개 | `patch-button` · `back-button` · `forward-button` | 「Patch」(파랑 알약) · 「실행 취소」 · 「다시 실행」(보조 알약). 처음 = Patch 켜짐, 실행 취소 · 다시 실행 `disabled`. **자리 = 도구 막대** (앱 이름 · [+ 인스턴스] · [실행 취소] · [다시 실행] · [Patch] 순서, PP-07 변경). 실제 영역 머리글(`real-title`)은 제목만. 도구 막대의 앱 Undo/Redo 버튼(`undo-button` · `redo-button`)은 **없다** (PP-12) |
+ | 영역 상자 | `real-area` | 미니 React가 그리는 **자식 없는 빈 요소**, `inert` 속성. 안 내용은 엔진이 채움 |
+ | 깜빡임 층 | `real-overlay` | 상자 밖 빈 요소(상자와 같은 크기, 마우스 안 받음). 박스 `.viz-box`가 생김. `data-last-patch-count` · `data-last-flash-count` |
+ | 실제 영역 안 복사본 | 테스트 영역 testid 앞에 `real-` | `real-canvas-main` · `real-canvas-instances` · `real-figma-button`(`data-id` 그대로) · `real-btn-label` · `real-btn-icon`. **테스트 영역 testid(`figma-button` 등)와 `selected` 클래스는 복사본에 없다** |
+@@ -32,11 +33,22 @@
+ | QA-44 (design) 넘침 | 세 영역(레이어 · 캔버스 · 속성)의 아래 끝이 화면 아래 20px 안 | 세 영역 → **레이어 · 실제 영역 · 속성**(캔버스는 가운데 열 위 칸이라 제외). 캔버스 · 레이어 안쪽 스크롤 단언(`scrollHeight > clientHeight`, 끝 버튼 클릭 → `scrollTop > 0`)은 그대로 (캔버스가 낮아져 더 쉽게 성립) |
+ | `expectPanelsNoHorizontalOverflow` (design) | 레이어 · 캔버스 · 속성 | + `real-section` |
+ | `app.test.ts` 시작 화면 | `Array.from(area().children).map(testId)` = 4개 | 5개 (`real-section` 추가). `[0,1,2,3]` 접두 지킴 줄은 그대로 |
+-| `app.test.ts` Hook 개수 (Dev-6 Undo/Redo 버튼 테스트 이름 포함) | `instance.hooks` 길이 5 · 「useState 4칸 + useEffect 1칸」 | 길이 **8** · `slot(0..3)` 그대로, 뒤 3칸 = 보관함(`useMemo`) · 초기화 `useEffect` · `nav`(`useState`, `slot(7)`) |
++| `app.test.ts` Hook 개수 | `instance.hooks` 길이 5 · 「useState 4칸 + useEffect 1칸」 | 길이 **7** (doc · selectedId · nextId · 보관함 `useMemo` · 초기화 `useEffect` · `nav` `useState` · keydown `useEffect`). `nav` = `slot(5)`, 앱 Undo `history` 칸은 PP-12로 빠졌으므로 nextId = `slot(2)`. 처음 계획의 「8칸 · `slot(7)`」은 PP-12 반영 전 값 |
+ | `app.test.ts` 화면에 patch 없음 (MF-05) | `root.textContent`에 `patch` 없음 | `patch-button` 글자를 뺀 나머지에 `patch` 없음 + `log-` testid 없음 |
+ | `app.test.ts` `B2_PATH` (P-10 · 12 · 13 · 14) | `[0,2,1,1]` | `[0,2,2,1]` (캔버스 제목 한 칸 — B 단계에서 `[0,2,2,1,1]` 오기를 바로잡음). patch 종류 · 개수 단언은 그대로 |
+-| `rootOnlyHooks.test.ts` | 컴포넌트 7개 · 순수 모듈 `model` `undo` `keys` `color` | 컴포넌트 **8개**(`PreviewPanel.ts`), 순수 모듈 + `previewVNode` · `previewNav`, `preview.ts` Hook 없음 |
+-| 그 밖 (QA-3 ~ 41 · 45 · A1 ~ A29, P-1 ~ 28 접두 · 개수) | — | 단언 변화 없음 (회귀로 그대로 통과) |
++| `rootOnlyHooks.test.ts` | 컴포넌트 7개 · 순수 모듈 `model` `undo` `keys` `color` | 컴포넌트 **8개**(`PreviewPanel.ts`), 순수 모듈 `model` `keys` `color` + `previewVNode` · `previewNav` (**`undo.ts` 삭제**, PP-12), `preview.ts` Hook 없음 |
++| `undo.test.ts` · `undo.ts` · `e2e/mini-figma-undo.spec.ts` | 앱 편집 Undo 모델 · 시험 | **파일 삭제** (PP-12). 되돌리기는 State History(`previewNav` · 실제 영역)가 맡음 |
++| `keys.test.ts` | 동작 `'undo'` · `'redo'` | `'back'` · `'forward'` (규칙 표 그대로) |
++| **삭제된 기존 QA / A** (앱 Undo 전용, PP-12) | QA-19 ~ 25 (`mini-figma-undo.spec.ts` 통째) · 29 · 30 · 32 · 33 (`toolbar`) · A9 · A15 · A17 · A19 (`attack`) · A20(2건) · A21 (`toolbar`) · A25 (`palette`) · A27 (`attack`) | 삭제 (뜻이 남는 것은 State History 시나리오 QA-52 · 54 · A31이 맡음) |
++| **단언이 바뀐 기존 QA / A** | QA-1 (render) | 시작 때 `undo-button` · `redo-button` 꺼짐 → `back-button` · `forward-button` 꺼짐 + `undo-button` 0개 (위 QA-1 행의 kids · patch 글 변경과 함께) |
++| 〃 | QA-40 (design) | 모서리 · 글꼴 검사 대상 `undo-button` → `back-button`, `undo-button` · `redo-button` 모서리 100px → `back-button` · `forward-button` |
++| 〃 | QA-A26 (design) | 도구 막대 버튼 3개 → 4개([+ 인스턴스] · [실행 취소] · [다시 실행] · [Patch]) 화면 안 · 눌러지는 크기, [↶] 켜짐 단언 → [Patch] 켜짐 |
++| 〃 | QA-31 (toolbar) | 도구 막대 순서 = 앱 이름 · [+ 인스턴스] · [실행 취소] · [다시 실행] · [Patch], [실행 취소] [다시 실행] 꺼짐 · [Patch] 켜짐 · [↶] [↷] 없음 |
++| 〃 | QA-34 (toolbar) · QA-37 (palette) · A13 · A14 (attack) · A22 · A24 (palette) | Undo(`[↶]` 켜짐 · Ctrl+Z) 단언만 제거 |
++| 〃 | A6 (attack) | Delete로 선택이 풀리는 것만 (Undo · Redo 풀림 제거) |
++| 〃 | A8 · A10 (attack) · A28 (palette) | Ctrl+Z · Ctrl+Shift+Z → 실제 영역 [실행 취소] · [다시 실행] (라벨 글자 칸 안은 안 움직임, 선택 상자 · 체크박스 · 색 입력칸은 움직임 + 막음 / A10은 키 핸들러가 옛 state를 안 읽고 리스너 1개) |
++| 〃 | A18 (attack) | 「추가 → Undo → 추가 = b5」 → 「추가 → 삭제 → 추가 = b5 · b6」 |
++| 그 밖 (위에 없는 QA-1 ~ 45 · A1 ~ A29, 단위 P-1 ~ 28 접두 · 개수) | — | 단언 변화 없음 (회귀로 그대로 통과). 단위 `app.test.ts`는 Undo 전용 테스트가 삭제 · 전환됨 (상세 = `dev_todo.md` Dev-7 근거) |
+ 
+ ## patch 기대 표 — 실제 영역 (`preview.test.ts`가 `observe`로 센 값 · 한 번 Patch)
+ 
+@@ -69,16 +81,18 @@
+ | QA-49 | PP-04 · 08 · D-02 | 메인을 고르고 칩 `#cf202f`를 누른다 (실제 영역 버튼 노드 · 박스 기록을 붙잡아 둠) | ① [Patch] ② 이어서 크기 `L`을 고르고 [Patch] | ① 실제 영역 메인 · b1 · b2 배경 `rgb(207, 32, 47)`(b3는 원래 빨강이라 그대로), 실제 영역 버튼 노드 모두 같은 참조, 변경은 attributes 3건뿐(childList · characterData 0), 박스 3개(`data-last-flash-count` = 3)가 각각 **메인 · b1 · b2 버튼 영역과 ±2px 일치**(색만 바뀌어 크기가 안 변하므로 잴 수 있음), b3 버튼 위에는 박스 없음. ② 실제 영역 버튼 4개가 모두 `btn-L`, attributes 4건(class) · 박스 4개, 버튼 노드 같은 참조. 두 단계 모두 `areaSnapshot` real = test | 〃 |
+ | QA-50 | PP-04 · D-03 · D-04 | 처음 연다 | [+ 인스턴스] → [Patch] → 메인 아이콘 켜기 → [Patch] → 아이콘 끄기 → [Patch] → b4 고르고 Delete → [Patch] | 단계마다 [Patch] 직후 `areaSnapshot` real = test. 추가: 실제 영역 인스턴스 줄 childList 1건(버튼 +1, 노드 b1 ~ b3 같은 참조). 아이콘 켜기: 버튼 5개에 아이콘 span이 글자 앞에 생김(글자 span 노드 같은 참조). 끄기: 아이콘 사라짐. 삭제: 버튼 4개로, 앞 버튼 노드 같은 참조. 각 단계 [실행 취소]가 켜져 있음 | 〃 |
+ | QA-51 | PP-04 · 05 (무변경 = 기록 안 함) | b2를 고른다(`selected`만 바뀜) | [Patch], 이어서 [Patch] 5번 더 | 실제 영역 DOM 변경 0, 박스가 한 번도 안 생김(`watchFlash` 기록 0건), **[실행 취소] 계속 `disabled`**(기록 안 쌓임), 실제 영역에 `selected` 클래스 0개. 선택 · 속성 패널은 그대로 | 〃 |
+-| QA-52 | PP-06 · 08 · History 동기화 | 라벨 `확인` → [Patch] (A), 크기 `L` → [Patch] (B) 까지 해서 기록이 3칸(처음 · A · B) | [실행 취소] → [실행 취소] → [다시 실행] → [다시 실행] | 매 단계 실제 영역이 그 기록 모습: B(크기 L · `확인`) → [실행 취소] = A(크기 M · `확인`) → [실행 취소] = 처음(`버튼`, M) → [다시 실행] = A → [다시 실행] = B. **테스트 영역 · 앱 상태는 그대로**: 내내 테스트 영역은 B 모습(크기 L · `확인`), 속성 패널 값 · 앱 [↶] 켜짐 유지. 버튼 켜짐: 처음 = [실행 취소] 꺼짐 · [다시 실행] 켜짐, 끝 = 반대, 가운데 = 둘 다 켜짐. 실제 영역 버튼 노드는 같은 참조. 이동마다 박스 ≥ 1개 생김 (꺼진 버튼은 안 눌려 박스 없음) | 〃 |
++| QA-52 | PP-06 · 08 · 11 · History 동기화 | 라벨 `확인` → [Patch] (A), 크기 `L` → [Patch] (B) 까지 해서 기록이 3칸(처음 · A · B) | [실행 취소] → [실행 취소] → [다시 실행] → [다시 실행] | 매 단계 실제 영역이 그 기록 모습: B(크기 L · `확인`) → [실행 취소] = A(크기 M · `확인`) → [실행 취소] = 처음(`버튼`, M) → [다시 실행] = A → [다시 실행] = B. **테스트 영역 · 앱 상태는 그대로**: 내내 테스트 영역은 B 모습(크기 L · `확인`), 속성 패널 값(크기 `L` · 라벨 `확인`) 그대로. 버튼 켜짐(Patch 두 번 직후 = [Patch] 켜짐 · [실행 취소] 켜짐 · [다시 실행] 꺼짐): 처음 기록 = [실행 취소] 꺼짐 · [다시 실행] 켜짐, 끝 = 반대, 가운데 = 둘 다 켜짐. 실제 영역 버튼 노드는 같은 참조. 이동마다 박스 ≥ 1개 생김. **이어서 같은 기록을 단축키로도**: Ctrl+Z ×2 → 처음, Ctrl+Shift+Z ×2 → B (버튼과 같은 모습 · 같은 버튼 켜짐 · 테스트 영역 불변) | 〃 |
+ | QA-53 | PP-06 | 라벨 `확인` → [Patch] (A), 크기 `L` → [Patch] (B) 후 [실행 취소] (실제 영역 = A, 테스트 영역 = B) | 테스트 영역은 그대로 둔 채 [Patch] | 실제 영역이 B 모습이 되고(새 기록), **앞쪽(원래 B) 기록은 버려져 [다시 실행] `disabled`**. [실행 취소] 두 번 = A → 처음, 그 뒤 [실행 취소] 꺼짐 (기록 = 처음 · A · 새 B 3칸) | 〃 |
+-| QA-54 | PP-10 · 06 · 09 | b1을 고른 상태(속성 패널에 「인스턴스 · 버튼」) | ① 실제 영역 b2 버튼을 `click({ force: true })`, Enter · Space ② 편집(색)·[Patch] 뒤 Ctrl+Z, 이어서 [실행 취소] | ① 선택 · 속성 패널 제목 · 레이어 선택 · 두 영역 DOM 모두 그대로(변경 0), 실제 영역 안 요소가 포커스를 못 받음(`activeElement`가 `real-area` 안이 아님). ② [Patch] 전후로 앱 [↶] · [↷] 켜짐 상태가 같음. Ctrl+Z는 **테스트 영역만** 되돌림(색 처음으로), 실제 영역은 그대로 · [실행 취소] 여전히 켜짐. 이어서 [실행 취소]를 눌러도 앱 [↶] · [↷] 켜짐 상태와 테스트 영역은 그대로. 즉 앱 Undo 기록과 실제 영역 기록은 서로 안 건드림 | 〃 |
++| QA-54 | PP-10 · 06 · 09 · 11 · 12 | b1을 고른 상태(속성 패널에 「인스턴스 · 버튼」) | ① 실제 영역 b2 버튼을 `click({ force: true })`, 포커스 시도, Enter · Space ② 편집(색 `#cf202f`) → [Patch] 뒤 Ctrl+Z · Ctrl+Shift+Z, [실행 취소] 버튼 → Ctrl+Shift+Z, 그 뒤 Ctrl+Z를 두 번 더 | ① 선택 · 속성 패널 제목 · 레이어 선택 · 두 영역 DOM 모두 그대로(변경 0), 실제 영역 안 요소가 포커스를 못 받음(`activeElement`가 `real-area` 안이 아님). ② **Ctrl+Z = 실제 영역 [실행 취소]**: 실제 영역 b1이 처음 색(파랑)으로 돌아가고 버튼 상태 = [실행 취소] 꺼짐 · [다시 실행] 켜짐. **테스트 영역 · 선택(b1) · 속성 패널 제목은 그대로**(빨강 유지). **Ctrl+Shift+Z = [다시 실행]**: 실제 영역이 [Patch] 직후 모습(빨강)으로, 버튼 상태 = [실행 취소] 켜짐 · [다시 실행] 꺼짐. [실행 취소] 버튼 → 파랑, 이어서 Ctrl+Shift+Z → 빨강 (버튼과 단축키가 같은 기록). **앱 편집 Undo는 없다**: `undo-button` 0개, 끝에서 Ctrl+Z를 두 번 더 눌러도 테스트 영역 b1은 빨강 그대로 | 〃 |
+ 
+ ## 공격적 시나리오 (새)
+ 
++> **e2e로 만든 것은 QA-A30 ~ A32뿐** (`mini-figma-preview.spec.ts`). **QA-A33 ~ A37은 이번 범위에서 e2e를 만들지 않았다** (사용자 「빠르게」). 한도 50(A36)은 단위 `preview.test.ts`(55번 Patch → back 정확히 49번) · `previewNav.test.ts`가 맡고, 나머지(A33 · A34 · A35 · A37)는 단위로도 e2e로도 같은 모양의 시험이 아직 없다. 아래 표의 A33 ~ A37 행은 계획 기록으로 남긴다 (`01_request_spec.md` 구현 제외 범위 아님, 후속 보강 후보).
++
+ | QA | 시나리오 | Then | 근거 ID | 스펙 파일 |
+ | --- | --- | --- | --- | --- |
+ | QA-A30 | [Patch] 연타: ① 편집 없이 20번 ② 라벨을 바꾼 뒤 [Patch]를 20번 (`click` 연속) | ① 기록 0칸([실행 취소] 꺼짐), 실제 영역 변경 0, 오류 없음. ② 기록 **1칸만**(첫 번째만 변경, 나머지 19번은 무변경) → [실행 취소] 한 번이면 처음 모습, 그 뒤 [실행 취소] 꺼짐. 두 영역(테스트 영역 vs 지금 기록) 일치 | PP-04 · 06 | `e2e/mini-figma-preview.spec.ts` |
+-| QA-A31 | [실행 취소] · [다시 실행] 연타: Patch 3번 쌓고 [실행 취소]를 10번 연속(3번째에서 `disabled`, 4 ~ 10번째는 `click({ force: true })`), 이어서 [다시 실행] 10번 | 한 번에 한 칸만 움직임, 처음 · 끝에서 멈춤(4번째부터 DOM 변경 0 · 박스 없음), 도중 오류 없음, 끝에서 실제 영역 = 마지막 Patch 모습. 연타 도중 버튼 켜짐 · 꺼짐이 실제 기록 위치와 어긋나지 않음(처음 = [실행 취소] 꺼짐, 끝 = [다시 실행] 꺼짐) | PP-06 | 〃 |
++| QA-A31 | [실행 취소] · [다시 실행] 연타: Patch 3번 쌓고 [실행 취소]를 10번 연속(3번째에서 `disabled`, 4 ~ 10번째는 `click({ force: true })`), 이어서 [다시 실행] 10번, 마지막으로 **단축키 연타** Ctrl+Z 10번 · Ctrl+Shift+Z 10번 | 한 번에 한 칸만 움직임, 처음 · 끝에서 멈춤(4번째부터 DOM 변경 0 · 박스 없음), 도중 오류 없음, 끝에서 실제 영역 = 마지막 Patch 모습. 단축키 연타도 버튼과 같은 기록을 한 칸씩 움직임. 연타 도중 버튼 켜짐 · 꺼짐이 실제 기록 위치와 어긋나지 않음(처음 = [실행 취소] 꺼짐, 끝 = [다시 실행] 꺼짐) | PP-06 · 11 | 〃 |
+ | QA-A32 | 특수문자 라벨: 메인 라벨 `<b>x</b> &amp; "q" 'a' 😀` → [Patch] | 실제 영역 글자가 입력 그대로 **글자로** 표시(실제 영역 안 `b` 요소 0개, `real-btn-label` 글자 = 입력), 테스트 영역 글자와 같음. [실행 취소]하면 `버튼`으로 돌아감 | PP-04 · 05 | 〃 |
+ | QA-A33 | 빈 입력: 메인 라벨을 모두 지우고(빈 글자) [Patch] → [실행 취소] | 실제 영역 메인 · b1 글자 span이 **빈 글자로 남음**(노드 제거 아님), 오류 없음, [실행 취소] = `버튼` 복원, 테스트 영역 그대로 | PP-04 | 〃 |
+ | QA-A34 | 새로고침: 편집 · [Patch] · [실행 취소] 뒤 `page.reload()` | 실제 영역 = 처음 모습(테스트 영역과 같음), 기록 비어 있음([실행 취소] · [다시 실행] 꺼짐), 오류 없음 (기록은 저장 안 함) | PP-03 · 06 | 〃 |
+diff --git a/fixtures/mini-figma/App.ts b/fixtures/mini-figma/App.ts
+index ca29f6a..25a8e42 100644
+--- a/fixtures/mini-figma/App.ts
++++ b/fixtures/mini-figma/App.ts
+@@ -36,20 +36,20 @@ export function App(): VNode {
+   const onSelect = (id: string): void => setSelectedId(id);
+ 
+   // [AI Note]: 속성 패널 한 칸이 바뀌면 불린다. 고른 대상이 메인이면 setMainField, 인스턴스면 setInstanceField(그 칸에 키가 생겨 override) → applyEdit.
+-  // 묶음 기준 = 고른 대상('main' 또는 인스턴스 id) + 그 칸이라 같은 대상의 같은 칸이 연달아 바뀌면 한 단계가 된다. 같은 값이면 같은 Doc이라 렌더 · 기록이 없다.
++  // 같은 값이면 같은 Doc이라 applyEdit가 렌더 없이 돌려보낸다. (앱 편집 Undo의 묶음 규칙은 task_006에서 없앴다)
+   const onEdit = (field: Field, value: MainProps[Field]): void => {
+     if (selectedId === null) return;
+     const next = selectedId === 'main' ? setMainField(doc, field, value) : setInstanceField(doc, selectedId, field, value);
+     applyEdit(next);
+   };
+ 
+-  // [AI Note]: ↻ = 그 인스턴스의 그 칸 키를 지운다 (undefined를 넣지 않음) → 메인 값을 다시 따라간다. 추가 · 삭제 · 순서와 같이 묶음을 끝내는 한 단계(group = null).
++  // [AI Note]: ↻ = 그 인스턴스의 그 칸 키를 지운다 (undefined를 넣지 않음) → 메인 값을 다시 따라간다.
+   const onReset = (field: Field): void => {
+     if (selectedId === null || selectedId === 'main') return;
+     applyEdit(resetInstanceField(doc, selectedId, field));
+   };
+ 
+-  // [AI Note]: [+ 인스턴스] = 번호 nextId로 끝에 붙이고(addInstance) nextId를 하나 올린다. 번호 칸은 doc 밖이라 Undo가 되돌리지 않는다 (Q17-3).
++  // [AI Note]: [+ 인스턴스] = 번호 nextId로 끝에 붙이고(addInstance) nextId를 하나 올린다. 번호 칸은 doc 밖이라 삭제해도 지운 번호를 다시 쓰지 않는다 (Q17-3).
+   // 한 동작의 setter 값은 모두 이 렌더의 doc · nextId에서 계산한다 (묶음 2 검수 NON-BLOCKING 4) → 렌더는 한 번.
+   const onAdd = (): void => {
+     applyEdit(addInstance(doc, nextId));
+@@ -57,11 +57,11 @@ export function App(): VNode {
+   };
+ 
+   // [AI Note]: [↑] [↓] = 배열에서 그 인스턴스의 자리만 바꾼다(moveInstance). 선택은 id라서 순서가 바뀌어도 그대로다 (MF-26).
+-  // 경계(맨 위의 [↑] · 맨 아래의 [↓])는 같은 Doc → applyEdit가 렌더 · 기록 없이 돌려보낸다 (④-13). 새 단계 하나(묶음 끝).
++  // 경계(맨 위의 [↑] · 맨 아래의 [↓])는 같은 Doc → applyEdit가 렌더 없이 돌려보낸다 (④-13).
+   const onMove = (id: string, delta: -1 | 1): void => applyEdit(moveInstance(doc, id, delta));
+ 
+-  // [AI Note]: 고른 인스턴스 삭제 = 문서 · 선택 · 기록을 이 렌더의 doc 하나에서 계산해 한 번에 바꾼다 (setter 3개 → 렌더 1번, 결정 9 B).
+-  // 메인 · 선택 없음 · 이미 없는 id는 아무것도 안 함 (removeInstance가 같은 Doc을 돌려줌 → 렌더 · 기록 없음, MF-24).
++  // [AI Note]: 고른 인스턴스 삭제 = 문서 · 선택을 이 렌더의 doc 하나에서 계산해 한 번에 바꾼다 (결정 9 B: 렌더 1번).
++  // 메인 · 선택 없음 · 이미 없는 id는 아무것도 안 함 (removeInstance가 같은 Doc을 돌려줌 → 렌더 없음, MF-24).
+   // 지운 것이 고른 것이므로 reconcileSelection이 null로 정리한다 (MF-23).
+   const deleteSelected = (): void => {
+     if (selectedId === null || selectedId === 'main') return;
+diff --git a/fixtures/mini-figma/__tests__/rootOnlyHooks.test.ts b/fixtures/mini-figma/__tests__/rootOnlyHooks.test.ts
+index 8a4241f..6f28770 100644
+--- a/fixtures/mini-figma/__tests__/rootOnlyHooks.test.ts
++++ b/fixtures/mini-figma/__tests__/rootOnlyHooks.test.ts
+@@ -98,7 +98,7 @@ describe('T-16 코드 확인 — 루트(App.ts)만 Hook을 쓴다', () => {
+   it('preview.ts: Hook이 없다 (엔진 · DOM 연결은 허용 — Hook은 App.ts만)', () => {
+     const code = stripNoise(sourceOf(topLevel, '../preview.ts'));
+     for (const hook of ['useState', 'useEffect', 'useMemo']) {
+-      expect(new RegExp(`\b${hook}\b`).test(code), `preview.ts의 ${hook}`).toBe(false);
++      expect(new RegExp(`\\b${hook}\\b`).test(code), `preview.ts의 ${hook}`).toBe(false);
+     }
+   });
+ 
+diff --git a/fixtures/mini-figma/components/ColorPalette.ts b/fixtures/mini-figma/components/ColorPalette.ts
+index 73382cd..ed0562e 100644
+--- a/fixtures/mini-figma/components/ColorPalette.ts
++++ b/fixtures/mini-figma/components/ColorPalette.ts
+@@ -13,8 +13,8 @@ interface ColorPaletteProps {
+ // 속성 패널이 `h(ColorPalette, …)`로 부르고, 자식 컴포넌트 안의 자식 컴포넌트도 엔진이 끝까지 풀어 준다 (공통 주의 5).
+ // - 칩의 `aria-pressed`는 문자열 'true' / 'false'다: 불린 false를 넘기면 속성이 통째로 빠져 「누르지 않음」이 안 그려진다 (공통 주의 3).
+ // - 색 입력칸의 `value`는 DOM 프로퍼티라 엔진이 실제 값과 다를 때만 대입한다 (입력칸은 다시 만들지 않음). 브라우저가 값을 `#rrggbb` 소문자로 정리한다 (공통 주의 4).
+-// - 입력칸은 `onInput`만 쓴다: 엔진 이벤트는 click · input뿐이고, Chromium은 고르는 동안 input을 연달아 낸다 → 같은 칸 묶음 규칙으로 한 단계 (MF-31).
+-// 칩과 입력칸 모두 같은 onPick을 부르므로 한 색 칸(`color`)의 묶음 하나로 합쳐진다 (④-5).
++// - 입력칸은 `onInput`만 쓴다: 엔진 이벤트는 click · input뿐이고, Chromium은 고르는 동안 input을 연달아 낸다 → 입력 이벤트마다 같은 onPick을 불러 한 칸(`color`)의 값만 바꾼다 (MF-31).
++// 칩과 입력칸 모두 같은 onPick을 부르므로 한 색 칸(`color`)으로 합쳐진다 (④-5).
+ export function ColorPalette(props: Props): VNode {
+   const { value, onPick } = props as unknown as ColorPaletteProps;
+   return h(
+diff --git a/fixtures/mini-figma/components/PropertyPanel.ts b/fixtures/mini-figma/components/PropertyPanel.ts
+index 7da0343..ca6497c 100644
+--- a/fixtures/mini-figma/components/PropertyPanel.ts
++++ b/fixtures/mini-figma/components/PropertyPanel.ts
+@@ -89,7 +89,7 @@ function propRows(values: MainProps, onEdit: PropertyPanelProps['onEdit'], overr
+       override,
+     ),
+     select('icon', 'prop-icon', '아이콘 종류', values.icon, ICON_OPTIONS),
+-    // [AI Note]: 색 칸 = 팔레트 판(칩 8개 + 직접 고르기). 고른 색 `#rrggbb`를 그대로 onEdit('color', hex)로 올린다 — 묶음 { target, field: 'color' }은 다른 칸과 같은 규칙 (FD-21 · 22 · 25).
++    // [AI Note]: 색 칸 = 팔레트 판(칩 8개 + 직접 고르기). 고른 색 `#rrggbb`를 그대로 onEdit('color', hex)로 올린다 — 다른 칸과 같은 경로 (FD-21 · 22 · 25).
+     propRow('color', '색', h(ColorPalette, { value: values.color, onPick: (hex: string) => onEdit('color', hex) }), override),
+   ];
+ }
+diff --git a/fixtures/mini-figma/components/Toolbar.ts b/fixtures/mini-figma/components/Toolbar.ts
+index de8ab7a..ed0f0f7 100644
+--- a/fixtures/mini-figma/components/Toolbar.ts
++++ b/fixtures/mini-figma/components/Toolbar.ts
+@@ -15,8 +15,8 @@ interface ToolbarProps {
+ 
+ // [AI Note]: 도구 막대 — props + 콜백 props만 받는 순수 함수 (Hook 없음, P2-09). `div.app`의 첫 자식이라 경로 접두가 [0,0]이고
+ // 레이어 · 캔버스 · 속성 패널의 접두는 하나씩 밀린다 ([0,1] · [0,2] · [0,3], FD-10). 안 자식 순서 = 앱 이름 · [+ 인스턴스] · [실행 취소] · [다시 실행] · [Patch].
+-// [AI Note]: 앱 편집 Undo/Redo 버튼([↶] [↷], FD-12)은 없앴다 — 기능은 그대로고 Ctrl/Cmd+Z · Ctrl/Cmd+Shift+Z 단축키로만 동작한다 (App의 keydown effect).
+-// [실행 취소] [다시 실행]는 실제 영역 기록용 State History 버튼이다 (앱 Undo와 별개). 켜짐 여부는 루트가 nav에서 계산해 내려 준다(canBack · canForward, 새 Hook 아님).
++// [AI Note]: 앱 편집 Undo/Redo 버튼([↶] [↷], FD-12)과 앱 Undo 기능은 task_006(PP-12)에서 없앴다. 되돌리기는 State History가 맡는다.
++// [실행 취소] [다시 실행]는 실제 영역 기록용 State History 버튼이고, Ctrl/Cmd+Z · Ctrl/Cmd+Shift+Z 단축키(App의 keydown effect)가 같은 기록을 움직인다. 켜짐 여부는 루트가 nav에서 계산해 내려 준다(canBack · canForward, 새 Hook 아님).
+ // 꺼진 버튼은 `disabled` 속성만 바뀌므로 Patch로 기록이 처음 쌓이는 때 도구 막대 patch는 SET_ATTR 1줄뿐이다.
+ // 꺼진 `<button>`은 눌러도 click이 오지 않으므로(브라우저) 핸들러에 「꺼진 상태 검사」를 따로 두지 않는다 — 경계 이동은 엔진이 무시하고 nav는 같은 객체를 돌려준다.
+ // 앱 이름은 「mini-figma」 — 디자인 문서의 회사 이름 · 로고는 쓰지 않는다 (FD-07).
+diff --git a/fixtures/mini-figma/model.ts b/fixtures/mini-figma/model.ts
+index dda4e6c..d2eaa60 100644
+--- a/fixtures/mini-figma/model.ts
++++ b/fixtures/mini-figma/model.ts
+@@ -1,6 +1,6 @@
+ // [AI Note]: mini-figma의 "값" 쪽 순수 함수들. DOM · Hook · 엔진 import가 없다 (rootOnlyHooks.test.ts가 검사).
+ // 입력을 고치지 않고 새 객체를 돌려준다. 바뀐 것이 없으면 "같은 Doc 객체"를 그대로 돌려줘서,
+-// 루트의 setter가 같은 값(Object.is)으로 보고 다시 그리지 않고 Undo 기록에도 안 남게 한다 (phase2-app/todoOps.ts 방식).
++// 루트의 setter가 같은 값(Object.is)으로 보고 다시 그리지 않게 한다 (phase2-app/todoOps.ts 방식).
+ 
+ export type Size = 'S' | 'M' | 'L';
+ /** 색 값 `#rrggbb` (소문자, FD-20). 이름('blue')이 아니라 값을 저장한다 — 칩 8개 밖의 색도 색 입력칸으로 고를 수 있어서 */
+@@ -22,7 +22,7 @@ export type Field = keyof MainProps;
+ /** 인스턴스 = id + "바꾼 칸만" 가진 객체. 키가 있으면 override, 없으면 메인을 따른다 */
+ export type Instance = { readonly id: string } & Partial<MainProps>;
+ 
+-/** Undo가 기록하는 것: main · instances만. 선택(selectedId) · nextId는 doc 밖이라 기록에 없다 */
++/** 앱 문서: main · instances만. 선택(selectedId) · nextId는 doc 밖의 App 칸이다 */
+ export interface Doc {
+   readonly main: MainProps;
+   readonly instances: readonly Instance[];
+@@ -85,8 +85,7 @@ export function resetInstanceField(doc: Doc, id: string, field: Field): Doc {
+ 
+ /**
+  * 끝에 새 인스턴스를 붙인다. 번호 `nextId`는 doc 밖(App의 칸)에서 받는다.
+- * [AI Note]: 번호가 doc 안에 있으면 Undo가 번호까지 되돌려서 추가 → Undo → 추가가 같은 id(b4)를 다시 만든다.
+- * 번호를 App이 따로 세고 Undo가 건드리지 않으므로 지운 번호를 다시 쓰지 않는다 (key가 겹치지 않음, Q17-3).
++ * [AI Note]: 번호를 App이 따로 세므로(doc 밖) 삭제한 뒤 다시 추가해도 지운 번호를 다시 쓰지 않는다 (추가 → 삭제 → 추가 = b4 · b5, key가 겹치지 않음, Q17-3).
+  * 새 인스턴스는 override 없이 `{ id }`만 가진다 → 메인을 따른다.
+  */
+ export function addInstance(doc: Doc, nextId: number): Doc {
+@@ -114,7 +113,7 @@ export function moveInstance(doc: Doc, id: string, delta: -1 | 1): Doc {
+ }
+ 
+ /**
+- * 삭제 · Undo · Redo로 doc이 바뀐 뒤 선택을 정리한다. 'main'은 항상 유효, 없는 인스턴스 id는 null (MF-32).
++ * 삭제로 doc이 바뀐 뒤 선택을 정리한다. 'main'은 항상 유효, 없는 인스턴스 id는 null (MF-32).
+  * [AI Note]: 선택은 인덱스가 아니라 id라서, 앞에 다른 인스턴스가 끼어들거나 빠져도 같은 인스턴스를 계속 가리킨다 (MF-26).
+  */
+ export function reconcileSelection(selectedId: string | null, doc: Doc): string | null {

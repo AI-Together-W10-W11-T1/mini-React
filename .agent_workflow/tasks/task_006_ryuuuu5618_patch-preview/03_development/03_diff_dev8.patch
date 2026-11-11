@@ -1,0 +1,1421 @@
+diff --git a/.agent_workflow/tasks/task_006_ryuuuu5618_patch-preview/03_development/dev_todo.md b/.agent_workflow/tasks/task_006_ryuuuu5618_patch-preview/03_development/dev_todo.md
+index db690a8..343d628 100644
+--- a/.agent_workflow/tasks/task_006_ryuuuu5618_patch-preview/03_development/dev_todo.md
++++ b/.agent_workflow/tasks/task_006_ryuuuu5618_patch-preview/03_development/dev_todo.md
+@@ -148,8 +148,15 @@ e2e/mini-figma-helpers.ts        실제 영역 도우미 추가 / 기존 render
+   - 의존: Dev-6
+   - 알고리즘: 해당 없음
+ 
+-- [ ] **Dev-8** (`mini-figma`): [실행 취소] · [다시 실행]이 실제 영역과 함께 테스트 영역(`doc`)도 그 칸 상태로 되돌린다 [PP-06 변경 · PRD T-08]
+-  - **완료 근거 (Evidence)**: (개발 때 채움)
++- [x] **Dev-8** (`mini-figma`): [실행 취소] · [다시 실행]이 실제 영역과 함께 테스트 영역(`doc`)도 그 칸 상태로 되돌린다 [PP-06 변경 · PRD T-08]
++  - **완료 근거 (Evidence)**: 2026-11-12, 커밋 = 이 문서가 들어 있는 커밋 (`git log --grep "PP-06 · T-08"`)
++    - **신규 모듈** `fixtures/mini-figma/previewDocs.ts` (`DocTrack` · `initialTrack` · `trackPush` · `trackBack` · `trackForward` · `trackDoc`, 칸 수 · 잘림은 `previewNav`의 `navPush`/`navBack`/`navForward`를 그대로 호출). `App.ts`: 보관함 `{ preview, track }`(새 Hook 칸 없음, `instance.hooks` 7칸 · `slot(0~6)` 번호 · `slot(5)` 모양 그대로), `onPreviewPatch`는 기록이 쌓였을 때만 `trackPush(vault.track, doc)`, `onPreviewBack`/`onPreviewForward`는 `moveTo`(`setDoc(target)` + `setSelectedId(prev => reconcileSelection(prev, target))` + `setNav`, `setNextId` 호출 없음). `packages/` · `types.ts` · `preview.ts` · `previewNav.ts` · `keys.ts` 수정 없음 (`git diff --stat main -- packages/` 빈 출력)
++    - **단위 (Vitest)**: `previewDocs.test.ts` 신규 7건 통과 (PD-1 2 · PD-2 1 · PD-3 1 · PD-4 2(한도 50 · 엔진 `History` 대조) · PD-5 1(무작위 2000번)). `app.test.ts` 신규 9건(U-1 ~ U-7 · A41 · A42) + 고친 기존 9건(Ctrl+Z · Meta+Z / 선택 상자 / 색 입력칸 / 체크박스 / [Patch] 뒤 켜짐 상태 / 연타 정확성 / 실행 취소한 뒤 [Patch](편집을 끼워 고침) / 버튼 · 단축키 같은 기록 / Hook 7칸 `track`), `rootOnlyHooks.test.ts`에 `previewDocs.ts` 추가 3곳, `preview.test.ts` 한 건 이름에 「(모듈 단위)」. `npx vitest run fixtures/mini-figma` 394 passed (전 378 + 16)
++    - **e2e (Playwright, desktop · mobile)**: 새 시나리오를 test 7개로 묶음 — `QA-55 · 61` · `QA-56 · 57 · 62` · `QA-58 · 59` · `QA-60` · `QA-A38` · `QA-A39` · `QA-A40` (요약 표 단언을 하나도 빼지 않음). 개정 = QA-52 · 53 · 54 · A30 · A31 · A32 · A33 · A35 (`mini-figma-preview.spec.ts`) · A8 · A10 (`mini-figma-attack.spec.ts`) · A28 (`mini-figma-palette.spec.ts`). `npx playwright test e2e/mini-figma-preview.spec.ts e2e/mini-figma-attack.spec.ts e2e/mini-figma-palette.spec.ts` 96 passed
++    - **일부러 깬 뒤 되돌린 확인 3개** (모두 되돌린 뒤 `git status`로 파일 상태 확인): ① `moveTo`의 `setDoc(target)` 제거 → `QA-55` desktop 실패 (`QA-55 [실행 취소]: 테스트 영역` 불일치) ② `setSelectedId(... reconcileSelection ...)` 제거 → `QA-58` desktop 실패 (`selectedOnCanvas` `[]` 기대인데 b4가 남음) ③ `trackPush`의 앞쪽 자르기를 `slice(0, index)`로 한 칸 어긋나게 → `previewDocs.test.ts` 5건 + `app.test.ts` 16건(A42 포함) 실패 (21 failed). 세 곳 모두 원복 확인
++    - **전체**: `npx vitest run` 46 files · 1195 passed, `npx tsc --noEmit` 오류 0, `npx playwright test` 330 passed (desktop + mobile)
++    - **참고 (작업 트리 상황)**: 개발 중 사용자의 다른 창이 `[+ 인스턴스]`를 도구 막대에서 속성 패널로 옮기는 디자인 수정을 하는 중이었다(`Toolbar.ts` · `PropertyPanel.ts` · `e2e/mini-figma-helpers.ts`의 `clickAdd` 등, 미커밋). Dev-8 커밋에는 그 수정을 넣지 않고 **HEAD 위에 Dev-8 변경만 다시 적용한 파일**을 스테이지했다(HEAD + Dev-8 단독 상태도 별도 작업 트리에서 vitest 394 · tsc 0 · playwright 96 통과 확인). 사용자의 수정은 작업 트리에 그대로 남아 있다
++    - **알려진 결과(명세대로)**: 「실행 취소 → 편집 없이 [Patch]」는 무변경이라 기록이 안 쌓임(QA-62 · U-6), 처음 · 끝 칸에서 편집만 한 상태는 꺼진 버튼 · 단축키로 못 버림(QA-A38 · U-5)
+   - 의존: Dev-7. 명세: `../01_request_spec.md` PP-06 (최신) · §5 「뒤로 · 앞으로」 행 · `../00_master_dialogue.md` 「PP-06 변경」. 테스트 케이스: `../04_qa_evidence/qa_todo.md` 「PP-06 변경 (Dev-8)」 (QA-55 ~ 62 · A38 ~ A42 · 바뀌는 기존 단언)
+   - **엔진 · `packages/` · `types.ts` 수정 없음.** `preview.ts`(createPreview) · `previewNav.ts` · `keys.ts` · 컴포넌트 · `index.html`도 안 고친다 (실제 영역 연결 모듈은 「실제 영역 기록만」 그대로 두고, 테스트 영역 되돌리기는 App이 맡는다)
+   - **설계 (현재 코드 확인: `App.ts`는 Hook 7칸 — `[0]doc [1]selectedId [2]nextId [3]보관함 useMemo [4]초기화 useEffect [5]nav useState [6]keydown useEffect`, 핸들러 3개가 `vault.preview.patch/back/forward()`가 true일 때만 `setNav(navPush/navBack/navForward)`, `doc`은 안 건드림)**
+diff --git a/.agent_workflow/tasks/task_006_ryuuuu5618_patch-preview/04_qa_evidence/qa_todo.md b/.agent_workflow/tasks/task_006_ryuuuu5618_patch-preview/04_qa_evidence/qa_todo.md
+index 34c2881..37fcbe7 100644
+--- a/.agent_workflow/tasks/task_006_ryuuuu5618_patch-preview/04_qa_evidence/qa_todo.md
++++ b/.agent_workflow/tasks/task_006_ryuuuu5618_patch-preview/04_qa_evidence/qa_todo.md
+@@ -194,7 +194,7 @@ e2e (다른 스펙, Dev-8이 고침)
+ 
+ ## 필수 확인
+ - [x] Diff 기본 케이스 D-01 ~ 05: D-01 = R-3 · QA-48, D-02 = R-4 · 5 · QA-49, D-03 = R-6 · 9 · QA-50, D-04 = R-7 · 10 · QA-50, **D-05(교체) = R-13(단위, 이 모듈 단위로만)** — 캔버스 흐름에는 노드 종류가 바뀌는 장면이 없다. 엔진 전체 D-01 ~ 05는 엔진 단위 테스트가 회귀로 덮음
+-- [ ] History 동기화: Patch 2회 → 뒤로 → 앞으로 = QA-52. ~~**Phase 1 페이지와 다른 점**: 이 앱에서는 뒤로 · 앞으로가 실제 영역 기록만 움직이고 테스트 영역은 그대로다~~ → **(PP-06 변경 2026-11-12) 뒤로 · 앞으로 = 두 영역이 함께 그 기록 상태로 복원된다 (PRD T-08)**: Phase 1 페이지와 같은 약속이 됨. QA-52 · 55 ~ 62 · A38 ~ A42가 「테스트 영역 = 실제 영역 = 그 칸 모습」(Patch 안 한 편집은 버려짐)을 본다. 이 체크는 Dev-8 뒤 QA에서 다시 확인
++- [x] History 동기화 (Dev-8 개발 후 갱신, 2026-11-12): Patch 2회 → 뒤로 → 앞으로 = QA-52. ~~**Phase 1 페이지와 다른 점**: 이 앱에서는 뒤로 · 앞으로가 실제 영역 기록만 움직이고 테스트 영역은 그대로다~~ → **(PP-06 변경 2026-11-12) 뒤로 · 앞으로 = 두 영역이 함께 그 기록 상태로 복원된다 (PRD T-08)**: Phase 1 페이지와 같은 약속이 됨. QA-52 · 55 ~ 62 · A38 ~ A42가 「테스트 영역 = 실제 영역 = 그 칸 모습」(Patch 안 한 편집은 버려짐)을 본다. → **Dev-8 개발 단계에서 통과**: QA-52 · 53 · 54 · 55 · 56 · 57 · 58 · 59 · 60 · 61 · 62 · A30 ~ A33 · A35 · A38 ~ A40 e2e(desktop · mobile) + 단위 U-1 ~ 7 · A41 · A42 · PD-1 ~ 5 모두 초록 (`playwright test` 전체 330 passed, `vitest run` 1195 passed). 이 체크는 Dev-8 뒤 QA 단계에서 한 번 더 확인
+ - [ ] 회귀: `git diff --stat main -- packages/` 비어 있음, `npx vitest run` 전체, `npx tsc --noEmit`, `npx playwright test` 전체
+ - [ ] desktop · mobile 캡처 (`04_qa_evidence/screenshot_NN_<desktop|mobile>.png`) — QA 단계: ① 처음 두 영역 ② 편집 뒤 Patch 전(두 영역이 다름) ③ Patch 직후 깜빡임 ④ 뒤로 간 상태([다시 실행] 켜짐)
+ 
+diff --git a/e2e/mini-figma-attack.spec.ts b/e2e/mini-figma-attack.spec.ts
+index 2be7bb6..ff37708 100644
+--- a/e2e/mini-figma-attack.spec.ts
++++ b/e2e/mini-figma-attack.spec.ts
+@@ -230,6 +230,7 @@ test('QA-A8 라벨 글자 칸 안의 키는 앱 동작이 없고, 선택 상자
+   expect(await realBgOf(page, 'main')).toBe(rgb('#cf202f'));
+   await selectOnCanvas(page, 'b2');
+ 
++  // [AI Note]: PP-06 변경(Dev-8) — [실행 취소]하면 테스트 영역도 파랑이 된다. appUntouched = 두 영역 모두 빨강이고 버튼 · 행 · 선택 · b2 글자는 그대로
+   const appUntouched = async (where: string): Promise<void> => {
+     expect(await mainBg(page), `${where}: 테스트 영역 메인 색`).toBe(rgb('#cf202f'));
+     expect(await realBgOf(page, 'main'), `${where}: 실제 영역 메인 색`).toBe(rgb('#cf202f'));
+@@ -239,14 +240,14 @@ test('QA-A8 라벨 글자 칸 안의 키는 앱 동작이 없고, 선택 상자
+     expect((await canvasLabels(page))[2], `${where}: b2 글자`).toBe('취소');
+   };
+ 
+-  // [AI Note]: 선택 상자 · 체크박스 안에서 Delete · Backspace는 무시, Ctrl+Z는 실제 영역 [실행 취소](실제 영역 메인 파랑), Ctrl+Shift+Z는 [다시 실행](빨강). 테스트 영역은 계속 빨강
++  // [AI Note]: 선택 상자 · 체크박스 안에서 Delete · Backspace는 무시, Ctrl+Z는 [실행 취소](두 영역 메인 파랑), Ctrl+Shift+Z는 [다시 실행](두 영역 빨강)
+   const selectAndCheckbox = async (testId: string, where: string): Promise<void> => {
+     await page.getByTestId(testId).focus();
+     for (const key of ['Delete', 'Backspace']) await page.keyboard.press(key);
+     await appUntouched(where);
+     await page.keyboard.press('Control+KeyZ');
+     expect(await realBgOf(page, 'main'), `${where}: Ctrl+Z → 실제 영역 [실행 취소]`).toBe(rgb('#0052ff'));
+-    expect(await mainBg(page), `${where}: 테스트 영역은 그대로`).toBe(rgb('#cf202f'));
++    expect(await mainBg(page), `${where}: 테스트 영역 메인 색도 파랑 (PP-06 변경)`).toBe(rgb('#0052ff'));
+     await expect(page.getByTestId('figma-button'), `${where}: 버튼`).toHaveCount(4);
+     expect(await selectedOnCanvas(page), `${where}: 선택`).toEqual(['b2']);
+     expect((await canvasLabels(page))[2], `${where}: b2 글자`).toBe('취소');
+@@ -299,7 +300,8 @@ test('QA-A10 옛 state를 보는 키 핸들러 · 리스너 정리: Delete는 
+   await pressBack(page);
+   expect((await realClassOf(page, 'main')).split(' ')).toContain('btn-M');
+   expect(await realBgOf(page, 'main')).toBe(rgb('#cf202f'));
+-  expect((await mainClass(page)).split(' '), '테스트 영역은 그대로 L').toContain('btn-L');
++  expect((await mainClass(page)).split(' '), '테스트 영역 메인도 btn-M (PP-06 변경, 색은 빨강 유지)').toContain('btn-M');
++  expect(await mainBg(page)).toBe(rgb('#cf202f'));
+ 
+   // ③ 상태를 20번 넘게 바꾼다 (고르기 · 수정 섞어서): 등록 − 해제는 그대로
+   for (let i = 0; i < 6; i += 1) {
+@@ -314,6 +316,9 @@ test('QA-A10 옛 state를 보는 키 핸들러 · 리스너 정리: Delete는 
+   // 보조 확인: Ctrl+Shift+Z 한 번 = [다시 실행] 한 단계 (옛 렌더의 nav를 안 읽고 정확히 끝으로)
+   await pressForward(page);
+   expect((await realClassOf(page, 'main')).split(' ')).toContain('btn-L');
++  // PP-06 변경: Patch 안 한 편집(③의 20번 넘는 수정)은 버려지고 테스트 영역도 btn-L, b1 글자는 Patch 때 값
++  expect((await mainClass(page)).split(' '), '테스트 영역 메인도 btn-L').toContain('btn-L');
++  expect((await canvasLabels(page))[1], 'Patch 안 한 b1 글자 수정은 버려짐').toBe('버튼');
+   expect(await keydownListenerCount(page)).toBe(baseline);
+ });
+ 
+diff --git a/e2e/mini-figma-palette.spec.ts b/e2e/mini-figma-palette.spec.ts
+index 91b05c6..f47c23e 100644
+--- a/e2e/mini-figma-palette.spec.ts
++++ b/e2e/mini-figma-palette.spec.ts
+@@ -289,12 +289,13 @@ test('QA-A28 색 입력칸에 포커스가 있을 때: Delete · Backspace는 
+   expect((await watch.take()).body.total, 'Delete · Backspace = DOM 변경 0').toBe(0);
+   await expect(input).toBeFocused();
+ 
+-  // Ctrl+Z = 실제 영역 [실행 취소] (포커스를 안 빼고 누른다), Ctrl+Shift+Z = [다시 실행]. 테스트 영역은 그대로
++  // Ctrl+Z = [실행 취소] (포커스를 안 빼고 누른다), Ctrl+Shift+Z = [다시 실행]. PP-06 변경: 테스트 영역 b2도 파랑(메인을 따름) ↔ 초록
+   await page.keyboard.press('Control+KeyZ');
+   expect(await realBgOf(page, 'b2')).toBe(rgb('#0052ff'));
+-  expect(await bgOf(page, 'b2')).toBe(rgb('#05b169'));
++  expect(await bgOf(page, 'b2')).toBe(rgb('#0052ff'));
+   expect(await selectedOnCanvas(page)).toEqual(['b2']);
+   await page.keyboard.press('Control+Shift+KeyZ');
+   expect(await realBgOf(page, 'b2')).toBe(rgb('#05b169'));
++  expect(await bgOf(page, 'b2')).toBe(rgb('#05b169'));
+   expect(await canvasOrder(page)).toEqual(['b1', 'b2', 'b3']);
+ });
+diff --git a/e2e/mini-figma-preview.spec.ts b/e2e/mini-figma-preview.spec.ts
+index c4a1855..4324b23 100644
+--- a/e2e/mini-figma-preview.spec.ts
++++ b/e2e/mini-figma-preview.spec.ts
+@@ -1,8 +1,8 @@
+-import { test, expect, URL, selectOnCanvas, moveInLayer, pickColor, pressBack, pressForward, realBgOf, watchSel, watchApp, noHorizontalScroll, areaSnapshot, realLabels, realButtonSel, watchFlash, boxInside, boxOverlap, boxSame, overlayCounts, navState, setMainLabel, titleText, buttonSel } from './mini-figma-helpers';
++import { test, expect, URL, selectOnCanvas, moveInLayer, pickColor, pressBack, pressForward, realBgOf, watchSel, watchApp, noHorizontalScroll, areaSnapshot, realLabels, realButtonSel, watchFlash, boxInside, boxOverlap, boxSame, overlayCounts, navState, setMainLabel, titleText, buttonSel, blurFocus, layerOrder, canvasOrder, selectedOnCanvas, selectedInLayer, overriddenFields, inRow, rgb } from './mini-figma-helpers';
+ import type { ButtonLook } from './mini-figma-helpers';
+ import { holdNodes as holdReal, sameNode as sameReal } from './phase1-helpers';
+ 
+-// [AI Note]: patch-preview(task_006) 인수 QA-46 ~ 54 + 공격 QA-A30 ~ A35 · A37. 이 스펙의 테스트는 desktop · mobile 두 프로젝트에서 모두 돈다.
++// [AI Note]: patch-preview(task_006) 인수 QA-46 ~ 54 + 공격 QA-A30 ~ A35 · A37. PP-06 변경(Dev-8, 2026-11-12): [실행 취소] · [다시 실행]은 테스트 영역(doc)도 그 칸 상태로 되돌린다 → QA-52 · 53 · 54 · A30 ~ A35 개정, 신규 QA-55 ~ 62 · A38 ~ A40 (같은 준비를 쓰는 것은 한 test로 묶고 이름에 번호를 모두 적음). 이 스펙의 테스트는 desktop · mobile 두 프로젝트에서 모두 돈다.
+ // 기준: .agent_workflow/tasks/task_006_ryuuuu5618_patch-preview/04_qa_evidence/qa_todo.md. QA-A36(한도 50)만 e2e로 안 만들고 단위 preview.test.ts · previewNav.test.ts가 맡는다 (사용자 결정: 느린 ≈ 110번 클릭 시나리오).
+ // 콘솔 error · 선언 안 한 dialog는 phase1-helpers의 test 확장이 자동으로 잡는다.
+ // 깜빡임은 시간에 기대는 효과라 사라지는 시간은 재지 않고, 박스가 「생길 때」의 위치(watchFlash)만 본다.
+@@ -267,7 +267,7 @@ test('QA-51 고르기만 하고 [Patch]를 6번 눌러도 기록이 안 쌓인
+   expect(await overlayCounts(page)).toEqual({ patch: null, flash: null });
+ });
+ 
+-test('QA-52 History 동기화: 라벨 → [Patch] → 크기 → [Patch] 뒤 [실행 취소] ×2 · [다시 실행] ×2가 매번 실제 영역만 그 기록 모습으로 움직이고 테스트 영역 · 앱 상태는 그대로다', async ({ page }) => {
++test('QA-52 History 동기화: 라벨 → [Patch] → 크기 → [Patch] 뒤 [실행 취소] ×2 · [다시 실행] ×2가 매번 실제 영역과 테스트 영역(속성 패널 값 포함)을 함께 그 기록 모습으로 움직이고 선택은 그대로다 (PP-06 변경)', async ({ page }) => {
+   await page.goto(URL);
+   const initial = await areaSnapshot(page, 'real');
+   await holdRealButtons(page);
+@@ -285,36 +285,37 @@ test('QA-52 History 동기화: 라벨 → [Patch] → 크기 → [Patch] 뒤 [
+   expect(initial.map((b) => b.label)).toEqual(INITIAL_LABELS);
+   await flash.take();
+ 
+-  /** 테스트 영역 · 앱 상태가 B 그대로다 (속성 패널 값) */
+-  const expectTestUntouched = async (where: string): Promise<void> => {
+-    expect(await areaSnapshot(page, 'test'), `${where}: 테스트 영역은 B 모습`).toEqual(B);
+-    await expect(page.getByTestId('prop-size')).toHaveValue('L');
+-    await expect(page.getByTestId('prop-label')).toHaveValue('확인');
+-  };
+-  const step = async (action: () => Promise<void>, expected: ButtonLook[], buttons: { back: boolean; forward: boolean }, where: string): Promise<void> => {
++  /** 테스트 영역 = 실제 영역 = 그 칸 모습이고 속성 패널 값도 그 칸 값이다. 선택(메인)은 그대로 (PP-06 변경) */
++  const step = async (action: () => Promise<void>, expected: ButtonLook[], props: { size: string; label: string }, buttons: { back: boolean; forward: boolean }, where: string): Promise<void> => {
+     await action();
+     expect(await areaSnapshot(page, 'real'), `${where}: 실제 영역`).toEqual(expected);
++    expect(await areaSnapshot(page, 'test'), `${where}: 테스트 영역도 그 칸 모습`).toEqual(expected);
++    await expect(page.getByTestId('prop-size')).toHaveValue(props.size);
++    await expect(page.getByTestId('prop-label')).toHaveValue(props.label);
++    expect(await selectedOnCanvas(page), `${where}: 선택(메인) 그대로`).toEqual(['main']);
+     const s = await navState(page);
+     expect({ back: s.back, forward: s.forward }, `${where}: 버튼`).toEqual(buttons);
+-    await expectTestUntouched(where);
+     await expectRealSame(page);
+     expect((await flash.take()).boxes.length, `${where}: 박스 ≥ 1`).toBeGreaterThanOrEqual(1);
+   };
++  const PA = { size: 'M', label: '확인' };
++  const P0 = { size: 'M', label: '버튼' };
++  const PB = { size: 'L', label: '확인' };
+ 
+   expect(await navState(page)).toEqual({ patch: true, back: true, forward: false });
+-  await step(() => back(page), A, { back: true, forward: true }, '[실행 취소] 1');
+-  await step(() => back(page), initial, { back: false, forward: true }, '[실행 취소] 2');
+-  await step(() => forward(page), A, { back: true, forward: true }, '[다시 실행] 1');
+-  await step(() => forward(page), B, { back: true, forward: false }, '[다시 실행] 2');
++  await step(() => back(page), A, PA, { back: true, forward: true }, '[실행 취소] 1');
++  await step(() => back(page), initial, P0, { back: false, forward: true }, '[실행 취소] 2');
++  await step(() => forward(page), A, PA, { back: true, forward: true }, '[다시 실행] 1');
++  await step(() => forward(page), B, PB, { back: true, forward: false }, '[다시 실행] 2');
+ 
+   // 같은 기록을 단축키로도 움직인다: Ctrl+Z ×2 → 처음, Ctrl+Shift+Z ×2 → B (버튼과 같은 모습 · 같은 버튼 상태)
+-  await step(() => pressBack(page), A, { back: true, forward: true }, 'Ctrl+Z 1');
+-  await step(() => pressBack(page), initial, { back: false, forward: true }, 'Ctrl+Z 2');
+-  await step(() => pressForward(page), A, { back: true, forward: true }, 'Ctrl+Shift+Z 1');
+-  await step(() => pressForward(page), B, { back: true, forward: false }, 'Ctrl+Shift+Z 2');
++  await step(() => pressBack(page), A, PA, { back: true, forward: true }, 'Ctrl+Z 1');
++  await step(() => pressBack(page), initial, P0, { back: false, forward: true }, 'Ctrl+Z 2');
++  await step(() => pressForward(page), A, PA, { back: true, forward: true }, 'Ctrl+Shift+Z 1');
++  await step(() => pressForward(page), B, PB, { back: true, forward: false }, 'Ctrl+Shift+Z 2');
+ });
+ 
+-test('QA-53 실행 취소한 뒤 [Patch]하면 앞쪽 기록을 버린다: 실제 영역이 B가 되고 [다시 실행]은 꺼지며, [실행 취소] 두 번이면 처음까지(기록 3칸)', async ({ page }) => {
++test('QA-53 실행 취소한 뒤 편집을 끼워 [Patch]하면 앞쪽 기록을 버린다: 두 영역이 새 모습 C가 되고 [다시 실행]은 꺼지며(원래 B는 어디에도 안 나옴), [실행 취소] 두 번이면 처음까지(기록 3칸) (PP-06 변경)', async ({ page }) => {
+   await page.goto(URL);
+   const initial = await areaSnapshot(page, 'real');
+   await setMainLabel(page, '확인');
+@@ -324,24 +325,42 @@ test('QA-53 실행 취소한 뒤 [Patch]하면 앞쪽 기록을 버린다: 실
+   await patch(page);
+   const B = await areaSnapshot(page, 'real');
+ 
++  // [실행 취소] 뒤 두 영역 = A. 이 상태의 편집 없는 [Patch]는 무변경이라 아무 일 없다 (새 QA-62가 따로 봄)
+   await back(page);
+   expect(await areaSnapshot(page, 'real')).toEqual(A);
+-  expect(await areaSnapshot(page, 'test')).toEqual(B);
++  expect(await areaSnapshot(page, 'test')).toEqual(A);
+   expect((await navState(page)).forward).toBe(true);
++  await patch(page);
++  expect(await areaSnapshot(page, 'real')).toEqual(A);
++  expect((await navState(page)).forward, '편집 없는 [Patch]는 기록을 안 만든다').toBe(true);
+ 
+-  // 테스트 영역은 그대로 둔 채 [Patch]
++  // 색 #cf202f를 편집해 끼운 뒤 [Patch] → 새 모습 C (A + 빨강)
++  await pickColor(page, '#cf202f');
+   await patch(page);
+-  expect(await areaSnapshot(page, 'real')).toEqual(B);
++  const C = await areaSnapshot(page, 'real');
++  expect(C[0].bg).toBe(RED);
++  expect(C[0].label).toBe('확인');
++  expect(C.every((b) => b.cls.includes('btn-M'))).toBe(true);
++  expect(await areaSnapshot(page, 'test')).toEqual(C);
+   expect(await navState(page)).toEqual({ patch: true, back: true, forward: false });
+ 
++  // [실행 취소] 두 번 = A → 처음, 칸마다 두 영역 같음 (기록 3칸)
+   await back(page);
+   expect(await areaSnapshot(page, 'real')).toEqual(A);
++  expect(await areaSnapshot(page, 'test')).toEqual(A);
+   await back(page);
+   expect(await areaSnapshot(page, 'real')).toEqual(initial);
++  expect(await areaSnapshot(page, 'test')).toEqual(initial);
+   expect(await navState(page)).toEqual({ patch: true, back: false, forward: true });
++  // [다시 실행]으로 끝까지 가도 원래 B(크기 L)는 안 나온다
++  await forward(page);
++  await forward(page);
++  expect(await areaSnapshot(page, 'real')).toEqual(C);
++  expect(await areaSnapshot(page, 'real')).not.toEqual(B);
++  expect((await navState(page)).forward).toBe(false);
+ });
+ 
+-test('QA-54 실제 영역은 눌러도 키를 받아도 반응이 없고, Ctrl+Z · Ctrl+Shift+Z는 실제 영역 [실행 취소] · [다시 실행]와 같은 기록을 움직이며 테스트 영역 · 앱 상태는 안 건드린다', async ({ page }) => {
++test('QA-54 실제 영역은 눌러도 키를 받아도 반응이 없고, Ctrl+Z · Ctrl+Shift+Z는 [실행 취소] · [다시 실행]와 같은 기록을 움직여 두 영역이 함께 파랑 ↔ 빨강이 되며 선택 · 속성 패널 제목은 그대로다 (PP-06 변경)', async ({ page }) => {
+   await page.goto(URL);
+   await selectOnCanvas(page, 'b1');
+   const title = await titleText(page);
+@@ -362,7 +381,7 @@ test('QA-54 실제 영역은 눌러도 키를 받아도 반응이 없고, Ctrl+Z
+   expect(await page.locator('[data-testid="layer-item"].selected').getAttribute('data-id')).toBe('b1');
+   expect(await page.locator('[data-testid="figma-button"].selected').getAttribute('data-id')).toBe('b1');
+ 
+-  // ② 편집(색) → [Patch] → 단축키 Ctrl+Z = [실행 취소], Ctrl+Shift+Z = [다시 실행]: 실제 영역만 움직이고 테스트 영역 · 선택 · 속성 패널은 그대로 (앱 편집 Undo는 없다)
++  // ② 편집(색) → [Patch] → 단축키 Ctrl+Z = [실행 취소], Ctrl+Shift+Z = [다시 실행]: 두 영역이 함께 움직이고 선택 · 속성 패널 제목은 그대로 (앱 편집 Undo는 없다)
+   await pickColor(page, '#cf202f');
+   await patch(page);
+   const afterEdit = await areaSnapshot(page, 'real');
+@@ -373,25 +392,33 @@ test('QA-54 실제 영역은 눌러도 키를 받아도 반응이 없고, Ctrl+Z
+   await pressBack(page);
+   expect((await areaSnapshot(page, 'real'))[1].bg, 'Ctrl+Z → 실제 영역 [실행 취소]').toBe(BLUE);
+   expect(await navState(page)).toEqual({ patch: true, back: false, forward: true });
+-  expect(await areaSnapshot(page, 'test'), '테스트 영역은 그대로').toEqual(testBefore);
++  expect((await areaSnapshot(page, 'test'))[1].bg, '테스트 영역 b1도 처음 색(파랑)').toBe(BLUE);
++  expect(await areaSnapshot(page, 'test')).toEqual(await areaSnapshot(page, 'real'));
++  await expect(page.getByTestId('prop-color')).toHaveValue('#0052ff');
+   expect(await titleText(page)).toBe(propTitle);
+   expect(await page.locator('[data-testid="figma-button"].selected').getAttribute('data-id')).toBe('b1');
+ 
+   await pressForward(page);
+   expect(await areaSnapshot(page, 'real'), 'Ctrl+Shift+Z → [다시 실행]').toEqual(afterEdit);
++  expect(await areaSnapshot(page, 'test'), '테스트 영역도 빨강').toEqual(testBefore);
++  await expect(page.getByTestId('prop-color')).toHaveValue('#cf202f');
+   expect(await navState(page)).toEqual({ patch: true, back: true, forward: false });
+ 
+-  // 버튼으로도 같은 기록: [실행 취소] 버튼 → 단축키 [다시 실행]
++  // 버튼으로도 같은 기록: [실행 취소] 버튼 → 두 영역 파랑 → 단축키 [다시 실행] → 빨강
+   await back(page);
+   expect((await areaSnapshot(page, 'real'))[1].bg).toBe(BLUE);
++  expect((await areaSnapshot(page, 'test'))[1].bg).toBe(BLUE);
+   await pressForward(page);
+   expect(await areaSnapshot(page, 'real')).toEqual(afterEdit);
+   expect(await areaSnapshot(page, 'test')).toEqual(testBefore);
+-  // 앱 편집 Undo는 없다: 도구 막대에 [↶] [↷]가 없고 테스트 영역은 키로 안 돌아간다
++  expect(await page.locator('[data-testid="figma-button"].selected').getAttribute('data-id')).toBe('b1');
++  // 앱 편집 Undo는 없다(도구 막대에 [↶] [↷] 없음). 끝에서 Ctrl+Z를 두 번 더 → 처음에서 멈추고 테스트 영역도 파랑 (PP-06 변경)
+   await expect(page.getByTestId('undo-button')).toHaveCount(0);
+   await pressBack(page);
+   await pressBack(page);
+-  expect((await areaSnapshot(page, 'test'))[1].bg, '테스트 영역은 색 빨강 그대로').toBe(RED);
++  expect((await areaSnapshot(page, 'test'))[1].bg, '처음에서 멈추고 테스트 영역 파랑').toBe(BLUE);
++  expect(await areaSnapshot(page, 'test')).toEqual(await areaSnapshot(page, 'real'));
++  expect((await navState(page)).back).toBe(false);
+ });
+ 
+ // ---------------------------------------------------------------------------
+@@ -421,6 +448,8 @@ test('QA-A30 [Patch] 연타: 편집 없이 20번은 기록 0칸, 라벨을 바
+   // 기록은 1칸만: [실행 취소] 한 번이면 처음 모습, 그 뒤 [실행 취소]는 꺼짐
+   await back(page);
+   expect(await areaSnapshot(page, 'real')).toEqual(initial);
++  expect(await areaSnapshot(page, 'test'), '테스트 영역도 처음 모습 (PP-06 변경)').toEqual(initial);
++  expect(await page.getByTestId('btn-label').allTextContents()).toEqual(INITIAL_LABELS);
+   expect((await navState(page)).back).toBe(false);
+   expect((await navState(page)).forward).toBe(true);
+ });
+@@ -439,6 +468,7 @@ test('QA-A31 [실행 취소] · [다시 실행] 연타: 한 번에 한 칸만 
+   history.push(await areaSnapshot(page, 'real'));
+   expect(history).toHaveLength(4);
+   const mut = await watchSel(page, 'real', '[data-testid="real-area"]');
++  const mutTest = await watchSel(page, 'test', '[data-testid="canvas"]');
+   const flash = await watchFlash(page);
+ 
+   // [실행 취소] 10번: 3번째에서 disabled, 4 ~ 10번째는 force 클릭
+@@ -448,12 +478,15 @@ test('QA-A31 [실행 취소] · [다시 실행] 연타: 한 번에 한 칸만 
+     else await page.getByTestId('back-button').click({ force: true });
+     index = Math.max(0, index - 1);
+     expect(await areaSnapshot(page, 'real'), `[실행 취소] ${i}번째`).toEqual(history[index]);
++    expect(await areaSnapshot(page, 'test'), `[실행 취소] ${i}번째 테스트 영역도`).toEqual(history[index]);
+     expect(await page.getByTestId('back-button').isEnabled(), `[실행 취소] ${i}번째 뒤 [실행 취소] 켜짐`).toBe(index > 0);
+     expect(await page.getByTestId('forward-button').isEnabled(), `[실행 취소] ${i}번째 뒤 [다시 실행] 켜짐`).toBe(true);
+     const m = await mut.take();
++    const mt = await mutTest.take();
+     const f = await flash.take();
+     if (i > 3) {
+       expect(m.total, `[실행 취소] ${i}번째는 DOM 변경 0`).toBe(0);
++      expect(mt.total, `[실행 취소] ${i}번째 테스트 영역도 변경 0`).toBe(0);
+       expect(f.boxes, `[실행 취소] ${i}번째는 박스 0`).toHaveLength(0);
+     } else {
+       expect(f.boxes.length, `[실행 취소] ${i}번째는 박스 ≥ 1`).toBeGreaterThanOrEqual(1);
+@@ -467,12 +500,15 @@ test('QA-A31 [실행 취소] · [다시 실행] 연타: 한 번에 한 칸만 
+     else await page.getByTestId('forward-button').click({ force: true });
+     index = Math.min(3, index + 1);
+     expect(await areaSnapshot(page, 'real'), `[다시 실행] ${i}번째`).toEqual(history[index]);
++    expect(await areaSnapshot(page, 'test'), `[다시 실행] ${i}번째 테스트 영역도`).toEqual(history[index]);
+     expect(await page.getByTestId('forward-button').isEnabled(), `[다시 실행] ${i}번째 뒤 [다시 실행] 켜짐`).toBe(index < 3);
+     expect(await page.getByTestId('back-button').isEnabled(), `[다시 실행] ${i}번째 뒤 [실행 취소] 켜짐`).toBe(true);
+     const m = await mut.take();
++    const mt = await mutTest.take();
+     const f = await flash.take();
+     if (i > 3) {
+       expect(m.total, `[다시 실행] ${i}번째는 DOM 변경 0`).toBe(0);
++      expect(mt.total, `[다시 실행] ${i}번째 테스트 영역도 변경 0`).toBe(0);
+       expect(f.boxes, `[다시 실행] ${i}번째는 박스 0`).toHaveLength(0);
+     }
+   }
+@@ -482,12 +518,14 @@ test('QA-A31 [실행 취소] · [다시 실행] 연타: 한 번에 한 칸만 
+     await pressBack(page);
+     index = Math.max(0, index - 1);
+     expect(await areaSnapshot(page, 'real'), `Ctrl+Z ${i}번째`).toEqual(history[index]);
++    expect(await areaSnapshot(page, 'test'), `Ctrl+Z ${i}번째 테스트 영역도`).toEqual(history[index]);
+     expect(await page.getByTestId('back-button').isEnabled(), `Ctrl+Z ${i}번째 뒤 [실행 취소] 켜짐`).toBe(index > 0);
+   }
+   for (let i = 1; i <= 10; i += 1) {
+     await pressForward(page);
+     index = Math.min(3, index + 1);
+     expect(await areaSnapshot(page, 'real'), `Ctrl+Shift+Z ${i}번째`).toEqual(history[index]);
++    expect(await areaSnapshot(page, 'test'), `Ctrl+Shift+Z ${i}번째 테스트 영역도`).toEqual(history[index]);
+     expect(await page.getByTestId('forward-button').isEnabled(), `Ctrl+Shift+Z ${i}번째 뒤 [다시 실행] 켜짐`).toBe(index < 3);
+   }
+   // 끝에서 실제 영역 = 마지막 Patch 모습 = 테스트 영역
+@@ -512,12 +550,18 @@ test('QA-A32 특수문자 라벨 `<b>x</b> &amp; "q" \'a\' 😀`는 실제 영
+   await back(page);
+   expect(await realLabels(page)).toEqual(INITIAL_LABELS);
+   expect(await real.locator('b').count()).toBe(0);
++  // PP-06 변경: 테스트 영역 글자 · 라벨 입력칸 값도 `버튼`
++  expect(await page.getByTestId('btn-label').allTextContents()).toEqual(INITIAL_LABELS);
++  expect(await page.getByTestId('canvas').locator('b').count()).toBe(0);
++  await expect(page.getByTestId('prop-label')).toHaveValue('버튼');
+ });
+ 
+-test('QA-A33 빈 입력: 메인 라벨을 모두 지우고 [Patch]하면 실제 영역 메인 · b1 글자 span이 빈 글자로 남고(노드 제거 아님), [실행 취소]하면 `버튼`으로 돌아간다', async ({ page }) => {
++test('QA-A33 빈 입력: 메인 라벨을 모두 지우고 [Patch]하면 실제 영역 메인 · b1 글자 span이 빈 글자로 남고(노드 제거 아님), [실행 취소]하면 두 영역 모두 `버튼`으로 돌아온다 (PP-06 변경)', async ({ page }) => {
+   await page.goto(URL);
+   const spanSel = (id: string) => `${realButtonSel(id)} [data-testid="real-btn-label"]`;
++  const testSpanSel = `${buttonSel('main')} [data-testid="btn-label"]`;
+   await holdReal(page, { realMainLabel: spanSel('main'), realB1Label: spanSel('b1') });
++  await holdReal(page, { testMainLabel: testSpanSel }, { area: 'app-root' });
+   await setMainLabel(page, '');
+   await patch(page);
+ 
+@@ -530,12 +574,16 @@ test('QA-A33 빈 입력: 메인 라벨을 모두 지우고 [Patch]하면 실제
+   const testAfterPatch = await areaSnapshot(page, 'test');
+   expect(testAfterPatch.map((b) => b.label)).toEqual(['', '', '취소', '삭제']);
+ 
+-  // [실행 취소] = 버튼 복원, 테스트 영역은 그대로
++  // [실행 취소] = 두 영역 모두 `버튼`으로 복원 (전: 테스트 영역은 빈 글자 그대로였음), 글자 span 4개 노드는 그대로
+   await back(page);
+   expect(await realLabels(page)).toEqual(INITIAL_LABELS);
+   await expect(page.getByTestId('real-btn-label')).toHaveCount(4);
+   expect(await sameReal(page, 'realMainLabel', spanSel('main'))).toBe(true);
+-  expect(await areaSnapshot(page, 'test')).toEqual(testAfterPatch);
++  expect(await page.getByTestId('btn-label').allTextContents(), '테스트 영역 글자도 복원').toEqual(INITIAL_LABELS);
++  await expect(page.getByTestId('btn-label')).toHaveCount(4);
++  expect(await sameReal(page, 'testMainLabel', testSpanSel, { area: 'app-root' }), '테스트 영역 메인 글자 span도 같은 노드').toBe(true);
++  expect(await areaSnapshot(page, 'test')).not.toEqual(testAfterPatch);
++  await expectAreasSame(page, '빈 라벨 [실행 취소] 뒤');
+ });
+ 
+ test('QA-A34 새로고침: 편집 · [Patch] · [실행 취소] 뒤 새로고침하면 실제 영역이 처음 모습(테스트 영역과 같음)이고 기록이 비어 있다', async ({ page }) => {
+@@ -596,11 +644,18 @@ test('QA-A35 구조 바꾸기를 섞어서(추가 → 순서 바꾸기 → 삭
+   const testLast = await areaSnapshot(page, 'test');
+   expect(testLast).toEqual(snaps[4]);
+ 
+-  // [실행 취소]를 끝까지: 한 칸씩 그 기록 모습, 테스트 영역은 그대로
++  /** 캔버스 · 레이어 행 순서도 그 칸 모습이다 (PP-06 변경) */
++  const expectOrders = async (i: number, where: string): Promise<void> => {
++    const ids = snaps[i].map((b) => b.id).filter((id) => id !== 'main');
++    expect(await canvasOrder(page), `${where}: 캔버스 순서`).toEqual(ids);
++    expect(await layerOrder(page), `${where}: 레이어 순서`).toEqual(ids);
++  };
++  // [실행 취소]를 끝까지: 한 칸씩 칸마다 테스트 영역 = 실제 영역 = 그 기록 모습 (전: 테스트 영역은 마지막 모습 그대로)
+   for (let i = 3; i >= 0; i -= 1) {
+     await back(page);
+     expect(await areaSnapshot(page, 'real'), `[실행 취소] 뒤 실제 영역 = 기록 ${i}`).toEqual(snaps[i]);
+-    expect(await areaSnapshot(page, 'test'), '테스트 영역 그대로').toEqual(testLast);
++    expect(await areaSnapshot(page, 'test'), `[실행 취소] 뒤 테스트 영역 = 기록 ${i}`).toEqual(snaps[i]);
++    await expectOrders(i, `[실행 취소] 뒤 기록 ${i}`);
+   }
+   expect((await navState(page)).back, '처음에서 [실행 취소] 꺼짐').toBe(false);
+   expect(await realLabels(page)).toEqual(INITIAL_LABELS);
+@@ -609,10 +664,280 @@ test('QA-A35 구조 바꾸기를 섞어서(추가 → 순서 바꾸기 → 삭
+   for (let i = 1; i <= 4; i += 1) {
+     await forward(page);
+     expect(await areaSnapshot(page, 'real'), `[다시 실행] 뒤 실제 영역 = 기록 ${i}`).toEqual(snaps[i]);
+-    expect(await areaSnapshot(page, 'test'), '테스트 영역 그대로').toEqual(testLast);
++    expect(await areaSnapshot(page, 'test'), `[다시 실행] 뒤 테스트 영역 = 기록 ${i}`).toEqual(snaps[i]);
++    await expectOrders(i, `[다시 실행] 뒤 기록 ${i}`);
+   }
+   expect((await navState(page)).forward, '끝에서 [다시 실행] 꺼짐').toBe(false);
+   expect(await areaSnapshot(page, 'real')).toEqual(testLast);
++  expect(await areaSnapshot(page, 'test')).toEqual(testLast);
++});
++
++// ---------------------------------------------------------------------------
++// PP-06 변경 (Dev-8, 2026-11-12): [실행 취소] · [다시 실행]이 테스트 영역도 그 칸 상태로 되돌린다
++// ---------------------------------------------------------------------------
++
++/** 테스트 영역 = 실제 영역 = expected 모습 (PP-06 변경 「두 영역이 같다」) */
++async function expectBoth(page: import('@playwright/test').Page, expected: ButtonLook[], where: string): Promise<void> {
++  expect(await areaSnapshot(page, 'real'), `${where}: 실제 영역`).toEqual(expected);
++  expect(await areaSnapshot(page, 'test'), `${where}: 테스트 영역`).toEqual(expected);
++}
++
++test('QA-55 · 61 색을 빨강으로 바꿔 [Patch]한 뒤 [실행 취소] = 두 영역 모두 파랑 · [다시 실행] = 모두 빨강(속성 패널 색 입력값 · 선택 그대로), 단축키 Ctrl+Z · Ctrl+Shift+Z와 버튼이 같은 칸을 움직인다', async ({ page }) => {
++  await page.goto(URL);
++  const initial = await areaSnapshot(page, 'real');
++  expect(initial.map((b) => b.bg)).toEqual([BLUE, BLUE, BLUE, RED]);
++  await selectOnCanvas(page, 'main');
++  await pickColor(page, '#cf202f');
++  await patch(page);
++  const red = await areaSnapshot(page, 'real');
++  expect(red.map((b) => b.bg)).toEqual([RED, RED, RED, RED]);
++  await expectBoth(page, red, 'Patch 뒤');
++
++  const at = async (expected: ButtonLook[], color: string, buttons: { back: boolean; forward: boolean }, where: string): Promise<void> => {
++    await expectBoth(page, expected, where);
++    await expect(page.getByTestId('prop-color'), `${where}: 속성 패널 색 입력값`).toHaveValue(color);
++    expect(await selectedOnCanvas(page), `${where}: 선택(메인) 그대로`).toEqual(['main']);
++    const s = await navState(page);
++    expect({ back: s.back, forward: s.forward }, `${where}: 버튼`).toEqual(buttons);
++  };
++
++  // QA-55: 버튼
++  await back(page);
++  await at(initial, '#0052ff', { back: false, forward: true }, 'QA-55 [실행 취소]');
++  await forward(page);
++  await at(red, '#cf202f', { back: true, forward: false }, 'QA-55 [다시 실행]');
++
++  // QA-61: 단축키 → 단축키 → 버튼 → 단축키 (같은 칸을 움직임)
++  await pressBack(page);
++  await at(initial, '#0052ff', { back: false, forward: true }, 'QA-61 Ctrl+Z');
++  await pressForward(page);
++  await at(red, '#cf202f', { back: true, forward: false }, 'QA-61 Ctrl+Shift+Z');
++  await back(page);
++  await at(initial, '#0052ff', { back: false, forward: true }, 'QA-61 [실행 취소] 버튼');
++  await pressForward(page);
++  await at(red, '#cf202f', { back: true, forward: false }, 'QA-61 Ctrl+Shift+Z (버튼 뒤)');
++});
++
++test('QA-56 · 57 · 62 Patch 안 한 편집은 이동하면 버려지고(실행 취소 · 다시 실행 모두), 실행 취소 뒤 편집 없는 [Patch]는 아무 일도 안 하며 [다시 실행]은 계속 켜져 있다', async ({ page }) => {
++  await page.goto(URL);
++  const initial = await areaSnapshot(page, 'real');
++  await setMainLabel(page, '확인');
++  await patch(page);
++  const A = await areaSnapshot(page, 'real');
++
++  // QA-56: 크기 L을 고르기만(Patch 안 함) → [실행 취소] = 편집 버려지고 처음 모습
++  await page.getByTestId('prop-size').selectOption('L');
++  expect(await areaSnapshot(page, 'test'), '헛돌지 않게: 테스트 영역은 L 편집 중').not.toEqual(A);
++  await back(page);
++  await expectBoth(page, initial, 'QA-56 [실행 취소]');
++  await expect(page.getByTestId('prop-size')).toHaveValue('M');
++  await expect(page.getByTestId('prop-label')).toHaveValue('버튼');
++  // [다시 실행] = A (확인 · M), 버려진 L은 안 돌아온다
++  await forward(page);
++  await expectBoth(page, A, 'QA-56 [다시 실행]');
++  await expect(page.getByTestId('prop-size')).toHaveValue('M');
++  await expect(page.getByTestId('prop-label')).toHaveValue('확인');
++
++  // QA-57: B(크기 L)까지 Patch 후 [실행 취소]해서 A 칸, 라벨 `임시`를 고르기만 → [다시 실행] = 편집 버리고 B
++  await page.getByTestId('prop-size').selectOption('L');
++  await patch(page);
++  const B = await areaSnapshot(page, 'real');
++  expect(B.every((b) => b.cls.includes('btn-L'))).toBe(true);
++  await back(page);
++  await expectBoth(page, A, 'QA-57 A 칸');
++  await page.getByTestId('prop-label').fill('임시');
++  expect((await areaSnapshot(page, 'test'))[0].label, '헛돌지 않게: 테스트 영역은 `임시` 편집 중').toBe('임시');
++  await forward(page);
++  await expectBoth(page, B, 'QA-57 [다시 실행]');
++  await expect(page.getByTestId('prop-label')).toHaveValue('확인');
++  await expect(page.getByTestId('prop-size')).toHaveValue('L');
++
++  // QA-62: A 칸으로 돌아가 편집 없이 [Patch] 3번 = 무변경 (실제 영역 변경 0 · 박스 0 · 테스트 영역도 그대로), [다시 실행] 계속 켜짐
++  await back(page);
++  await expectBoth(page, A, 'QA-62 A 칸');
++  const mut = await watchSel(page, 'real', '[data-testid="real-area"]');
++  const mutTest = await watchSel(page, 'test', '[data-testid="canvas"]');
++  const flash = await watchFlash(page);
++  for (let i = 0; i < 3; i += 1) await patch(page);
++  expect((await mut.take()).total, '실제 영역 DOM 변경 0').toBe(0);
++  expect((await mutTest.take()).total, '테스트 영역 DOM 변경 0').toBe(0);
++  expect((await flash.take()).boxes, '박스 0').toHaveLength(0);
++  await expectBoth(page, A, 'QA-62 [Patch] ×3 뒤');
++  expect(await navState(page), '[다시 실행] 계속 켜짐').toEqual({ patch: true, back: true, forward: true });
++  await forward(page);
++  await expectBoth(page, B, 'QA-62 [다시 실행]');
++});
++
++test('QA-58 · 59 인스턴스 b4를 추가해 [Patch]한 뒤 고르고 [실행 취소] = b4가 두 영역 · 레이어에서 사라지고 선택이 풀리며 [다시 실행]해도 선택은 풀린 채, 번호는 재사용되지 않는다(b5 · b6)', async ({ page }) => {
++  await page.goto(URL);
++  const initial = await areaSnapshot(page, 'real');
++  await page.getByTestId('add-instance').click();
++  await patch(page);
++  const withB4 = await areaSnapshot(page, 'real');
++  expect(withB4.map((b) => b.id)).toEqual(['main', 'b1', 'b2', 'b3', 'b4']);
++  await selectOnCanvas(page, 'b4');
++  expect(await titleText(page)).toContain('인스턴스');
++  expect(await layerOrder(page)).toEqual(['b1', 'b2', 'b3', 'b4']);
++
++  // QA-58: [실행 취소] = b4 사라짐 + 선택 풀림
++  await back(page);
++  await expectBoth(page, initial, 'QA-58 [실행 취소]');
++  expect(await canvasOrder(page)).toEqual(['b1', 'b2', 'b3']);
++  expect(await layerOrder(page)).toEqual(['b1', 'b2', 'b3']);
++  await expect(page.getByTestId('figma-button')).toHaveCount(4);
++  expect(await selectedOnCanvas(page)).toEqual([]);
++  expect(await selectedInLayer(page)).toEqual([]);
++  await expect(page.locator('.selected')).toHaveCount(0);
++  await expect(page.getByTestId('property-empty')).toBeVisible();
++  // [다시 실행] = b4가 돌아오지만 선택은 풀린 채
++  await forward(page);
++  await expectBoth(page, withB4, 'QA-58 [다시 실행]');
++  expect(await layerOrder(page)).toEqual(['b1', 'b2', 'b3', 'b4']);
++  expect(await selectedOnCanvas(page)).toEqual([]);
++  expect(await selectedInLayer(page)).toEqual([]);
++  await expect(page.getByTestId('property-empty')).toBeVisible();
++
++  // QA-59: [실행 취소] 뒤 [+ 인스턴스] = b5 (b4 번호 재사용 안 함), [다시 실행]은 Patch 안 한 b5를 버리고 b4 모습, 다시 [+ 인스턴스] = b6
++  await back(page);
++  await page.getByTestId('add-instance').click();
++  expect(await canvasOrder(page)).toEqual(['b1', 'b2', 'b3', 'b5']);
++  await forward(page);
++  expect(await canvasOrder(page)).toEqual(['b1', 'b2', 'b3', 'b4']);
++  await expectBoth(page, withB4, 'QA-59 [다시 실행]');
++  await page.getByTestId('add-instance').click();
++  expect(await canvasOrder(page)).toEqual(['b1', 'b2', 'b3', 'b4', 'b6']);
++});
++
++test('QA-60 고른 인스턴스 b2의 색 override가 [실행 취소]하면 이전 칸 값으로 돌아간다: 선택 · 속성 패널 제목은 그대로, override 표시(↻)가 사라지고 [다시 실행]하면 돌아온다', async ({ page }) => {
++  await page.goto(URL);
++  await selectOnCanvas(page, 'b2');
++  const title = await titleText(page);
++  expect(title).toContain('인스턴스');
++  await pickColor(page, '#05b169');
++  expect(await overriddenFields(page), 'b2는 처음부터 라벨이 override, 색이 더해짐').toEqual(['label', 'color']);
++  await patch(page);
++  const green = await areaSnapshot(page, 'real');
++  expect(green[2].bg).toBe(rgb('#05b169'));
++
++  await back(page);
++  expect(await selectedOnCanvas(page), '선택은 b2 그대로').toEqual(['b2']);
++  expect(await titleText(page)).toBe(title);
++  expect(await overriddenFields(page), '색 override 표시(↻)가 사라지고 라벨만 남음').toEqual(['label']);
++  await expect(page.locator(inRow('color', 'prop-reset'))).toHaveCount(0);
++  await expect(page.getByTestId('prop-color')).toHaveValue('#0052ff');
++  expect((await areaSnapshot(page, 'real'))[2].bg).toBe(BLUE);
++  expect((await areaSnapshot(page, 'test'))[2].bg).toBe(BLUE);
++
++  await forward(page);
++  expect(await overriddenFields(page)).toEqual(['label', 'color']);
++  await expectBoth(page, green, 'QA-60 [다시 실행]');
++  expect(await selectedOnCanvas(page)).toEqual(['b2']);
++});
++
++test('QA-A38 처음 칸 · 끝 칸에서 편집만 한 상태는 꺼진 [실행 취소] · [다시 실행] · 단축키로 버려지지 않고(명세 「처음 · 끝에서는 꺼짐」 우선), 그 상태를 [Patch]하면 정상적으로 새 기록이 된다', async ({ page }) => {
++  await page.goto(URL);
++  const initial = await areaSnapshot(page, 'real');
++  const mut = await watchSel(page, 'real', '[data-testid="real-area"]');
++  const flash = await watchFlash(page);
++
++  // ① 처음 칸(기록 0칸)에서 라벨을 `임시`로 바꾸고 포커스를 뺀 뒤 꺼진 [실행 취소] · Ctrl+Z
++  await setMainLabel(page, '임시');
++  await blurFocus(page);
++  const edited = await areaSnapshot(page, 'test');
++  expect(edited[0].label).toBe('임시');
++  await page.getByTestId('back-button').click({ force: true });
++  await pressBack(page);
++  expect(await areaSnapshot(page, 'test'), '편집이 안 버려짐').toEqual(edited);
++  await expect(page.getByTestId('prop-label')).toHaveValue('임시');
++  expect(await areaSnapshot(page, 'real')).toEqual(initial);
++  expect((await mut.take()).total, '실제 영역 DOM 변경 0').toBe(0);
++  expect((await flash.take()).boxes, '박스 0').toHaveLength(0);
++
++  // ② 라벨 `임시` → [Patch] (A, 끝 칸), 크기 L을 고르기만 한 뒤 꺼진 [다시 실행] · Ctrl+Shift+Z
++  await patch(page);
++  const A = await areaSnapshot(page, 'real');
++  await flash.take();
++  await mut.take();
++  await page.getByTestId('prop-size').selectOption('L');
++  const editedL = await areaSnapshot(page, 'test');
++  expect(editedL.every((b) => b.cls.includes('btn-L'))).toBe(true);
++  await page.getByTestId('forward-button').click({ force: true });
++  await pressForward(page);
++  expect(await areaSnapshot(page, 'test'), '편집이 안 버려짐').toEqual(editedL);
++  await expect(page.getByTestId('prop-size')).toHaveValue('L');
++  expect(await areaSnapshot(page, 'real')).toEqual(A);
++  expect((await mut.take()).total, '실제 영역 DOM 변경 0').toBe(0);
++  expect((await flash.take()).boxes, '박스 0').toHaveLength(0);
++
++  // 이 상태를 [Patch]하면 정상적으로 새 기록
++  await patch(page);
++  const B = await areaSnapshot(page, 'real');
++  expect(B).toEqual(editedL);
++  expect(await navState(page)).toEqual({ patch: true, back: true, forward: false });
++  await back(page);
++  await expectBoth(page, A, 'A38 [실행 취소]');
++});
++
++test('QA-A39 Patch 안 한 삭제는 [실행 취소]하면 버려져 b2가 되살아나고(선택은 풀린 채), [다시 실행]하면 A 모습(b2 있음 · 라벨 `확인`)이다', async ({ page }) => {
++  await page.goto(URL);
++  const initial = await areaSnapshot(page, 'real');
++  await setMainLabel(page, '확인');
++  await patch(page);
++  const A = await areaSnapshot(page, 'real');
++  await selectOnCanvas(page, 'b2');
++  await page.keyboard.press('Delete'); // Patch 안 함
++  expect(await canvasOrder(page), '헛돌지 않게: 삭제됨').toEqual(['b1', 'b3']);
++  expect(await selectedOnCanvas(page)).toEqual([]);
++
++  await back(page);
++  await expectBoth(page, initial, 'A39 [실행 취소]');
++  expect(await canvasOrder(page)).toEqual(['b1', 'b2', 'b3']);
++  expect(await layerOrder(page)).toEqual(['b1', 'b2', 'b3']);
++  expect(await selectedOnCanvas(page)).toEqual([]);
++  expect(await selectedInLayer(page)).toEqual([]);
++  await expect(page.getByTestId('property-empty')).toBeVisible();
++
++  await forward(page);
++  await expectBoth(page, A, 'A39 [다시 실행]');
++  expect(await canvasOrder(page)).toEqual(['b1', 'b2', 'b3']);
++  expect((await areaSnapshot(page, 'test'))[0].label).toBe('확인');
++});
++
++test('QA-A40 특수문자 · 빈 라벨을 [Patch]한 뒤 [실행 취소] ×3 · [다시 실행] ×2 왕복: 칸마다 두 영역 · 라벨 입력칸 값이 같고 `b` 요소 0개, 글자 span 4개 노드는 그대로다', async ({ page }) => {
++  const special = '<b>x</b> &amp; "q" \'a\' 😀';
++  await page.goto(URL);
++  const initial = await areaSnapshot(page, 'real');
++  const testSpanSel = `${buttonSel('main')} [data-testid="btn-label"]`;
++  await holdReal(page, { testMainLabel: testSpanSel }, { area: 'app-root' });
++  await setMainLabel(page, special);
++  await patch(page);
++  const S = await areaSnapshot(page, 'real');
++  await page.getByTestId('prop-label').fill('');
++  await patch(page);
++  const E = await areaSnapshot(page, 'real');
++  expect(S[0].label).toBe(special);
++  expect(E.map((b) => b.label)).toEqual(['', '', '취소', '삭제']);
++
++  const at = async (expected: ButtonLook[], labelValue: string, where: string): Promise<void> => {
++    await expectBoth(page, expected, where);
++    await expect(page.getByTestId('prop-label'), `${where}: 라벨 입력칸 값`).toHaveValue(labelValue);
++    expect(await page.getByTestId('canvas').locator('b').count(), `${where}: 테스트 영역 b 요소 0개`).toBe(0);
++    expect(await page.getByTestId('real-area').locator('b').count(), `${where}: 실제 영역 b 요소 0개`).toBe(0);
++    await expect(page.getByTestId('btn-label')).toHaveCount(4);
++    await expect(page.getByTestId('real-btn-label')).toHaveCount(4);
++  };
++  await at(E, '', '끝 칸 (빈 글자)');
++  await back(page);
++  await at(S, special, '[실행 취소] 1');
++  await back(page);
++  await at(initial, '버튼', '[실행 취소] 2');
++  await page.getByTestId('back-button').click({ force: true }); // 3번째 = 처음이라 꺼진 버튼
++  await at(initial, '버튼', '[실행 취소] 3 (꺼짐)');
++  await forward(page);
++  await at(S, special, '[다시 실행] 1');
++  await forward(page);
++  await at(E, '', '[다시 실행] 2');
++  expect(await sameReal(page, 'testMainLabel', testSpanSel, { area: 'app-root' }), '테스트 영역 메인 글자 span이 같은 노드').toBe(true);
+ });
+ 
+ test('QA-A37 인스턴스를 60번 더하고 긴 라벨(`A`×200)로 [Patch]해도 desktop은 페이지가 안 늘고 실제 영역 구역 안에서 스크롤되며, 두 크기 모두 가로 스크롤 · 버튼 넘침이 없다', async ({ page }, testInfo) => {
+diff --git a/fixtures/mini-figma/App.ts b/fixtures/mini-figma/App.ts
+index 25a8e42..5e6c519 100644
+--- a/fixtures/mini-figma/App.ts
++++ b/fixtures/mini-figma/App.ts
+@@ -10,8 +10,10 @@ import type { Doc, Field, MainProps } from './model';
+ import { keyAction } from './keys';
+ import { createPreview } from './preview';
+ import type { Preview } from './preview';
+-import { INITIAL_NAV, canBack, canForward, navBack, navForward, navPush } from './previewNav';
++import { INITIAL_NAV, canBack, canForward } from './previewNav';
+ import type { PreviewNav } from './previewNav';
++import { initialTrack, trackBack, trackDoc, trackForward, trackPush } from './previewDocs';
++import type { DocTrack } from './previewDocs';
+ 
+ // [AI Note]: 루트 컴포넌트. 모든 useState · useEffect · useMemo는 이 파일에서만 부른다 (MF-04 · P2-07 · P2-08).
+ // 자식(Toolbar · LayerPanel · Canvas · PropertyPanel)은 props만 받는 순수 함수이고, 바꾸고 싶은 것은 루트가 내려 주는 콜백 props로 알린다 (Lifting State Up).
+@@ -20,6 +22,7 @@ import type { PreviewNav } from './previewNav';
+ //   selectedId = 'main' | 인스턴스 id | null (처음은 null, ④-2)
+ //   nextId     = 새 인스턴스 번호 — 지운 번호를 다시 쓰지 않는다 (b4 추가 → 삭제 → 다시 추가 = b5, Q17-3)
+ // patch-preview(task_006)에서 앱 편집 Undo/Redo(history 칸 · undo.ts)를 없앴다: Ctrl/Cmd+Z · Shift+Z는 이제 실제 영역 State History의 [실행 취소] · [다시 실행]다.
++// PP-06 변경: [실행 취소] · [다시 실행]은 실제 영역과 함께 테스트 영역(doc)도 그 칸 상태로 되돌린다 (PRD T-08, Phase 1과 같은 약속). 칸마다 그때의 doc 사본을 previewDocs의 DocTrack이 들고 있다.
+ export function App(): VNode {
+   const [doc, setDoc] = useState<Doc>(INITIAL_DOC);
+   const [selectedId, setSelectedId] = useState<string | null>(null);
+@@ -75,7 +78,8 @@ export function App(): VNode {
+   //   [3] useMemo = 보관함: 한 번 만들어 계속 쓰는 같은 객체. 안에 createPreview 결과를 넣어 두는 자리이고 setter가 없어 바꿔도 렌더가 안 일어난다 (엔진에 useRef가 없어서 이렇게 한다)
+   //   [4] useEffect([]) = 마운트 patch 직후 한 번: DOM에서 테스트 영역 · 실제 영역 상자 · 깜빡임 층을 찾아 createPreview를 만든다 (렌더 중에는 DOM이 아직 없다). cleanup = 보관함 비움
+   //   [5] useState(nav) = 실행 취소 · 다시 실행 가능 여부 (App state, PP-09). 렌더 중 canBack · canForward로 계산해 Toolbar의 [실행 취소] [다시 실행]에 내려 준다
+-  const vault = useMemo<{ preview: Preview | null }>(() => ({ preview: null }), []);
++  //       보관함에는 `track`(기록 칸마다의 doc 사본)도 함께 둔다 — 새 Hook 칸 없이 7칸 그대로. state가 아니라 상자에 두는 이유: 같은 틱 연타에서 렌더 클로저 값이 낡아도 핸들러가 늘 동기로 최신 칸을 읽고 쓰게 하려고 (Dev-5 함수형 setter 연타와 같은 목적)
++  const vault = useMemo<{ preview: Preview | null; track: DocTrack }>(() => ({ preview: null, track: initialTrack(INITIAL_DOC) }), []);
+   useEffect(() => {
+     const testArea = document.querySelector('[data-testid="canvas"]');
+     const realArea = document.querySelector<HTMLElement>('[data-testid="real-area"]');
+@@ -88,17 +92,36 @@ export function App(): VNode {
+   }, []);
+   const [nav, setNav] = useState<PreviewNav>(INITIAL_NAV);
+ 
+-  // [AI Note]: [Patch] [실행 취소] [다시 실행] = 보관함의 createPreview 결과를 부르고, **기록이 실제로 움직였을 때만** nav를 바꾼다 (실제 영역 기록만 움직임, PP-06).
+-  // doc · selectedId는 건드리지 않는다 — 테스트 영역 · 앱 상태는 그대로. 바뀐 게 없는 Patch · 경계 이동은 false라 setter를 안 부른다.
+-  // nav는 함수형 setter로 바꾼다: 같은 틱에 연타해도 낡은 nav 값을 읽지 않고 쌓인 만큼 정확히 센다. 효과가 아직 안 돈 상태(보관함 비어 있음)면 아무것도 안 한다.
++  // [AI Note]: [Patch] = 실제 영역에 지금 테스트 영역 모습을 반영하고, **기록이 실제로 쌓였을 때만** 이 렌더의 doc(= Patch가 읽은 테스트 영역 DOM을 그린 바로 그 값)을 칸 사본으로 보관한다.
++  // 무변경 Patch(false)는 기록도 사본도 안 쌓는다. nav(state)는 버튼 꺼짐 계산용으로 보관함 track의 nav와 맞춘다 — 같은 객체면 렌더 0번.
+   const onPreviewPatch = (): void => {
+-    if (vault.preview?.patch()) setNav(navPush);
++    if (vault.preview?.patch()) {
++      vault.track = trackPush(vault.track, doc);
++      setNav(vault.track.nav);
++    }
++  };
++
++  // [AI Note]: [실행 취소] · [다시 실행] = 실제 영역 기록을 움직이고(PP-06), 성공하면 **테스트 영역 doc도 그 칸 사본으로 되돌린다** (PP-06 변경, T-08).
++  //   ① doc만 되돌림 (setDoc) — Patch 안 한 편집은 이 setDoc이 덮어써서 버려진다 (사용자 결정 ④)
++  //   ② selectedId는 그대로 두되, 되돌린 doc에 없는 인스턴스면 reconcileSelection이 null로 푼다 (MF-23). 함수형 setter라 같은 틱에 고른 것도 안 놓친다
++  //   ③ nextId는 setter 자체를 안 부른다 — 지운 번호를 다시 쓰지 않는다 (Q17-3)
++  // 경계(처음 · 끝)에서는 track이 같은 객체라 아무것도 안 한다 (꺼진 버튼 · 단축키로는 편집을 못 버림, 명세 「처음 · 끝에서는 꺼짐」 우선). setter 여러 개는 결정 9 B 배칭으로 렌더 1번.
++  const moveTo = (next: DocTrack): void => {
++    vault.track = next;
++    const target = trackDoc(next);
++    setDoc(target);
++    setSelectedId((prev) => reconcileSelection(prev, target));
++    setNav(next.nav);
+   };
+   const onPreviewBack = (): void => {
+-    if (vault.preview?.back()) setNav(navBack);
++    const next = trackBack(vault.track);
++    if (next === vault.track || !vault.preview?.back()) return;
++    moveTo(next);
+   };
+   const onPreviewForward = (): void => {
+-    if (vault.preview?.forward()) setNav(navForward);
++    const next = trackForward(vault.track);
++    if (next === vault.track || !vault.preview?.forward()) return;
++    moveTo(next);
+   };
+ 
+   // [AI Note]: 키보드 = 마운트 때 한 번이 아니라 "핸들러가 읽는 state가 바뀔 때마다" document에 다시 등록한다 (엔진 이벤트는 click · input뿐이라 keydown은 직접 등록, MF-34).
+diff --git a/fixtures/mini-figma/__tests__/app.test.ts b/fixtures/mini-figma/__tests__/app.test.ts
+index dd4094f..50bddce 100644
+--- a/fixtures/mini-figma/__tests__/app.test.ts
++++ b/fixtures/mini-figma/__tests__/app.test.ts
+@@ -7,6 +7,7 @@ import { App } from '../App';
+ import { INITIAL_DOC } from '../model';
+ import { PALETTE, textColorFor } from '../color';
+ import { INITIAL_NAV } from '../previewNav';
++import { initialTrack } from '../previewDocs';
+ import type { PreviewNav } from '../previewNav';
+ 
+ // [AI Note]: mini-figma 앱 단위 테스트 (jsdom, render(App, root)). 화면에는 patch 목록 · 렌더 횟수를 그리지 않으므로(MF-05)
+@@ -1055,7 +1056,7 @@ describe('키보드 · State History (Dev-11 + task_006)', () => {
+     expect(ids()).toEqual(['b1', 'b2', 'b3']);
+   });
+ 
+-  it('Ctrl+Z · Meta+Z = 실제 영역 [실행 취소], Ctrl+Shift+Z(`Z`로 와도) · Meta+Shift+Z = [다시 실행] — 테스트 영역 · doc은 그대로 (task_006)', async () => {
++  it('Ctrl+Z · Meta+Z = 실제 영역 [실행 취소], Ctrl+Shift+Z(`Z`로 와도) · Meta+Shift+Z = [다시 실행] — 테스트 영역 · doc도 그 칸으로 (task_006 · PP-06 변경)', async () => {
+     await click(buttonOf('main'));
+     await choose('prop-size', 'L');
+     await patchNow();
+@@ -1063,13 +1064,17 @@ describe('키보드 · State History (Dev-11 + task_006)', () => {
+     const doc = slot(0);
+     await press('z', { metaKey: true });
+     expect(realOf('main').classList.contains('btn-M')).toBe(true);
++    expect(buttonOf('main').classList.contains('btn-M'), '테스트 영역도 M').toBe(true);
++    expect(slot(0), '처음 칸 doc').toBe(INITIAL_DOC);
+     await press('Z', { ctrlKey: true, shiftKey: true });
+     expect(realOf('main').classList.contains('btn-L')).toBe(true);
++    expect(buttonOf('main').classList.contains('btn-L')).toBe(true);
++    expect(slot(0), 'Patch 때 doc 같은 참조').toBe(doc);
+     await press('z', { metaKey: true });
+     expect(realOf('main').classList.contains('btn-M')).toBe(true);
++    expect(buttonOf('main').classList.contains('btn-M')).toBe(true);
+     await press('Z', { metaKey: true, shiftKey: true });
+     expect(realOf('main').classList.contains('btn-L')).toBe(true);
+-    // 테스트 영역 · 앱 문서는 키로 안 움직인다
+     expect(buttonOf('main').classList.contains('btn-L')).toBe(true);
+     expect(slot(0)).toBe(doc);
+   });
+@@ -1122,12 +1127,14 @@ describe('키보드 · State History (Dev-11 + task_006)', () => {
+     expect(await press('z', { ctrlKey: true }, byId('prop-size'))).toBe(true);
+     expect(realOf('b2').classList.contains('btn-L')).toBe(false);
+     expect(realOf('b2').classList.contains('btn-M')).toBe(true);
++    expect(buttonOf('b2').classList.contains('btn-M'), '테스트 영역도 M').toBe(true);
+     expect(await press('Z', { ctrlKey: true, shiftKey: true }, byId('prop-size'))).toBe(true);
+     expect(realOf('b2').classList.contains('btn-L')).toBe(true);
++    expect(buttonOf('b2').classList.contains('btn-L')).toBe(true);
+     expect(await press('z', { metaKey: true }, byId('prop-icon'))).toBe(true);
+     expect(realOf('b2').classList.contains('btn-M')).toBe(true);
+-    // 테스트 영역은 그대로 L
+-    expect(buttonOf('b2').classList.contains('btn-L')).toBe(true);
++    // PP-06 변경: 테스트 영역도 마지막(z) 뒤 M
++    expect(buttonOf('b2').classList.contains('btn-M')).toBe(true);
+   });
+ 
+   it('색 입력칸(prop-color) 안의 Ctrl+Z · Ctrl+Shift+Z = 실제 영역 [실행 취소] · [다시 실행] + preventDefault, Delete · Backspace는 무시하고 막지 않는다 (④-3, Q18 ② 확장)', async () => {
+@@ -1144,10 +1151,11 @@ describe('키보드 · State History (Dev-11 + task_006)', () => {
+     expect(ids()).toEqual(['b1', 'b2', 'b3']);
+     expect(await press('z', { ctrlKey: true }, byId('prop-color'))).toBe(true);
+     expect(realBg('b2')).toBe(rgb('#0052ff'));
++    expect(bgOf('b2'), '테스트 영역 b2도 파랑 (PP-06 변경)').toBe(rgb('#0052ff'));
+     expect(await press('Z', { ctrlKey: true, shiftKey: true }, byId('prop-color'))).toBe(true);
+     expect(realBg('b2')).toBe(rgb('#05b169'));
+     expect(slot(1)).toBe('b2');
+-    expect(bgOf('b2'), '테스트 영역은 그대로').toBe(rgb('#05b169'));
++    expect(bgOf('b2'), '[다시 실행] 뒤 초록').toBe(rgb('#05b169'));
+   });
+ 
+   it('체크박스 안의 Ctrl+Z · Ctrl+Shift+Z = 실제 영역 [실행 취소] · [다시 실행] + preventDefault (Q18 ②)', async () => {
+@@ -1155,10 +1163,14 @@ describe('키보드 · State History (Dev-11 + task_006)', () => {
+     await toggle('prop-hasicon', true);
+     await patchNow();
+     expect(realIcons()).toBe(1);
++    const testIcons = (): number => root.querySelectorAll('[data-testid="btn-icon"]').length;
++    expect(testIcons()).toBe(1);
+     expect(await press('z', { ctrlKey: true }, byId('prop-hasicon'))).toBe(true);
+     expect(realIcons()).toBe(0);
++    expect(testIcons(), '테스트 영역 아이콘도 0 (PP-06 변경)').toBe(0);
+     expect(await press('Z', { ctrlKey: true, shiftKey: true }, byId('prop-hasicon'))).toBe(true);
+     expect(realIcons()).toBe(1);
++    expect(testIcons()).toBe(1);
+   });
+ 
+   it('입력칸 밖(body)에서 cancelable Ctrl+Z · Ctrl+Shift+Z는 defaultPrevented true + 실제 영역 [실행 취소] · [다시 실행], 그 밖의 키(Delete · Escape · Ctrl+Y · Alt+Z)는 false (Q18 ①)', async () => {
+@@ -1299,8 +1311,9 @@ describe('실제 영역 (patch-preview, PP-01 ~ 10 · Dev-7)', () => {
+     expect(slot(1)).toBeNull();
+     expect(slot(2)).toBe(4);
+     expect(slot(5)).toBe(INITIAL_NAV);
+-    const vault = (instance.hooks[3] as MemoHook).value as { preview: unknown };
++    const vault = (instance.hooks[3] as MemoHook).value as { preview: unknown; track: unknown };
+     expect(vault.preview).not.toBeNull();
++    expect(vault.track, '보관함 track = 처음 칸만 (PP-06 변경, 새 Hook 칸 없음)').toEqual(initialTrack(INITIAL_DOC));
+     // 여러 번 다시 그려도 같은 보관함 · 같은 preview
+     const preview = vault.preview;
+     await click(buttonOf('b2'));
+@@ -1362,6 +1375,7 @@ describe('실제 영역 (patch-preview, PP-01 ~ 10 · Dev-7)', () => {
+     await click(backButton());
+     expect(nav()).toEqual({ index: 0, size: 2 });
+     expect(realLabels()).toEqual(['버튼', '버튼', '취소', '삭제']);
++    expect(labels(), '테스트 영역도 처음 글자').toEqual(['버튼', '버튼', '취소', '삭제']);
+     expect(backButton().hasAttribute('disabled')).toBe(true);
+     expect(forwardButton().hasAttribute('disabled')).toBe(false);
+     before = renders;
+@@ -1370,6 +1384,7 @@ describe('실제 영역 (patch-preview, PP-01 ~ 10 · Dev-7)', () => {
+     expect(realLabels()).toEqual(['버튼', '버튼', '취소', '삭제']);
+     await click(forwardButton());
+     expect(realLabels()).toEqual(['확인', '확인', '취소', '삭제']);
++    expect(labels(), '[다시 실행] 뒤 테스트 영역 글자 확인').toEqual(['확인', '확인', '취소', '삭제']);
+     expect(forwardButton().hasAttribute('disabled')).toBe(true);
+   });
+ 
+@@ -1407,24 +1422,43 @@ describe('실제 영역 (patch-preview, PP-01 ~ 10 · Dev-7)', () => {
+     expect(realButtons().map((b) => b.className.includes('btn-M'))).toEqual([true, true, true, true]);
+     expect(backButton().hasAttribute('disabled')).toBe(true);
+     expect(forwardButton().hasAttribute('disabled')).toBe(false);
++    // PP-06 변경: 보관함 track을 렌더 클로저가 아니라 동기로 읽어 처음 칸까지 정확히 간다
++    expect(slot(0)).toBe(INITIAL_DOC);
++    expect(labels()).toEqual(['버튼', '버튼', '취소', '삭제']);
++    expect(buttons().map((b) => b.className.includes('btn-M'))).toEqual([true, true, true, true]);
+   });
+ 
+-  it('실행 취소한 뒤 [Patch]하면 앞쪽 기록을 버린다: nav size = index + 2, [다시 실행] 꺼짐', async () => {
++  it('실행 취소한 뒤 편집을 끼워 [Patch]하면 앞쪽 기록(과 doc 사본)을 버린다: nav size = index + 2, [다시 실행] 꺼짐 (PP-06 변경: 편집 없는 Patch는 무변경이라 기록이 안 쌓임)', async () => {
+     await editLabelAndPatch('확인');
+     await choose('prop-size', 'L');
+     await click(patchButton());
++    const docB = slot(0);
+     await click(backButton());
+     expect(nav()).toEqual({ index: 1, size: 3 });
++    // 편집 없이 [Patch] = 무변경: 기록 그대로 (옛 단언은 깨짐)
++    await click(patchButton());
++    expect(nav()).toEqual({ index: 1, size: 3 });
++    expect(forwardButton().hasAttribute('disabled')).toBe(false);
++    // 편집(크기 S)을 끼운 뒤 [Patch] = 새 기록
++    await choose('prop-size', 'S');
+     await click(patchButton());
+     expect(nav()).toEqual({ index: 2, size: 3 });
+     expect(forwardButton().hasAttribute('disabled')).toBe(true);
++    const docC = slot(0);
++    expect(docC).not.toBe(docB);
+     await click(backButton());
+     await click(backButton());
++    expect(slot(0), '처음 칸 doc').toBe(INITIAL_DOC);
+     expect(realLabels()).toEqual(['버튼', '버튼', '취소', '삭제']);
+     expect(backButton().hasAttribute('disabled')).toBe(true);
++    // 앞쪽의 원래 B(크기 L)는 어느 칸에도 없다
++    await click(forwardButton());
++    await click(forwardButton());
++    expect(slot(0)).toBe(docC);
++    expect(forwardButton().hasAttribute('disabled')).toBe(true);
+   });
+ 
+-  it('[Patch] · [실행 취소] · [다시 실행] 버튼과 단축키(Ctrl+Z · Ctrl+Shift+Z)는 같은 실제 영역 기록을 움직이고 doc · selectedId · 테스트 영역은 안 건드린다 (PP-06 · PP-10)', async () => {
++  it('[Patch] · [실행 취소] · [다시 실행] 버튼과 단축키(Ctrl+Z · Ctrl+Shift+Z)는 같은 기록을 움직이고 doc이 그 칸 사본으로 돌아가고 selectedId는 그대로다 (PP-06 변경 · PP-10)', async () => {
+     await click(buttonOf('main'));
+     await pick('#cf202f');
+     await patchButton().click();
+@@ -1445,6 +1479,7 @@ describe('실제 영역 (patch-preview, PP-01 ~ 10 · Dev-7)', () => {
+     expect(await press(false)).toBe(true);
+     expect(nav()).toEqual({ index: 0, size: 2 });
+     expect(realBgs().slice(0, 3)).toEqual([rgb('#0052ff'), rgb('#0052ff'), rgb('#0052ff')]);
++    expect(bgs().slice(0, 3), '테스트 영역도 처음 색').toEqual(realBgs().slice(0, 3));
+     expect(backButton().hasAttribute('disabled')).toBe(true);
+     expect(forwardButton().hasAttribute('disabled')).toBe(false);
+     // 버튼으로 다시 실행, 키로 다시 실행(끝이라 움직일 게 없음 = 막기만)
+@@ -1455,7 +1490,7 @@ describe('실제 영역 (patch-preview, PP-01 ~ 10 · Dev-7)', () => {
+     expect(await press(true)).toBe(true);
+     expect(nav()).toBe(navAtEnd);
+ 
+-    expect(slot(0)).toBe(doc);
++    expect(slot(0), '끝에서 Patch 때 doc 같은 참조').toBe(doc);
+     expect(slot(1)).toBe(selected);
+     expect(bgs()).toEqual(testBgs);
+   });
+@@ -1470,4 +1505,216 @@ describe('실제 영역 (patch-preview, PP-01 ~ 10 · Dev-7)', () => {
+     expect(slot(1)).toBe('b1');
+     expect(byId('property-title').textContent).toContain('버튼');
+   });
++
++  // -------------------------------------------------------------------------
++  // PP-06 변경 (Dev-8): [실행 취소] · [다시 실행]이 테스트 영역 doc도 그 칸 상태로 되돌린다 (U-1 ~ 7 · A41 · A42)
++  // -------------------------------------------------------------------------
++  const docIds = (): string[] => (slot(0) as typeof INITIAL_DOC).instances.map((it) => it.id);
++  const sameAreas = (): void => {
++    expect(labels()).toEqual(realLabels());
++    expect(buttons().map((b) => b.style.getPropertyValue('background-color'))).toEqual(realBgs());
++    expect(buttons()).toHaveLength(realButtons().length);
++  };
++  const keyZ = async (shiftKey: boolean): Promise<boolean> => {
++    const event = new KeyboardEvent('keydown', { key: 'z', ctrlKey: true, shiftKey, bubbles: true, cancelable: true });
++    document.body.dispatchEvent(event);
++    await Promise.resolve();
++    return event.defaultPrevented;
++  };
++
++  it('U-1 [Patch] 뒤 [실행 취소]: slot(0) = 처음 INITIAL_DOC 같은 참조, 테스트 영역 · 속성 패널이 그 doc 모습이고 실제 영역과 같다. [다시 실행]: slot(0) = Patch 때 doc 같은 참조', async () => {
++    await editLabelAndPatch('확인');
++    const docA = slot(0);
++    expect(docA).not.toBe(INITIAL_DOC);
++    await click(backButton());
++    expect(slot(0)).toBe(INITIAL_DOC);
++    expect(labels()).toEqual(['버튼', '버튼', '취소', '삭제']);
++    expect((byId('prop-label') as HTMLInputElement).value).toBe('버튼');
++    sameAreas();
++    await click(forwardButton());
++    expect(slot(0)).toBe(docA);
++    expect(labels()).toEqual(['확인', '확인', '취소', '삭제']);
++    expect((byId('prop-label') as HTMLInputElement).value).toBe('확인');
++    sameAreas();
++  });
++
++  it('U-2 selectedId: 되돌린 칸에도 있는 b2 · main은 그대로, 없는 b4는 null (다시 실행해도 자동으로 다시 고르지 않음)', async () => {
++    await click(buttonOf('b2'));
++    await pick('#05b169');
++    await click(patchButton());
++    await click(backButton());
++    expect(slot(1)).toBe('b2');
++    await click(forwardButton());
++    expect(slot(1)).toBe('b2');
++    await click(buttonOf('main'));
++    await choose('prop-size', 'L');
++    await click(patchButton());
++    await click(backButton());
++    expect(slot(1)).toBe('main');
++    await click(forwardButton());
++    // b4를 추가해 Patch한 뒤 b4를 고르고 [실행 취소]
++    await click(byId('add-instance'));
++    await click(patchButton());
++    await click(buttonOf('b4'));
++    expect(slot(1)).toBe('b4');
++    await click(backButton());
++    expect(slot(1), '되돌린 doc에 b4가 없다').toBeNull();
++    expect(root.querySelectorAll('.selected')).toHaveLength(0);
++    await click(forwardButton());
++    expect(slot(1), '다시 실행해도 자동으로 다시 고르지 않음').toBeNull();
++    // null은 그대로
++    await click(backButton());
++    expect(slot(1)).toBeNull();
++  });
++
++  it('U-3 nextId: slot(2)가 이동 전후 같은 숫자, 다음 [+ 인스턴스] = b5 (번호 재사용 없음)', async () => {
++    await click(byId('add-instance'));
++    await click(patchButton());
++    expect(slot(2)).toBe(5);
++    await click(backButton());
++    expect(slot(2)).toBe(5);
++    expect(docIds()).toEqual(['b1', 'b2', 'b3']);
++    await click(byId('add-instance'));
++    expect(docIds()).toEqual(['b1', 'b2', 'b3', 'b5']);
++    expect(slot(2)).toBe(6);
++  });
++
++  it('U-4 Patch 안 한 편집: [실행 취소] · [다시 실행]이 slot(0)을 사본으로 바꿔 편집이 사라진다', async () => {
++    await editLabelAndPatch('확인');
++    await typeInto('prop-label', '임시'); // Patch 안 함
++    expect(labels()[0]).toBe('임시');
++    await click(backButton());
++    expect(slot(0)).toBe(INITIAL_DOC);
++    expect(labels()).toEqual(['버튼', '버튼', '취소', '삭제']);
++    expect((byId('prop-label') as HTMLInputElement).value).toBe('버튼');
++    await typeInto('prop-label', '또임시');
++    await click(forwardButton());
++    expect(labels()).toEqual(['확인', '확인', '취소', '삭제']);
++    expect((byId('prop-label') as HTMLInputElement).value).toBe('확인');
++    sameAreas();
++  });
++
++  it('U-5 경계: 처음 · 끝 칸에서 편집만 한 상태로 [실행 취소] · [다시 실행] · Ctrl+Z · Ctrl+Shift+Z → slot(0) 같은 참조 · 렌더 0번 · 키는 preventDefault만', async () => {
++    await click(buttonOf('main'));
++    await typeInto('prop-label', '임시'); // 처음 칸 (기록 1칸)에서 편집만
++    let doc = slot(0);
++    let before = renders;
++    await click(backButton());
++    await click(forwardButton());
++    expect(await keyZ(false)).toBe(true);
++    expect(await keyZ(true)).toBe(true);
++    expect(renders - before).toBe(0);
++    expect(slot(0)).toBe(doc);
++    expect(labels()[0]).toBe('임시');
++    // 끝 칸
++    await click(patchButton());
++    await choose('prop-size', 'L');
++    doc = slot(0);
++    before = renders;
++    await click(forwardButton());
++    expect(await keyZ(true)).toBe(true);
++    expect(renders - before).toBe(0);
++    expect(slot(0)).toBe(doc);
++    expect(buttonOf('main').classList.contains('btn-L')).toBe(true);
++  });
++
++  it('U-6 무변경 Patch: [실행 취소] 뒤 편집 없이 [Patch] → slot(5) 같은 객체 · 렌더 0번 · [다시 실행] 켜짐 유지', async () => {
++    await editLabelAndPatch('확인');
++    await click(backButton());
++    const navBefore = slot(5);
++    const before = renders;
++    await click(patchButton());
++    await click(patchButton());
++    expect(slot(5)).toBe(navBefore);
++    expect(renders - before).toBe(0);
++    expect(forwardButton().hasAttribute('disabled')).toBe(false);
++    expect(slot(0)).toBe(INITIAL_DOC);
++  });
++
++  it('U-7 렌더 횟수: [실행 취소] 한 번 = setDoc · setSelectedId · setNav 배칭으로 렌더 1번, 도구 막대 patch는 버튼 꺼짐 속성(SET_ATTR)뿐', async () => {
++    await editLabelAndPatch('확인');
++    await click(byId('add-instance'));
++    await click(patchButton());
++    await click(backButton()); // index 1
++    const before = renders;
++    await click(backButton()); // index 0: 처음 칸이라 [실행 취소]가 꺼짐
++    expect(renders - before, '이동 한 번 = 렌더 1번').toBe(1);
++    expect(toolbarCounts(instance.lastPatches)).toEqual({ SET_ATTR: 1 });
++    // 선택이 풀리는 이동도 렌더 1번
++    await click(forwardButton());
++    await click(forwardButton());
++    await click(buttonOf('b4'));
++    expect(slot(1)).toBe('b4');
++    const before2 = renders;
++    await click(backButton());
++    expect(renders - before2).toBe(1);
++    expect(slot(1)).toBeNull();
++  });
++
++  it('A41 같은 틱 연타: Patch 3번 쌓고 [실행 취소]를 같은 틱에 두 번, 이어서 [다시 실행] 한 번 · 두 번 → 한 칸씩 정확히 (slot(0) 사본 같은 참조)', async () => {
++    await click(buttonOf('main'));
++    await typeInto('prop-label', '확인');
++    await click(patchButton());
++    const doc1 = slot(0);
++    await choose('prop-size', 'L');
++    await click(patchButton());
++    const doc2 = slot(0);
++    await pick('#cf202f');
++    await click(patchButton());
++    const doc3 = slot(0);
++    expect(nav()).toEqual({ index: 3, size: 4 });
++    backButton().click();
++    backButton().click();
++    await Promise.resolve();
++    expect(nav()).toEqual({ index: 1, size: 4 });
++    expect(slot(0)).toBe(doc1);
++    expect(labels()[0]).toBe('확인');
++    expect(buttonOf('main').classList.contains('btn-M')).toBe(true);
++    sameAreas();
++    expect(backButton().hasAttribute('disabled')).toBe(false);
++    expect(forwardButton().hasAttribute('disabled')).toBe(false);
++    forwardButton().click();
++    await Promise.resolve();
++    expect(nav()).toEqual({ index: 2, size: 4 });
++    expect(slot(0)).toBe(doc2);
++    sameAreas();
++    forwardButton().click();
++    forwardButton().click();
++    await Promise.resolve();
++    expect(nav()).toEqual({ index: 3, size: 4 });
++    expect(slot(0)).toBe(doc3);
++    expect(forwardButton().hasAttribute('disabled')).toBe(true);
++    sameAreas();
++  });
++
++  it('A42 한도 50: [+ 인스턴스] → [Patch] 55번 → [실행 취소]를 계속: 사본 · 두 영역 버튼 수가 맞고 정확히 49번째에 꺼진다, [다시 실행] 49번 = 끝', async () => {
++    for (let i = 0; i < 55; i++) {
++      await click(byId('add-instance'));
++      await click(patchButton());
++    }
++    expect(nav()).toEqual({ index: 49, size: 50 });
++    expect(docIds()).toHaveLength(58);
++    let undone = 0;
++    while (!backButton().hasAttribute('disabled')) {
++      await click(backButton());
++      undone++;
++      const instancesNow = (slot(0) as typeof INITIAL_DOC).instances.length;
++      expect(buttons().length - 1, `undo ${undone}: 테스트 영역`).toBe(instancesNow);
++      expect(realButtons().length - 1, `undo ${undone}: 실제 영역`).toBe(instancesNow);
++      expect(instancesNow).toBe(58 - undone);
++      if (undone > 60) throw new Error('끝나지 않음');
++    }
++    expect(undone).toBe(49);
++    // 가장 오래된 6칸이 빠졌으므로 맨 앞 = 인스턴스 3 + 6 = 9개
++    expect((slot(0) as typeof INITIAL_DOC).instances).toHaveLength(9);
++    const at = slot(0);
++    const before = renders;
++    await click(backButton());
++    expect(renders - before, '50번째 클릭은 아무 일 없음').toBe(0);
++    expect(slot(0)).toBe(at);
++    for (let i = 0; i < 49; i++) await click(forwardButton());
++    expect(forwardButton().hasAttribute('disabled')).toBe(true);
++    expect(docIds()).toHaveLength(58);
++    sameAreas();
++  });
+ });
+diff --git a/fixtures/mini-figma/__tests__/preview.test.ts b/fixtures/mini-figma/__tests__/preview.test.ts
+index c705d38..8eee98c 100644
+--- a/fixtures/mini-figma/__tests__/preview.test.ts
++++ b/fixtures/mini-figma/__tests__/preview.test.ts
+@@ -261,7 +261,7 @@ describe('Patch 기대 표 (실제 영역 patch 종류 · 개수) — R-1 ~ R-13
+ });
+ 
+ describe('뒤로 · 앞으로 (PP-06)', () => {
+-  it('Patch 2번 → back · back · forward · forward 매 단계 실제 영역이 그 기록 모습, 경계 이동은 false, 테스트 영역은 그대로', async () => {
++  it('Patch 2번 → back · back · forward · forward 매 단계 실제 영역이 그 기록 모습, 경계 이동은 false, 테스트 영역은 그대로 (모듈 단위)', async () => {
+     const initial = realLook();
+     await selectMain();
+     await typeInto('prop-label', '확인');
+diff --git a/fixtures/mini-figma/__tests__/previewDocs.test.ts b/fixtures/mini-figma/__tests__/previewDocs.test.ts
+new file mode 100644
+index 0000000..920dcbb
+--- /dev/null
++++ b/fixtures/mini-figma/__tests__/previewDocs.test.ts
+@@ -0,0 +1,171 @@
++import { describe, expect, it } from 'vitest';
++import { History } from '@mini-react/react-dom';
++import { HISTORY_LIMIT } from '@mini-react/shared';
++import type { HistoryEntry } from '@mini-react/shared';
++import { INITIAL_DOC } from '../model';
++import type { Doc } from '../model';
++import { initialTrack, trackBack, trackDoc, trackForward, trackPush } from '../previewDocs';
++import type { DocTrack } from '../previewDocs';
++
++// [AI Note]: 실제 영역 기록 칸마다 그때의 doc 사본을 들고 있는 모델(PP-06 변경). 칸 번호 = nav.index, 불변식 docs.length === nav.size.
++// 칸 수 · 잘림 · 경계는 previewNav(navPush · navBack · navForward)가 정하고, 엔진 History에 같은 연산을 돌려 매 단계 맞춰 본다.
++
++/** 번호표가 붙은 doc 사본 (label에 번호를 넣어 서로 구별한다) */
++const docN = (n: number): Doc => ({ main: { ...INITIAL_DOC.main, label: `d${n}` }, instances: [] });
++const tag = (d: Doc): string => d.main.label;
++const entry = (n: number): HistoryEntry => ({ snapshot: [], patches: [], inverse: [{ kind: 'SET_TEXT', path: [0], before: String(n), after: String(n - 1) }] });
++
++/** trackPush · trackBack · trackForward를 하나씩 받아 DocTrack과 엔진 History를 같이 굴리는 짝 */
++function pair() {
++  let track: DocTrack = initialTrack(docN(0));
++  let counter = 0;
++  const history = new History({ snapshot: [], patches: [], inverse: [] });
++  // 엔진 쪽 각 항목에 번호표를 달아 두는 곳: 엔진 항목 → 번호표
++  const labels = new Map<object, string>();
++  labels.set(history.current, 'd0');
++  return {
++    push() {
++      counter++;
++      track = trackPush(track, docN(counter));
++      history.push(entry(counter));
++      labels.set(history.current, `d${counter}`);
++    },
++    back() {
++      track = trackBack(track);
++      history.back();
++    },
++    forward() {
++      track = trackForward(track);
++      history.forward();
++    },
++    get track() {
++      return track;
++    },
++    engine() {
++      let index = 0;
++      for (let x = history.current; x.prev !== null; x = x.prev) index++;
++      return { index, size: history.size, tag: labels.get(history.current) };
++    },
++  };
++}
++
++describe('PD-1 기본 동작', () => {
++  it('처음 trackDoc = 처음 doc, nav는 { index: 0, size: 1 }', () => {
++    const t = initialTrack(INITIAL_DOC);
++    expect(trackDoc(t)).toBe(INITIAL_DOC);
++    expect(t.nav).toEqual({ index: 0, size: 1 });
++    expect(t.docs).toEqual([INITIAL_DOC]);
++  });
++
++  it('push · back · forward마다 trackDoc이 그 칸 doc이고, 이전 DocTrack은 안 고쳐진다', () => {
++    const d0 = docN(0), d1 = docN(1), d2 = docN(2);
++    const t0 = initialTrack(d0);
++    const t1 = trackPush(t0, d1);
++    const t2 = trackPush(t1, d2);
++    expect(trackDoc(t1)).toBe(d1);
++    expect(trackDoc(t2)).toBe(d2);
++    const b1 = trackBack(t2);
++    expect(trackDoc(b1)).toBe(d1);
++    const b0 = trackBack(b1);
++    expect(trackDoc(b0)).toBe(d0);
++    expect(trackDoc(trackForward(b0))).toBe(d1);
++    expect(trackDoc(trackForward(trackForward(b0)))).toBe(d2);
++    // 입력 불변
++    expect(t0.docs).toEqual([d0]);
++    expect(t0.nav).toEqual({ index: 0, size: 1 });
++    expect(t2.docs).toEqual([d0, d1, d2]);
++    expect(t2.nav).toEqual({ index: 2, size: 3 });
++    expect(b0.docs).toEqual([d0, d1, d2]);
++  });
++});
++
++describe('PD-2 경계', () => {
++  it('처음에서 trackBack · 끝에서 trackForward는 같은 객체', () => {
++    const t0 = initialTrack(docN(0));
++    expect(trackBack(t0)).toBe(t0);
++    expect(trackForward(t0)).toBe(t0);
++    const t2 = trackPush(trackPush(t0, docN(1)), docN(2));
++    expect(trackForward(t2)).toBe(t2);
++    const b = trackBack(trackBack(t2));
++    expect(trackBack(b)).toBe(b);
++  });
++});
++
++describe('PD-3 뒤로 간 뒤 push', () => {
++  it('앞쪽 사본이 사라져 docs.length = index + 2, 버려진 사본은 어떤 칸에도 안 남는다', () => {
++    const d = [0, 1, 2, 3].map(docN);
++    let t = initialTrack(d[0]!);
++    t = trackPush(t, d[1]!);
++    t = trackPush(t, d[2]!);
++    t = trackBack(trackBack(t)); // index 0
++    const fresh = docN(9);
++    t = trackPush(t, fresh);
++    expect(t.nav).toEqual({ index: 1, size: 2 });
++    expect(t.docs.length).toBe(t.nav.index + 1);
++    expect(t.docs).toEqual([d[0], fresh]);
++    expect(t.docs).not.toContain(d[1]);
++    expect(t.docs).not.toContain(d[2]);
++    expect(trackForward(t)).toBe(t);
++  });
++});
++
++describe('PD-4 한도 50 · 엔진 대조', () => {
++  it('push 60번 → docs 50개, 맨 앞 = 11번째 사본(d10), index 49, back 49번째에 맨 앞 사본, 50번째는 같은 객체', () => {
++    let t = initialTrack(docN(0));
++    for (let i = 1; i <= 60; i++) t = trackPush(t, docN(i));
++    expect(t.docs.length).toBe(HISTORY_LIMIT);
++    expect(t.nav).toEqual({ index: 49, size: 50 });
++    expect(tag(t.docs[0]!)).toBe('d11');
++    expect(tag(trackDoc(t))).toBe('d60');
++    for (let i = 0; i < 49; i++) t = trackBack(t);
++    expect(tag(trackDoc(t))).toBe('d11');
++    expect(trackBack(t)).toBe(t);
++  });
++
++  it('엔진 History에 같은 연산(push · back · forward · 뒤로 간 뒤 push · 60번 push)을 넣어 매 단계 size · 현재 칸이 같다', () => {
++    const p = pair();
++    const same = () => {
++      const e = p.engine();
++      expect(p.track.nav.size).toBe(e.size);
++      expect(p.track.nav.index).toBe(e.index);
++      expect(tag(trackDoc(p.track))).toBe(e.tag);
++      expect(p.track.docs.length).toBe(p.track.nav.size);
++    };
++    same();
++    p.push(); same();
++    p.push(); same();
++    p.back(); same();
++    p.back(); same();
++    p.back(); same();
++    p.forward(); same();
++    p.push(); same(); // 뒤로 간 뒤 push
++    p.forward(); same();
++    for (let i = 0; i < 60; i++) { p.push(); same(); }
++    for (let i = 0; i < 55; i++) { p.back(); same(); }
++    for (let i = 0; i < 55; i++) { p.forward(); same(); }
++  });
++});
++
++describe('PD-5 무작위 불변식', () => {
++  it('무작위 연산 2000번 동안 docs.length === nav.size · trackDoc === docs[nav.index] · 엔진 History와 같은 위치', () => {
++    const p = pair();
++    let seed = 12345;
++    const rnd = (): number => {
++      seed = (seed * 1664525 + 1013904223) % 4294967296;
++      return seed / 4294967296;
++    };
++    for (let i = 0; i < 2000; i++) {
++      const r = rnd();
++      if (r < 0.4) p.push();
++      else if (r < 0.7) p.back();
++      else p.forward();
++      const t = p.track;
++      const e = p.engine();
++      expect(t.docs.length).toBe(t.nav.size);
++      expect(trackDoc(t)).toBe(t.docs[t.nav.index]);
++      expect(t.nav.size).toBe(e.size);
++      expect(t.nav.index).toBe(e.index);
++      expect(tag(trackDoc(t))).toBe(e.tag);
++    }
++  });
++});
+diff --git a/fixtures/mini-figma/__tests__/rootOnlyHooks.test.ts b/fixtures/mini-figma/__tests__/rootOnlyHooks.test.ts
+index 6f28770..aa9f587 100644
+--- a/fixtures/mini-figma/__tests__/rootOnlyHooks.test.ts
++++ b/fixtures/mini-figma/__tests__/rootOnlyHooks.test.ts
+@@ -81,7 +81,7 @@ describe('T-16 코드 확인 — 루트(App.ts)만 Hook을 쓴다', () => {
+   it('components/*.ts · model · keys · color는 useEffect도 부르지 않는다 (keydown 등록은 App.ts 한 곳)', () => {
+     const files = [
+       ...Object.entries(components).map(([path, source]) => [path, source] as const),
+-      ...['model.ts', 'keys.ts', 'color.ts', 'previewVNode.ts', 'previewNav.ts', 'preview.ts', 'main.ts'].map((file) => [file, sourceOf(topLevel, `../${file}`)] as const),
++      ...['model.ts', 'keys.ts', 'color.ts', 'previewVNode.ts', 'previewNav.ts', 'previewDocs.ts', 'preview.ts', 'main.ts'].map((file) => [file, sourceOf(topLevel, `../${file}`)] as const),
+     ];
+     for (const [path, source] of files) {
+       expect(/\buseEffect\b/.test(stripNoise(source)), `${path}의 useEffect`).toBe(false);
+@@ -89,7 +89,7 @@ describe('T-16 코드 확인 — 루트(App.ts)만 Hook을 쓴다', () => {
+     }
+   });
+ 
+-  for (const file of ['model.ts', 'keys.ts', 'color.ts', 'previewVNode.ts', 'previewNav.ts']) {
++  for (const file of ['model.ts', 'keys.ts', 'color.ts', 'previewVNode.ts', 'previewNav.ts', 'previewDocs.ts']) {
+     it(`${file}: 순수 모듈이라 Hook · document · window · 엔진 내부 접근이 없다`, () => {
+       expect(findViolations(sourceOf(topLevel, `../${file}`))).toEqual([]);
+     });
+@@ -103,7 +103,7 @@ describe('T-16 코드 확인 — 루트(App.ts)만 Hook을 쓴다', () => {
+   });
+ 
+   it('App.ts 밖의 소스(model · keys · color · main)는 Hook을 쓰지 않는다', () => {
+-    for (const file of ['model.ts', 'keys.ts', 'color.ts', 'previewVNode.ts', 'previewNav.ts', 'preview.ts', 'main.ts']) {
++    for (const file of ['model.ts', 'keys.ts', 'color.ts', 'previewVNode.ts', 'previewNav.ts', 'previewDocs.ts', 'preview.ts', 'main.ts']) {
+       const code = stripNoise(sourceOf(topLevel, `../${file}`));
+       for (const hook of ['useState', 'useEffect', 'useMemo']) {
+         expect(new RegExp(`\\b${hook}\\b`).test(code), `${file}의 ${hook}`).toBe(false);
+diff --git a/fixtures/mini-figma/previewDocs.ts b/fixtures/mini-figma/previewDocs.ts
+new file mode 100644
+index 0000000..51166c5
+--- /dev/null
++++ b/fixtures/mini-figma/previewDocs.ts
+@@ -0,0 +1,42 @@
++import type { Doc } from './model';
++import { INITIAL_NAV, navBack, navForward, navPush } from './previewNav';
++import type { PreviewNav } from './previewNav';
++
++// [AI Note]: 실제 영역 기록의 칸마다 "그 칸일 때의 테스트 영역 doc 사본"을 들고 있는 순수 모델 (PP-06 변경, T-08).
++// 칸 번호 = nav.index, 불변식 docs.length === nav.size. 칸 수 · 앞쪽 버림 · 한도(HISTORY_LIMIT) 규칙은 새로 만들지 않고
++// previewNav의 navPush · navBack · navForward를 그대로 불러 엔진 History와 같은 번호를 얻는다 → docs는 nav.size에 맞춰 같이 잘려 어긋날 수 없다.
++// Doc은 불변 값이라 사본 = 참조 하나면 된다 (복사 안 함).
++export interface DocTrack {
++  readonly nav: PreviewNav;
++  readonly docs: readonly Doc[];
++}
++
++export function initialTrack(doc: Doc): DocTrack {
++  return { nav: INITIAL_NAV, docs: [doc] };
++}
++
++/** Patch로 새 기록이 쌓임: 앞쪽 사본을 버리고 이 doc을 붙인 뒤, 한도를 넘으면 맨 앞(가장 오래된 칸)부터 뺀다 */
++export function trackPush(track: DocTrack, doc: Doc): DocTrack {
++  const nav = navPush(track.nav);
++  const docs = [...track.docs.slice(0, track.nav.index + 1), doc];
++  return { nav, docs: docs.length > nav.size ? docs.slice(docs.length - nav.size) : docs };
++}
++
++/** 처음 칸이면 같은 객체 (경계) */
++export function trackBack(track: DocTrack): DocTrack {
++  const nav = navBack(track.nav);
++  return nav === track.nav ? track : { nav, docs: track.docs };
++}
++
++/** 끝 칸이면 같은 객체 (경계) */
++export function trackForward(track: DocTrack): DocTrack {
++  const nav = navForward(track.nav);
++  return nav === track.nav ? track : { nav, docs: track.docs };
++}
++
++/** 지금 칸의 doc */
++export function trackDoc(track: DocTrack): Doc {
++  const doc = track.docs[track.nav.index];
++  if (doc === undefined) throw new Error('doc 사본 칸이 기록 칸과 어긋났습니다');
++  return doc;
++}

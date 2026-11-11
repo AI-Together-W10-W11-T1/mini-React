@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" href="data:," />
+    <title>Phase 2 검증 페이지</title>
+    <style>
+      :root {
+        --line: #c9ced6;
+        --label: #3b4252;
+        --accent: #2b6cb0;
+        --done: #8a93a3;
+      }
+      * { box-sizing: border-box; }
+      body { margin: 0; padding: 16px; font-family: system-ui, sans-serif; color: #1f2430; background: #fff; }
+      h1 { margin: 0 0 12px; font-size: 1.25rem; }
+      /* 칸 네 개: desktop은 2열, mobile은 위아래로 쌓인다 (가로 스크롤 없음) */
+      .panels { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: start; }
+      .panel { min-width: 0; border: 2px solid var(--line); border-radius: 8px; padding: 12px; overflow-wrap: anywhere; }
+      .panel h2 { margin: 0 0 8px; font-size: 1rem; color: var(--label); }
+      .panel button { padding: 6px 12px; font: inherit; cursor: pointer; }
+      .panel input[type="text"] { width: 100%; padding: 6px 8px; font: inherit; }
+      .counter-value { display: inline-block; min-width: 2.5rem; margin-right: 8px; font-size: 1.5rem; font-weight: 600; }
+      .row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 8px 0; }
+      .todo-list { margin: 8px 0; padding: 0; list-style: none; }
+      .todo { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 4px 0; border-bottom: 1px solid var(--line); }
+      .todo.done .todo-text { color: var(--done); text-decoration: line-through; }
+      .todo-text { flex: 1 1 6rem; min-width: 0; }
+      .log { margin: 0; padding: 0; list-style: none; font-variant-numeric: tabular-nums; }
+      .log li { display: flex; justify-content: space-between; gap: 8px; padding: 2px 0; }
+      @media (max-width: 720px) {
+        .panels { grid-template-columns: 1fr; }
+      }
+    </style>
+  </head>
+  <body>
+    <!-- 영역 상자: 보이지 않는 감싸개. 안에 App() 결과 <main> 하나가 그려진다 -->
+    <div data-testid="app-root"></div>
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>

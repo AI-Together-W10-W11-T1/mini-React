@@ -1,0 +1,34 @@
+2026-11-11T22:41 | stage=0 | agent=master | round=- | signal=START | task_006 patch-preview (feature/figma-design 위)
+2026-11-11T22:43 | stage=0 | agent=master | round=- | signal=APPROVE | 명세 PP-01~10 (추천안 일괄 수용), 서버 PID 50900 종료
+2026-11-11T22:57 | stage=1 | agent=mr-worker | round=- | signal=UNKNOWN | - | by=hook
+2026-11-11T23:00 | stage=1 | agent=master | round=- | signal=TESTCASE_OK | 빠르게 범위 · A(구현 먼저) → B(테스트) 순서
+2026-11-11T23:09 | stage=2 | agent=mr-worker | round=- | signal=UNKNOWN | Dev-1~7 | by=hook
+2026-11-11T23:23 | stage=2 | agent=master | round=- | signal=DECISION | PP-07 변경: Patch → 도구 막대 redo 옆 (B 작업자에게 전달)
+2026-11-11T23:25 | stage=2 | agent=master | round=- | signal=DECISION | PP-07 변경 2: Undo 버튼 제거, 도구 막대에 뒤로 · 앞으로 · Patch
+2026-11-11T23:27 | stage=2 | agent=master | round=- | signal=DECISION | PP-11 단축키 = State History · PP-12 앱 편집 Undo 제거 (사용자 "추천으로 가자")
+2026-11-11T23:40 | stage=2 | agent=mr-worker | round=- | signal=UNKNOWN | Dev-7 | by=hook
+2026-11-11T23:41 | stage=2 | agent=master | round=- | signal=VERIFY | B 단계 끝: vitest 1178 · tsc 0 · playwright 308 · packages diff 0. 다음 = 개발 검수(diff 969edc4..HEAD) → QA → 사람 확인
+2026-11-11T23:43 | stage=2 | agent=mr-worker | round=- | signal=UNKNOWN | Dev-7 | by=hook
+2026-11-11T23:43 | stage=2 | agent=master | round=- | signal=PAUSE | 버튼 글자 변경 0654f66, compact 전 멈춤. 다음 = 개발 검수(diff 969edc4..HEAD, 가벼운 1회) → QA → 사람 확인 → task_005 사람 확인 → 위키 · 병합(005 → 006)
+2026-11-11T23:50 | stage=2 | agent=mr-reviewer | round=1/3 | signal=UNKNOWN | Dev-1~7 | by=hook
+2026-11-11T23:50 | stage=2 | agent=master | round=1 | signal=REJECT | 개발 검수 1/3 REJECT: BLOCKING = qa_todo.md 문서만(코드 없음). 1·2·3·5 → mr-worker, 4 → 마스터(명세 §5 · CLAUDE.md 표시)
+2026-11-11T23:54 | stage=2 | agent=mr-worker | round=- | signal=UNKNOWN | Dev-7 | by=hook
+2026-11-11T23:56 | stage=2 | agent=mr-reviewer | round=2/3 | signal=UNKNOWN | Dev-7 | by=hook
+2026-11-11T23:56 | stage=2 | agent=master | round=2 | signal=APPROVE | 개발 검수 2/3 APPROVE (47b6478), vitest 1178 마스터 확인. 다음 = QA
+2026-11-12T00:00 | stage=3 | agent=mr-qa | round=- | signal=UNKNOWN | - | by=hook
+2026-11-12T00:00 | stage=3 | agent=master | round=- | signal=PASS | QA PASS (preview 24 · 전체 308 · vitest 1178), 캡처 10장. 서버 남음 5199 PID 47932 — 사용자 승인 대기. 다음 = 사람 확인
+2026-11-12T00:08 | stage=3 | agent=master | round=- | signal=SCOPE | 사용자 결정: A33 · 34 · 35 · 37 e2e 추가. 5199 서버(PID 47932) 끄기 승인 대기
+2026-11-12T00:26 | stage=3 | agent=master | round=- | signal=PASS | A33·34·35·37 e2e 추가 03ba8b9 (전체 316). 미커밋 index.html · design/render 스펙 · design.test = 사용자가 다른 창에서 디자인 수정 중 → 건드리지 않음. 다음 = 사람 확인
+2026-11-12T00:32 | stage=1 | agent=master | round=- | signal=SPEC_CHANGE | PP-06 변경: 실행 취소 · 다시 실행 = 두 영역 함께(doc 사본), 세부 1~4 추천안 "응". 1단계로 돌아가 Dev-8 기획 → 테스트 케이스 확인 → 개발
+2026-11-12T00:40 | stage=1 | agent=mr-worker | round=- | signal=UNKNOWN | Dev-8 | by=hook
+2026-11-12T00:47 | stage=2 | agent=mr-worker | round=- | signal=UNKNOWN | Dev-7 | by=hook
+2026-11-12T00:47 | stage=2 | agent=master | round=- | signal=VERIFY | 사용자 디자인 커밋 5e841b2 확인(tsc 0 · vitest 1178 · playwright 316). 실제 영역 점무늬 제거 905a582(사용자 "추천대로"). FD-02 · MF-21 · PP-02에 변경 기록. 다음 = Dev-8 진행 여부 질문
+2026-11-12T00:50 | stage=1 | agent=master | round=- | signal=TEST_CASES_OK | 사용자 "dev-8을 조금 더 빠르게 진행하고 싶어" → Dev-8 진행 · 테스트 케이스 표 그대로 수용으로 기록. 속도: 시나리오 묶어 e2e 수 줄이기(단언 유지) · 깨짐 확인 핵심 3개만 · 개발 중엔 관련 스펙만, 전체는 끝에 1번
+2026-11-12T01:06 | stage=2 | agent=mr-worker | round=- | signal=UNKNOWN | Dev-8 | by=hook
+2026-11-12T01:08 | stage=2 | agent=mr-reviewer | round=1/3 | signal=UNKNOWN | Dev-8 | by=hook
+2026-11-12T01:08 | stage=2 | agent=master | round=1 | signal=APPROVE | Dev-8 검수 1/3 APPROVE (a327456), NON-BLOCKING 1 문서 수정 · 2 기록만. 다음 = 사용자 디자인 커밋 뒤 QA + 캡처(005 · 006)
+2026-11-12T01:14 | stage=3 | agent=mr-qa | round=- | signal=UNKNOWN | - | by=hook
+2026-11-12T01:15 | stage=3 | agent=master | round=2 | signal=PASS | QA 재실행 2회차 PASS (playwright 330 · vitest 1195 · tsc 0), task_006 캡처 갱신 + task_005 v2 12장. 서버 남음 5231 PID 46960 — 승인 대기. 다음 = 사람 확인(005 · 006)
+2026-11-12T01:16 | stage=3 | agent=master | round=- | signal=HUMAN_CHECK | 사용자 "캡처 OK, 팝업 됨, 스크롤바 그대로, 서버 꺼" → 사람 확인 체크, 5231 서버 종료(승인). 다음 = 2.5 체크포인트 → 위키 → 병합
+2026-11-12T01:18 | stage=마무리 | agent=master | round=- | signal=MERGE_READY | 체크포인트 · 위키는 발표 전으로 미룸(사용자 "너가 추천하는 방식으로 진행해"), 07_pr_body 작성 → 병합 005 → 006
+2026-11-12T02:11 | stage=4 | agent=master | round=- | signal=CHECKPOINT_SKIPPED | 사용자 "a로 가자": 체크포인트 없이 위키 (기록 = 체크포인트 생략, 사용자 결정), 위키는 005 · 006 · 007 한 번에

@@ -1,0 +1,1596 @@
+diff --git a/fixtures/phase1-vdom-playground/index.html b/fixtures/phase1-vdom-playground/index.html
+index 568a91d..91e6583 100644
+--- a/fixtures/phase1-vdom-playground/index.html
++++ b/fixtures/phase1-vdom-playground/index.html
+@@ -5,9 +5,84 @@
+     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+     <link rel="icon" href="data:," />
+     <title>Phase 1 VDOM Playground</title>
++    <style>
++      :root {
++        --line: #c9ced6;
++        --label: #3b4252;
++        --accent: #2b6cb0;
++      }
++      * { box-sizing: border-box; }
++      body { margin: 0; padding: 16px; font-family: system-ui, sans-serif; color: #1f2430; background: #fff; }
++      h1 { margin: 0 0 12px; font-size: 1.25rem; }
++      .toolbar { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
++      .toolbar button { padding: 8px 16px; font: inherit; cursor: pointer; }
++      .panes { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: start; }
++      .pane { min-width: 0; border: 2px solid var(--line); border-radius: 8px; padding: 12px; }
++      .pane-real { border-color: var(--accent); }
++      .pane h2 { margin: 0 0 8px; font-size: 1rem; color: var(--label); }
++      .pane h3 { margin: 12px 0 4px; font-size: 0.875rem; color: var(--label); }
++      .area { min-height: 3rem; overflow-wrap: anywhere; border: 1px dashed var(--line); padding: 8px; }
++      #html-editor { display: block; width: 100%; min-height: 14rem; font: 0.8125rem/1.4 ui-monospace, monospace; }
++      .toolbar .viz-switch { display: inline-flex; align-items: center; gap: 6px; margin-left: 8px; cursor: pointer; user-select: none; }
++      /* Diff 시각화(확장): 오버레이는 실제 영역 "밖"에 같은 크기로 겹쳐 두는 투명 판이다. 마우스를 받지 않고, 실제 DOM에는 아무것도 붙이지 않는다 */
++      .real-wrap { position: relative; }
++      .viz-overlay { position: absolute; inset: 0; pointer-events: none; overflow: visible; }
++      .viz-box {
++        position: absolute;
++        border: 2px solid #e8590c;
++        background: rgba(255, 146, 43, 0.3);
++        border-radius: 3px;
++        animation: viz-flash 0.7s ease-out forwards;
++      }
++      @keyframes viz-flash {
++        0% { opacity: 1; }
++        50% { opacity: 0.2; }
++        100% { opacity: 0; }
++      }
++      /* 모바일: 두 영역이 위아래로 쌓이고 가로 스크롤이 없다 */
++      @media (max-width: 720px) {
++        .panes { grid-template-columns: 1fr; }
++      }
++    </style>
+   </head>
+   <body>
+-    <div id="root"></div>
++    <h1>Phase 1 VDOM 검증 페이지</h1>
++    <div class="toolbar">
++      <button type="button" data-testid="btn-patch">Patch</button>
++      <button type="button" data-testid="btn-back">뒤로</button>
++      <button type="button" data-testid="btn-forward">앞으로</button>
++      <label class="viz-switch"><input type="checkbox" data-testid="viz-toggle" /> 시각화 켜기</label>
++    </div>
++    <div class="panes">
++      <section class="pane pane-real">
++        <h2>실제 영역</h2>
++        <!-- 초기 샘플 HTML: 이 영역 안 글을 로드 때 읽어 초기 VNode(0번 기록)로 삼는다 (P1-20). 줄 들여쓰기도 샘플의 일부 -->
++        <div class="real-wrap">
++        <div class="area" data-testid="real-area">
++<section id="card" class="card">
++  <h2>제목</h2>
++  <!-- 안내 문구 -->
++  <p class="note" style="color: red; font-size: 16px">안녕</p>
++  <ul>
++    <li>하나</li>
++    <li>둘</li>
++    <li>셋</li>
++  </ul>
++  <button disabled>잠김</button>
++</section>
++        </div>
++        <!-- Diff 시각화(확장) 오버레이: 실제 영역(real-area) 밖. 깜빡임 상자는 여기에만 그린다 -->
++        <div class="viz-overlay" data-testid="viz-overlay" data-last-patch-count="0" data-last-flash-count="0" aria-hidden="true"></div>
++        </div>
++      </section>
++      <section class="pane pane-test">
++        <h2>테스트 영역</h2>
++        <label for="html-editor">HTML 편집창</label>
++        <textarea id="html-editor" data-testid="html-editor" spellcheck="false"></textarea>
++        <h3>미리보기</h3>
++        <div class="area" data-testid="test-area"></div>
++      </section>
++    </div>
+     <script type="module" src="./main.ts"></script>
+   </body>
+ </html>
+diff --git a/fixtures/phase1-vdom-playground/main.ts b/fixtures/phase1-vdom-playground/main.ts
+index b5e21ea..85bdf7a 100644
+--- a/fixtures/phase1-vdom-playground/main.ts
++++ b/fixtures/phase1-vdom-playground/main.ts
+@@ -1,22 +1,95 @@
+-import { h } from '@mini-react/react';
+-import { renderVNode } from '@mini-react/react-dom-bindings';
+-
+-// [AI Note]: 엔진 로직 없음. h()로 만든 샘플 트리를 renderVNode로 그려 #root에 붙이기만 한다.
+-// e2e/phase1-render.spec.ts의 기대값과 맞춰 둔 샘플이다.
+-const tree = h(
+-  'main',
+-  { id: 'app', class: 'demo' },
+-  h('h1', null, 'Mini React'),
+-  h('p', { 'data-testid': 'intro' }, '안녕, VDOM ', 2026),
+-  h(
+-    'ul',
+-    { 'data-testid': 'list' },
+-    h('li', null, '첫째 항목'),
+-    h('li', { class: 'done' }, '둘째 항목'),
+-    h('li', { hidden: false }, '셋째 항목'),
+-  ),
+-  h('input', { 'data-testid': 'field', disabled: true }),
+-  h('p', { 'data-testid': 'special' }, '<b>굵게 아님</b> & &amp; 😀'),
+-);
+-
+-document.getElementById('root')!.appendChild(renderVNode(tree));
++import { createVDomRoot } from '@mini-react/react-dom';
++import type { AreaChildren } from '@mini-react/shared';
++import { createOverlay } from './overlay';
++import { checkHtml, formatProblems, readAreaChildren, renderAreaChildren, setAreaHtml, vnodesToHtml } from '@mini-react/react-dom-bindings';
++
++// [AI Note]: 엔진 로직 없음. 패키지 공개 API만 이어 붙이는 연결 코드다.
++// 로드 때 실제 영역의 샘플 HTML을 읽어 0번 기록으로 삼고(createVDomRoot, P1-20),
++// 그 VNode로 테스트 영역(미리보기)을 그리고(P1-21) 편집창 글을 채운다.
++function byTestId<T extends HTMLElement>(id: string): T {
++  const el = document.querySelector<T>(`[data-testid="${id}"]`);
++  if (el === null) throw new Error(`data-testid="${id}" 요소가 없습니다`);
++  return el;
++}
++
++const realArea = byTestId<HTMLElement>('real-area');
++const testArea = byTestId<HTMLElement>('test-area');
++const editor = byTestId<HTMLTextAreaElement>('html-editor');
++
++// [AI Note]: Diff 시각화(확장). 스위치는 기본 꺼짐. 엔진(createVDomRoot)이 patch마다 알려 주는 노드를 오버레이가 받아 그린다.
++// 오버레이는 실제 영역 밖 투명 판이라 실제 DOM 변경은 스위치와 상관없이 같다. 한 동작(update · back · forward)은 overlay.run으로 감싼다.
++const vizToggle = byTestId<HTMLInputElement>('viz-toggle');
++const overlay = createOverlay(byTestId<HTMLElement>('viz-overlay'), realArea, () => vizToggle.checked);
++const root = createVDomRoot(realArea, { onPatch: overlay.onPatch });
++const initial = root.snapshot();
++renderAreaChildren(testArea, initial);
++editor.value = vnodesToHtml(initial);
++
++// [AI Note]: 입력 때마다 즉시 미리보기를 다시 그린다. 타이머 · debounce를 쓰지 않는다 —
++// 쓰면 칠 때마다 늦게 따라와 Patch가 옛 글을 읽을 수 있다(B6).
++// setAreaHtml이 on… · script · javascript: 등 위험한 것을 빼고 그린다 (미리보기가 코드를 실행하지 않게).
++editor.addEventListener('input', () => setAreaHtml(testArea, editor.value));
++
++// [AI Note]: Patch 흐름 (P1-23 · P1-24). 편집창 글로 미리보기를 한 번 더 그린 뒤 테스트 영역 DOM을 읽는다.
++// 입력 처리가 늦어도 옛 글로 Patch되지 않게 하려는 것이다(B6). 읽은 VNode를 root.update에 넘기면
++// 이전 기록 VNode와 diff → 실제 영역 patch → 기록까지 react-dom이 한다. 바뀐 게 없으면 update가 false를 돌려주고 아무 일도 없다.
++// Patch 성공 뒤에도 편집창 글은 친 그대로 둔다(B7) — 스냅샷 글로 다시 채우는 것은 뒤로 · 앞으로 때뿐이다.
++byTestId<HTMLButtonElement>('btn-patch').addEventListener('click', () => {
++  // [AI Note]: Patch 맨 앞에서 편집창 글을 검사한다 (위험 코드 · 태그 짝 · 구조 · SVG). 문제가 하나라도 있으면
++  // 한 번의 alert로 모두 알리고 끝낸다 — 실제 영역 · 기록은 그대로, 편집창 글도 그대로 둬서 고쳐 쓸 수 있게 한다.
++  const problems = checkHtml(editor.value);
++  if (problems.length > 0) {
++    alert(formatProblems(problems));
++    return;
++  }
++  setAreaHtml(testArea, editor.value);
++  try {
++    overlay.run(() => root.update(readAreaChildren(testArea)));
++  } catch (error) {
++    reportPatchError(error);
++  }
++});
++
++// [AI Note]: Patch · 뒤로 · 앞으로 도중 예외(C2). react-dom이 이미 기록을 그대로 두고 실제 영역을 마지막 기록 모습으로 다시 그린 뒤
++// 원래 예외를 던져 준다. 페이지는 그 예외를 잡아 alert로만 알린다 — 편집창 글 · 테스트 영역은 그대로 둬서 다시 해 볼 수 있다.
++function reportPatchError(error: unknown, doing = 'Patch를 적용하는 중'): void {
++  const detail = error instanceof Error ? error.message : String(error);
++  alert(
++    formatProblems([
++      {
++        kind: 'PATCH_ERROR',
++        message: `${doing} 오류가 났습니다 (${detail}). 실제 영역을 마지막 기록 상태로 되돌렸습니다. 다시 작성해 주세요.`,
++      },
++    ]),
++  );
++}
++
++// [AI Note]: 뒤로 · 앞으로 (P1-28 ~ P1-30). 실제 영역은 root가 역패치 · patch로 바꾸고, 돌려받은 스냅샷(VNode)으로
++// 테스트 영역을 다시 그리고 편집창 글을 vnodesToHtml(스냅샷)로 채운다 — 이동하면 미저장 편집은 버려진다(§3.3).
++// null이면 처음 · 끝이라 아무 일도 없다: 편집창에 쳐 둔 글도 그대로 남는다(경계 이동 무시).
++function move(go: () => AreaChildren | null, doing: string): void {
++  try {
++    const snapshot = overlay.run(go);
++    if (snapshot === null) return;
++    renderAreaChildren(testArea, snapshot);
++    editor.value = vnodesToHtml(snapshot);
++  } catch (error) {
++    reportPatchError(error, doing);
++  }
++}
++
++byTestId<HTMLButtonElement>('btn-back').addEventListener('click', () => move(() => root.back(), '뒤로 이동하는 중'));
++byTestId<HTMLButtonElement>('btn-forward').addEventListener('click', () => move(() => root.forward(), '앞으로 이동하는 중'));
++
++// [AI Note]: 검증 페이지 보호(C4). 두 영역 안의 링크를 누르거나 폼을 제출하면 페이지가 이동해 기록이 모두 날아간다.
++// 엔진이 아니라 이 페이지의 일이라 여기서 기본 동작만 막는다. 캡처 단계에서 막아야 영역 안 어느 요소의 리스너보다 먼저 적용된다.
++for (const area of [realArea, testArea]) {
++  area.addEventListener(
++    'click',
++    (event) => {
++      if (event.target instanceof Element && event.target.closest('a[href]') !== null) event.preventDefault();
++    },
++    true,
++  );
++  area.addEventListener('submit', (event) => event.preventDefault(), true);
++}
+diff --git a/fixtures/phase1-vdom-playground/overlay.ts b/fixtures/phase1-vdom-playground/overlay.ts
+new file mode 100644
+index 0000000..e035dec
+--- /dev/null
++++ b/fixtures/phase1-vdom-playground/overlay.ts
+@@ -0,0 +1,107 @@
++import type { PatchObserver } from '@mini-react/react-dom-bindings';
++
++// [AI Note]: Diff 시각화(확장)의 오버레이. 엔진이 알려 준 "바뀐 노드"의 위치를 재서, 실제 영역 **밖**에 겹쳐 둔
++// 투명 판(pointer-events: none) 위에 상자를 깜빡이게 그린다. 실제 DOM에는 class · 속성을 붙이지 않는다
++// (측정 오염 · 연속 Patch 때 엉킴 방지). 엔진 로직은 없고 위치 재기 · 그리기만 한다.
++
++interface Rect {
++  left: number;
++  top: number;
++  width: number;
++  height: number;
++}
++
++export interface Overlay {
++  /** `createVDomRoot(…, { onPatch })`에 넘기는 콜백 */
++  onPatch: PatchObserver;
++  /**
++   * 한 번의 동작(`update` · `back` · `forward`)을 감싼다. 동작 안에서 불린 patch를 모아 두었다가 끝나면
++   * 이번 동작의 patch 개수를 `data-last-patch-count`에 남기고, 스위치가 켜져 있으면 상자를 그린다.
++   * patch가 하나도 없는 동작(무변경 Patch · 경계 이동)은 지난 숫자를 그대로 둔다.
++   */
++  run<T>(action: () => T): T;
++}
++
++const FLASH_MS = 700;
++
++export function createOverlay(layer: HTMLElement, realArea: HTMLElement, isEnabled: () => boolean): Overlay {
++  let patchCount = 0;
++  let measured: Rect[] = [];
++
++  /** 바뀐 노드가 차지하는 영역. 글자 노드는 `Range`, 0 크기 · 주석은 부모 요소로 대신한다 */
++  function measure(node: Node): DOMRect {
++    if (node.nodeType === Node.TEXT_NODE) {
++      const range = document.createRange();
++      range.selectNodeContents(node);
++      const rect = range.getBoundingClientRect();
++      if (rect.width > 0 || rect.height > 0) return rect;
++    } else if (node.nodeType === Node.ELEMENT_NODE) {
++      const rect = (node as Element).getBoundingClientRect();
++      if (rect.width > 0 || rect.height > 0) return rect;
++    }
++    // 주석 · 0 크기(공백 글자, 빈 요소, display:none)는 가장 가까운 크기 있는 조상 요소로
++    let parent: Element | null = node.parentElement;
++    while (parent !== null && parent !== realArea) {
++      const rect = parent.getBoundingClientRect();
++      if (rect.width > 0 || rect.height > 0) return rect;
++      parent = parent.parentElement;
++    }
++    return realArea.getBoundingClientRect();
++  }
++
++  const onPatch: PatchObserver = ({ node }) => {
++    patchCount += 1;
++    if (!isEnabled()) return; // 꺼져 있으면 아무것도 재지 않는다 (개수만 센다)
++    // [AI Note]: REMOVE는 엔진이 지우기 직전(before)에 알려 주므로 그 순간에 재서 저장해야 한다 — 지운 뒤에는 위치를 알 수 없다.
++    // 오버레이 좌표계(layer 왼쪽 위 기준)로 바꿔 저장한다.
++    const rect = measure(node);
++    const origin = layer.getBoundingClientRect();
++    measured.push({ left: rect.left - origin.left, top: rect.top - origin.top, width: rect.width, height: rect.height });
++  };
++
++  function flush(): void {
++    if (patchCount === 0) {
++      measured = [];
++      return;
++    }
++    layer.dataset.lastPatchCount = String(patchCount);
++    // 지난 동작의 상자가 아직 남아 있으면 치운다 (이번 동작의 상자만 센다)
++    layer.replaceChildren();
++    for (const rect of measured) layer.appendChild(flashBox(rect));
++    layer.dataset.lastFlashCount = String(measured.length);
++    patchCount = 0;
++    measured = [];
++  }
++
++  function flashBox(rect: Rect): HTMLElement {
++    const box = document.createElement('div');
++    box.className = 'viz-box';
++    box.style.left = `${rect.left}px`;
++    box.style.top = `${rect.top}px`;
++    box.style.width = `${rect.width}px`;
++    box.style.height = `${rect.height}px`;
++    // 애니메이션이 끝나면 지운다. 애니메이션이 안 도는 환경(모션 줄이기 등)을 위해 타이머도 둔다
++    const remove = (): void => box.remove();
++    box.addEventListener('animationend', remove, { once: true });
++    setTimeout(remove, FLASH_MS + 300);
++    return box;
++  }
++
++  return {
++    onPatch,
++    run(action) {
++      patchCount = 0;
++      measured = [];
++      try {
++        const result = action();
++        flush();
++        return result;
++      } catch (error) {
++        // 도중 예외(C2): 엔진이 실제 영역을 마지막 기록으로 다시 그린 뒤라 깜빡일 변경이 아니다. 모아 둔 것을 버린다
++        patchCount = 0;
++        measured = [];
++        throw error;
++      }
++    },
++  };
++}
+diff --git a/packages/react-dom-bindings/src/client/checkHtml.ts b/packages/react-dom-bindings/src/client/checkHtml.ts
+new file mode 100644
+index 0000000..670343b
+--- /dev/null
++++ b/packages/react-dom-bindings/src/client/checkHtml.ts
+@@ -0,0 +1,163 @@
++import { scanDangerous } from './sanitize';
++import type { DangerousFinding } from './sanitize';
++import { scanHtml } from './htmlScan';
++import type { ScanNode } from './htmlScan';
++
++/**
++ * Patch 때 알려 줄 문제 종류 (알림 말머리 5종과 1:1).
++ * - `PATCH_ERROR`는 `checkHtml`이 아니라 Patch 도중 예외(C2)를 페이지가 알릴 때 쓴다 (Dev-17)
++ */
++export type HtmlProblemKind = 'DANGEROUS' | 'UNPAIRED' | 'STRUCTURE' | 'SVG' | 'PATCH_ERROR';
++
++export interface HtmlProblem {
++  readonly kind: HtmlProblemKind;
++  /** 말머리를 뺀 한 줄 설명 */
++  readonly message: string;
++}
++
++/** 알림 말머리 (dev_todo 「Patch 때 검사 알림 문구」 — e2e가 이 말마디로 확인한다) */
++export const PROBLEM_LABELS: Readonly<Record<HtmlProblemKind, string>> = {
++  DANGEROUS: '[위험한 코드]',
++  UNPAIRED: '[태그 짝]',
++  STRUCTURE: '[구조 불일치]',
++  SVG: '[SVG 미지원]',
++  PATCH_ERROR: '[Patch 오류]',
++};
++
++const RETRY_LINE = '다시 작성해 주세요.';
++
++// [AI Note]: Patch 버튼을 눌렀을 때 편집창 글을 검사한다. 문제가 하나라도 있으면 페이지가 alert로 알리고 Patch를 막는다.
++// 위험 코드의 기준은 sanitize.ts의 scanDangerous 하나뿐이다 (미리보기에서 빼는 것과 같은 목록).
++// 글을 살아 있는 문서에 넣지 않고 <template> 안에서 읽는다. 검사 순서(알림 줄 순서) = 위험한 코드 → SVG → 태그 짝 → 구조.
++// 태그 짝 · 구조는 htmlScan(엔진이 글을 직접 훑은 결과)과 브라우저가 읽은 나무를 비교해 찾는다.
++// 브라우저는 빠진 닫는 태그 · 잘못 놓인 태그를 몰래 고쳐 읽으므로, 고치기 전의 "쓴 모습"과 비교해야 알아챌 수 있다.
++export function checkHtml(html: string): HtmlProblem[] {
++  const template = document.createElement('template');
++  template.innerHTML = html;
++  const fragment = template.content;
++
++  const problems: HtmlProblem[] = [];
++  for (const finding of scanDangerous(fragment)) {
++    problems.push({ kind: 'DANGEROUS', message: describeDangerous(finding) });
++  }
++  // 몇 개가 있든(중첩 포함) 한 줄로 알린다. 파서가 `<SVG>`도 소문자 svg로 읽어 주므로 대소문자는 신경 쓰지 않는다
++  if (fragment.querySelector('svg') !== null) {
++    problems.push({ kind: 'SVG', message: '<svg> 요소는 지원하지 않습니다.' });
++  }
++
++  const scan = scanHtml(html);
++  for (const message of scan.issues.slice(0, MAX_PAIR_LINES)) {
++    problems.push({ kind: 'UNPAIRED', message });
++  }
++  if (scan.issues.length > MAX_PAIR_LINES) {
++    problems.push({ kind: 'UNPAIRED', message: `그 밖에 ${scan.issues.length - MAX_PAIR_LINES}건의 짝 문제가 더 있습니다.` });
++  }
++
++  const mismatch = findStructureMismatch(scan.tree, readBrowserTree(fragment), null);
++  if (mismatch !== null) {
++    const parent = mismatch.parent === null ? '최상위에서' : `<${mismatch.parent}> 안에서`;
++    problems.push({
++      kind: 'STRUCTURE',
++      message: `${parent} 입력한 구조(${outline(mismatch.written)})와 브라우저가 읽은 구조(${outline(mismatch.parsed)})가 다릅니다.`,
++    });
++  }
++  return problems;
++}
++
++// 짝 문제 줄이 너무 많으면 알림이 화면을 넘치므로 앞의 몇 줄만 적는다
++const MAX_PAIR_LINES = 5;
++
++/** 알림 글: 문제 한 줄 = `[말머리] 설명`, 마지막 줄 "다시 작성해 주세요." (Patch 오류만 있으면 자체 안내가 있어 붙이지 않음) */
++export function formatProblems(problems: readonly HtmlProblem[]): string {
++  const lines = problems.map((p) => `${PROBLEM_LABELS[p.kind]} ${p.message}`);
++  if (problems.some((p) => p.kind !== 'PATCH_ERROR')) lines.push(RETRY_LINE);
++  return lines.join('\n');
++}
++
++function describeDangerous(finding: DangerousFinding): string {
++  switch (finding.kind) {
++    case 'ELEMENT':
++      // <link>는 rel="stylesheet"일 때만 막히므로 그 모습 그대로 적는다
++      return finding.element === 'link' ? '<link rel="stylesheet"> 요소' : `<${finding.element}> 요소`;
++    case 'EVENT_ATTRIBUTE':
++      return `<${finding.element}> 요소의 ${finding.attribute} 속성`;
++    case 'JAVASCRIPT_URL':
++      return `<${finding.element}> 요소의 ${finding.attribute} 속성 (javascript: 주소)`;
++  }
++}
++
++// 브라우저가 읽은 요소 나무 (글자 · 주석은 뺀다). <template>은 안쪽(content)을 자식으로 본다. 반복문으로 훑어 깊은 트리에서도 안전하다
++function readBrowserTree(fragment: DocumentFragment): ScanNode[] {
++  const root: ScanNode = { tag: '#root', children: [] };
++  const work: Array<{ source: ParentNode; into: ScanNode }> = [{ source: fragment, into: root }];
++  while (work.length > 0) {
++    const { source, into } = work.pop()!;
++    for (const child of Array.from(source.children)) {
++      const node: ScanNode = { tag: child.localName.toLowerCase(), children: [] };
++      into.children.push(node);
++      work.push({ source: child instanceof HTMLTemplateElement ? child.content : child, into: node });
++    }
++  }
++  return root.children;
++}
++
++interface Mismatch {
++  readonly parent: string | null;
++  readonly written: readonly ScanNode[];
++  readonly parsed: readonly ScanNode[];
++}
++
++// 두 나무를 위에서부터 비교해 처음 다른 형제 목록을 돌려준다 (같으면 null). 태그 이름 · 중첩만 비교한다
++function findStructureMismatch(written: readonly ScanNode[], parsed: readonly ScanNode[], parent: string | null): Mismatch | null {
++  const pending: Array<{ written: readonly ScanNode[]; parsed: readonly ScanNode[]; parent: string | null }> = [
++    { written, parsed, parent },
++  ];
++  // 문서 순서대로 "처음 다른 곳"을 찾으려고 스택에 뒤에서부터 넣는다
++  while (pending.length > 0) {
++    const level = pending.pop()!;
++    // [AI Note]: C1 예외 — 브라우저가 <table> 안에 몰래 끼운 <tbody>만 같은 것으로 본다(그 자식을 <table> 자식으로 펼쳐 비교).
++    // 입력에도 그 자리에 <tbody>가 있었다면 직접 쓴 것이라 펼치지 않는다. <tr>까지 자동으로 추가되는 `<table><td>`는 그대로 불일치.
++    const parsedChildren = level.parent === 'table' ? flattenAutoTbody(level.written, level.parsed) : level.parsed;
++    if (level.written.length !== parsedChildren.length || level.written.some((w, k) => w.tag !== parsedChildren[k].tag)) {
++      return { parent: level.parent, written: level.written, parsed: parsedChildren };
++    }
++    for (let k = level.written.length - 1; k >= 0; k--) {
++      pending.push({ written: level.written[k].children, parsed: parsedChildren[k].children, parent: level.written[k].tag });
++    }
++  }
++  return null;
++}
++
++function flattenAutoTbody(written: readonly ScanNode[], parsed: readonly ScanNode[]): ScanNode[] {
++  const out: ScanNode[] = [];
++  for (const node of parsed) {
++    if (node.tag === 'tbody' && written[out.length]?.tag !== 'tbody') out.push(...node.children);
++    else out.push(node);
++  }
++  return out;
++}
++
++// 알림 글에 넣을 짧은 구조 요약: `<p><div></div></p>`, 길면 자른다
++function outline(nodes: readonly ScanNode[]): string {
++  const parts: string[] = [];
++  const work: Array<ScanNode | string> = [];
++  for (let k = nodes.length - 1; k >= 0; k--) work.push(nodes[k]);
++  let length = 0;
++  while (work.length > 0 && length < OUTLINE_LIMIT) {
++    const item = work.pop()!;
++    if (typeof item === 'string') {
++      parts.push(item);
++      length += item.length;
++      continue;
++    }
++    const open = `<${item.tag}>`;
++    parts.push(open);
++    length += open.length;
++    work.push(`</${item.tag}>`);
++    for (let k = item.children.length - 1; k >= 0; k--) work.push(item.children[k]);
++  }
++  const text = parts.join('');
++  return work.length > 0 ? `${text.slice(0, OUTLINE_LIMIT)}…` : text;
++}
++
++const OUTLINE_LIMIT = 60;
+diff --git a/packages/react-dom-bindings/src/client/domToVNode.ts b/packages/react-dom-bindings/src/client/domToVNode.ts
+new file mode 100644
+index 0000000..732091c
+--- /dev/null
++++ b/packages/react-dom-bindings/src/client/domToVNode.ts
+@@ -0,0 +1,43 @@
++import { COMMENT_NODE, TEXT_NODE } from '@mini-react/shared';
++import type { AreaChildren, ElementVNode, Props, StyleMap, VNode } from '@mini-react/shared';
++import { parseStyleText } from './style';
++
++// [AI Note]: 실제 DOM → VNode. 공백 텍스트 · 주석도 모두 남겨 VNode 자식 번호 = DOM childNodes 번호가 되게 한다 (알고리즘 결정 5 B).
++// 값 없는 속성(boolean)은 DOM이 이미 값 ""로 주므로 그대로 담는다. style은 글을 직접 쪼갠 StyleMap으로 담는다.
++export function domToVNode(node: Node): VNode {
++  switch (node.nodeType) {
++    case Node.TEXT_NODE:
++      return { type: TEXT_NODE, props: { nodeValue: node.nodeValue ?? '' }, children: [] };
++    case Node.COMMENT_NODE:
++      return { type: COMMENT_NODE, props: { nodeValue: node.nodeValue ?? '' }, children: [] };
++    case Node.ELEMENT_NODE: {
++      const element = node as Element;
++      return {
++        type: element.localName,
++        props: readProps(element),
++        children: Array.from(element.childNodes, domToVNode),
++      } satisfies ElementVNode;
++    }
++    default:
++      throw new Error(`domToVNode는 이 종류의 노드(nodeType ${node.nodeType})를 지원하지 않습니다.`);
++  }
++}
++
++// 영역 상자 자신은 읽지 않고 안의 자식 목록만 읽는다 (§5 영역 상자 = 보이지 않는 감싸개)
++export function readAreaChildren(area: Element): AreaChildren {
++  return Array.from(area.childNodes, domToVNode);
++}
++
++function readProps(element: Element): Props {
++  const props: { [name: string]: string | StyleMap } = {};
++  for (const attr of Array.from(element.attributes)) {
++    if (attr.name === 'style') {
++      // 항목이 하나도 없으면 style props를 두지 않는다 (B21)
++      const map = parseStyleText(attr.value);
++      if (Object.keys(map).length > 0) props.style = map;
++    } else {
++      props[attr.name] = attr.value;
++    }
++  }
++  return props;
++}
+diff --git a/packages/react-dom-bindings/src/client/htmlScan.ts b/packages/react-dom-bindings/src/client/htmlScan.ts
+new file mode 100644
+index 0000000..35de08c
+--- /dev/null
++++ b/packages/react-dom-bindings/src/client/htmlScan.ts
+@@ -0,0 +1,202 @@
++// [AI Note]: HTML 글을 "엔진이 직접" 훑는 작은 분석기. checkHtml이 두 가지에 쓴다.
++//  ① 태그 짝 검사: 여는 · 닫는 태그가 짝이 맞는지 (빈 태그 제외, 빠뜨린 닫는 태그를 브라우저가 몰래 고치기 전에 알아낸다)
++//  ② 구조 비교: 여기서 만든 태그 나무 ↔ 브라우저가 읽은 나무 (브라우저의 자동 보정을 찾아낸다)
++// 브라우저 파서를 흉내 내지 않는다 — 입력한 글 그대로의 "쓴 모습"만 본다. 그래야 둘의 차이가 보정의 증거가 된다.
++// DOM을 만지지 않는 순수 문자열 처리다. 깊은 중첩에서도 스택이 넘치지 않게 반복문 + 명시적 스택으로 만든다.
++
++export interface ScanNode {
++  /** 소문자 태그 이름 */
++  readonly tag: string;
++  readonly children: ScanNode[];
++}
++
++export interface HtmlScanResult {
++  /** 엔진이 훑은 요소 나무 (글자 · 주석은 담지 않음) */
++  readonly tree: ScanNode[];
++  /** 짝 문제 한 줄 설명들 (문서 순서) */
++  readonly issues: string[];
++}
++
++/** 닫는 태그가 없는 요소 (HTML 빈 태그) */
++export const VOID_TAGS = new Set([
++  'area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input', 'link', 'meta', 'param', 'source', 'track', 'wbr',
++]);
++
++// 안의 글을 태그로 읽지 않고 닫는 태그가 나올 때까지 그대로 읽는 요소 (원문 글 · RCDATA)
++const RAW_TEXT_TAGS = new Set(['style', 'script', 'textarea', 'title', 'xmp', 'iframe', 'noembed', 'noframes']);
++
++// 안에서는 `/>`가 진짜 자기 닫는 태그인 요소 (외부 이름공간). SVG 안의 <circle/>이 짝 오탐을 내지 않게 한다
++const FOREIGN_TAGS = new Set(['svg', 'math']);
++
++const isLetter = (c: string | undefined): boolean => c !== undefined && /[A-Za-z]/.test(c);
++const isSpace = (c: string): boolean => c === ' ' || c === '\t' || c === '\n' || c === '\r' || c === '\f';
++
++export function scanHtml(html: string): HtmlScanResult {
++  const root: ScanNode = { tag: '#root', children: [] };
++  const stack: ScanNode[] = [root];
++  const issues: string[] = [];
++  let foreignDepth = 0;
++  let i = 0;
++  const n = html.length;
++
++  const closeTop = (): void => {
++    const popped = stack.pop()!;
++    if (FOREIGN_TAGS.has(popped.tag)) foreignDepth--;
++  };
++
++  while (i < n) {
++    const lt = html.indexOf('<', i);
++    if (lt < 0) break;
++    const next = html[lt + 1];
++
++    // 주석 <!-- … -->
++    if (html.startsWith('<!--', lt)) {
++      if (html.startsWith('<!-->', lt)) i = lt + 5;
++      else if (html.startsWith('<!--->', lt)) i = lt + 6;
++      else {
++        const end = html.indexOf('-->', lt + 4);
++        i = end < 0 ? n : end + 3;
++      }
++      continue;
++    }
++
++    // <!DOCTYPE …> · <![CDATA[ · <? … > · </ 다음이 글자가 아닌 것: 브라우저는 모두 "가짜 주석"으로 읽고 첫 `>`에서 끝낸다
++    if (next === '!' || next === '?' || (next === '/' && !isLetter(html[lt + 2]))) {
++      if (next === '/' && html[lt + 2] === '>') {
++        i = lt + 3; // `</>`는 그냥 버려진다
++        continue;
++      }
++      const end = html.indexOf('>', lt + 2);
++      i = end < 0 ? n : end + 1;
++      continue;
++    }
++
++    // 닫는 태그 </name …>
++    if (next === '/') {
++      let j = lt + 2;
++      while (j < n && !isSpace(html[j]) && html[j] !== '/' && html[j] !== '>') j++;
++      const name = html.slice(lt + 2, j).toLowerCase();
++      const end = html.indexOf('>', j);
++      if (end < 0) {
++        issues.push(`</${name} 로 시작한 닫는 태그가 > 로 닫히지 않았습니다.`);
++        i = n;
++        continue;
++      }
++      i = end + 1;
++      handleClose(name);
++      continue;
++    }
++
++    // 여는 태그 <name attr…>
++    if (isLetter(next)) {
++      let j = lt + 1;
++      while (j < n && !isSpace(html[j]) && html[j] !== '/' && html[j] !== '>') j++;
++      const name = html.slice(lt + 1, j).toLowerCase();
++      const parsed = readAttributes(html, j);
++      if (parsed === null) {
++        // `>`를 못 찾고 글이 끝남: 브라우저는 이 태그를 통째로 버린다 (글이 조용히 사라지므로 알린다)
++        issues.push(`<${name} 로 시작한 태그가 > 로 닫히지 않았습니다.`);
++        i = n;
++        continue;
++      }
++      i = parsed.end;
++      const node: ScanNode = { tag: name, children: [] };
++      stack[stack.length - 1].children.push(node);
++      const selfClosing = parsed.selfClosing && foreignDepth > 0;
++      if (VOID_TAGS.has(name) || selfClosing) {
++        // 빈 태그 · 외부 이름공간의 `/>`: 열지 않는다. (HTML 요소의 `<div/>`는 `/`가 무시돼 열린 채로 남는다)
++        continue;
++      }
++      stack.push(node);
++      if (FOREIGN_TAGS.has(name)) foreignDepth++;
++      if (RAW_TEXT_TAGS.has(name)) i = skipRawText(html, i, name);
++      continue;
++    }
++
++    // `<` 뒤가 글자가 아니면(`1 < 2`, `x <= y`, `<>`) 태그가 아니라 글자다
++    i = lt + 1;
++  }
++
++  // 글이 끝났는데 열려 있는 것들
++  while (stack.length > 1) {
++    issues.push(`<${stack[stack.length - 1].tag}> 태그가 닫히지 않았습니다.`);
++    closeTop();
++  }
++  return { tree: root.children, issues };
++
++  function handleClose(name: string): void {
++    const top = stack[stack.length - 1];
++    if (stack.length > 1 && top.tag === name) {
++      closeTop();
++      return;
++    }
++    let depth = -1;
++    for (let k = stack.length - 1; k >= 1; k--) {
++      if (stack[k].tag === name) {
++        depth = k;
++        break;
++      }
++    }
++    if (depth < 0) {
++      issues.push(`</${name}> 닫는 태그에 짝이 되는 여는 태그가 없습니다.`);
++      return;
++    }
++    // 안쪽에 닫히지 않은 것이 있다: 그것들을 닫히지 않은 것으로 알리고, 이 닫는 태그까지 한꺼번에 닫는다
++    while (stack.length - 1 > depth) {
++      issues.push(`<${stack[stack.length - 1].tag}> 태그가 닫히지 않았습니다 (</${name}>를 먼저 만났습니다).`);
++      closeTop();
++    }
++    closeTop();
++  }
++}
++
++// 이름 뒤부터 `>`까지를 속성 읽기 규칙대로 건너뛴다. 따옴표 안의 `>`는 끝이 아니다. `>`를 못 찾으면 null
++function readAttributes(html: string, from: number): { end: number; selfClosing: boolean } | null {
++  const n = html.length;
++  let j = from;
++  let selfClosing = false;
++  while (j < n) {
++    const c = html[j];
++    if (c === '>') return { end: j + 1, selfClosing };
++    if (isSpace(c)) {
++      j++;
++      continue;
++    }
++    if (c === '/') {
++      selfClosing = html[j + 1] === '>';
++      j++;
++      continue;
++    }
++    selfClosing = false;
++    // 속성 이름 (첫 글자가 `=`여도 이름의 일부로 본다)
++    j++;
++    while (j < n && !isSpace(html[j]) && html[j] !== '/' && html[j] !== '>' && html[j] !== '=') j++;
++    while (j < n && isSpace(html[j])) j++;
++    if (html[j] !== '=') continue;
++    j++;
++    while (j < n && isSpace(html[j])) j++;
++    const quote = html[j];
++    if (quote === '"' || quote === "'") {
++      const close = html.indexOf(quote, j + 1);
++      if (close < 0) return null;
++      j = close + 1;
++    } else {
++      while (j < n && !isSpace(html[j]) && html[j] !== '>') j++;
++    }
++  }
++  return null;
++}
++
++// 원문 글 요소 안을 건너뛰고, 닫는 태그(`</name` 다음이 공백 · `/` · `>`) 바로 앞 위치를 돌려준다. 못 찾으면 글 끝
++function skipRawText(html: string, from: number, name: string): number {
++  const lower = html.toLowerCase();
++  const needle = `</${name}`;
++  let at = from;
++  for (;;) {
++    const found = lower.indexOf(needle, at);
++    if (found < 0) return html.length;
++    const after = html[found + needle.length];
++    if (after === undefined || isSpace(after) || after === '/' || after === '>') return found;
++    at = found + needle.length;
++  }
++}
+diff --git a/packages/react-dom-bindings/src/client/patch.ts b/packages/react-dom-bindings/src/client/patch.ts
+new file mode 100644
+index 0000000..775c1fd
+--- /dev/null
++++ b/packages/react-dom-bindings/src/client/patch.ts
+@@ -0,0 +1,128 @@
++import type { Patch, Path } from '@mini-react/shared';
++import { renderVNode } from './renderVNode';
++import { parseStyleText, styleMapToText } from './style';
++
++// [AI Note]: 고칠 일 목록을 실제 DOM에 "순서대로 하나씩" 적용한다 (알고리즘 결정 4 A).
++// 경로는 그 patch를 실행하는 순간의 DOM 기준이고, 영역 상자(area) 안 자식부터 센다 (공백 · 주석도 번호를 차지).
++// 노드를 새로 만드는 것은 INSERT · REPLACE뿐이고, 나머지는 있는 노드를 그 자리에서 고친다 (P1-17 · P1-18 참조 유지).
++
++/**
++ * Diff 시각화(확장)용 관찰 콜백. patch 하나를 적용할 때마다 "바뀐 노드"를 바깥(페이지)에 알려 준다.
++ * - `stage: 'before'`: REMOVE만. 지우기 직전, 아직 붙어 있는 노드 (위치를 잴 수 있게)
++ * - `stage: 'after'`: 나머지 모두. 적용 직후의 노드 (INSERT · REPLACE는 새로 만든 노드, MOVE는 옮겨진 노드)
++ */
++export type PatchObserver = (event: { patch: Patch; node: Node; stage: 'before' | 'after' }) => void;
++
++// [AI Note]: 관찰 콜백은 읽기 전용 알림이다. DOM에 표시용 class · 속성을 붙이지 않고, 콜백이 없으면 동작이 이전과 똑같다.
++// 오버레이를 그리는 일은 페이지(fixture) 몫이고, 이 패키지는 어떤 노드가 바뀌었는지만 넘긴다.
++export function patch(area: Element, patches: readonly Patch[], observer?: PatchObserver): void {
++  for (const p of patches) applyPatch(area, p, observer);
++}
++
++function applyPatch(area: Element, p: Patch, observer?: PatchObserver): void {
++  switch (p.kind) {
++    case 'SET_TEXT': {
++      const node = nodeAt(area, p.path);
++      if (node.nodeType !== Node.TEXT_NODE && node.nodeType !== Node.COMMENT_NODE) {
++        throw new Error(`patch: SET_TEXT 대상이 글자 · 주석 노드가 아닙니다 (경로 ${p.path.join(',')})`);
++      }
++      node.nodeValue = p.after;
++      observer?.({ patch: p, node, stage: 'after' });
++      return;
++    }
++    case 'SET_ATTR': {
++      const element = elementAt(area, p.path, 'SET_ATTR');
++      if (p.after === null) element.removeAttribute(p.name);
++      else element.setAttribute(p.name, p.after);
++      observer?.({ patch: p, node: element, stage: 'after' });
++      return;
++    }
++    case 'SET_STYLE': {
++      const element = elementAt(area, p.path, 'SET_STYLE');
++      // [AI Note]: style 속성 글을 직접 쪼개 항목 하나만 고치고 다시 쓴다. CSSOM(el.style)을 쓰면 축약형이 풀리고 모르는 항목이 사라진다.
++      const map: { [property: string]: string } = { ...parseStyleText(element.getAttribute('style') ?? '') };
++      if (p.after === null) delete map[p.property];
++      else map[p.property] = p.after;
++      if (Object.keys(map).length === 0) element.removeAttribute('style');
++      else element.setAttribute('style', styleMapToText(map));
++      observer?.({ patch: p, node: element, stage: 'after' });
++      return;
++    }
++    case 'INSERT': {
++      const parent = parentAt(area, p.path);
++      const index = p.path[p.path.length - 1];
++      if (index > parent.childNodes.length) throw missing(p.path);
++      const inserted = renderVNode(p.node);
++      parent.insertBefore(inserted, parent.childNodes[index] ?? null);
++      observer?.({ patch: p, node: inserted, stage: 'after' });
++      return;
++    }
++    case 'REMOVE': {
++      const node = nodeAt(area, p.path);
++      observer?.({ patch: p, node, stage: 'before' });
++      node.parentNode!.removeChild(node);
++      return;
++    }
++    case 'REPLACE': {
++      const node = nodeAt(area, p.path);
++      const replaced = renderVNode(p.after);
++      node.parentNode!.replaceChild(replaced, node);
++      observer?.({ patch: p, node: replaced, stage: 'after' });
++      return;
++    }
++    case 'MOVE': {
++      // [AI Note]: Key 확장 — 같은 DOM 노드를 새로 만들지 않고 옮긴다 (참조 유지). parent의 자식 from번을 빼서
++      // "뺀 뒤 목록"의 to번 자리에 넣는다. insertBefore는 이미 붙어 있는 노드를 그대로 옮기므로 제거 + 삽입이 한 번에 된다.
++      const parent = p.parent.length === 0 ? area : nodeAt(area, p.parent);
++      const count = parent.childNodes.length;
++      if (!Number.isInteger(p.from) || p.from < 0 || p.from >= count) {
++        throw new Error(`patch: MOVE 대상이 없습니다 (부모 경로 [${p.parent.join(',')}], from ${p.from})`);
++      }
++      if (!Number.isInteger(p.to) || p.to < 0 || p.to >= count) {
++        throw new Error(`patch: MOVE 자리가 목록 밖입니다 (부모 경로 [${p.parent.join(',')}], to ${p.to})`);
++      }
++      const moved = parent.childNodes[p.from];
++      if (p.from === p.to) {
++        observer?.({ patch: p, node: moved, stage: 'after' });
++        return;
++      }
++      // 뺀 뒤 목록의 to번 노드 = 원래 목록에서 to < from이면 to번, to > from이면 to + 1번 (from번 하나가 빠져서 한 칸 당겨짐)
++      const before = parent.childNodes[p.to < p.from ? p.to : p.to + 1] ?? null;
++      parent.insertBefore(moved, before);
++      observer?.({ patch: p, node: moved, stage: 'after' });
++      return;
++    }
++  }
++}
++
++function missing(path: Path): Error {
++  return new Error(`patch: 경로 [${path.join(',')}]에 해당하는 노드가 DOM에 없습니다.`);
++}
++
++function walk(area: Element, path: Path): Node {
++  let node: Node = area;
++  for (const index of path) {
++    const child: Node | undefined = node.childNodes[index];
++    if (child === undefined) throw missing(path);
++    node = child;
++  }
++  return node;
++}
++
++function nodeAt(area: Element, path: Path): Node {
++  if (path.length === 0) throw new Error('patch: 경로가 비어 있습니다. 영역 상자 자신은 고칠 수 없습니다.');
++  return walk(area, path);
++}
++
++function parentAt(area: Element, path: Path): Node {
++  if (path.length === 0) throw new Error('patch: 경로가 비어 있습니다. 영역 상자 자신은 고칠 수 없습니다.');
++  return walk(area, path.slice(0, -1));
++}
++
++function elementAt(area: Element, path: Path, kind: string): Element {
++  const node = nodeAt(area, path);
++  if (node.nodeType !== Node.ELEMENT_NODE) {
++    throw new Error(`patch: ${kind} 대상이 요소가 아닙니다 (경로 ${path.join(',')})`);
++  }
++  return node as Element;
++}
+diff --git a/packages/react-dom-bindings/src/client/renderVNode.ts b/packages/react-dom-bindings/src/client/renderVNode.ts
+index 5e8e8f1..9e08390 100644
+--- a/packages/react-dom-bindings/src/client/renderVNode.ts
++++ b/packages/react-dom-bindings/src/client/renderVNode.ts
+@@ -1,5 +1,6 @@
+-import { TEXT_NODE } from '@mini-react/shared';
+-import type { ElementVNode, VNode } from '@mini-react/shared';
++import { COMMENT_NODE, TEXT_NODE } from '@mini-react/shared';
++import type { AreaChildren, ElementVNode, StyleMap, VNode } from '@mini-react/shared';
++import { styleMapToText } from './style';
+ 
+ // [AI Note]: VNode → 실제 DOM. 텍스트는 createTextNode만 쓰므로 `<`·`&`가 마크업으로 해석되지 않는다 (innerHTML 미사용).
+ // key는 DOM에 쓰지 않는다.
+@@ -7,6 +8,9 @@ export function renderVNode(vnode: VNode): Node {
+   if (vnode.type === TEXT_NODE) {
+     return document.createTextNode((vnode.props as { nodeValue: string }).nodeValue);
+   }
++  if (vnode.type === COMMENT_NODE) {
++    return document.createComment((vnode.props as { nodeValue: string }).nodeValue);
++  }
+   if (typeof vnode.type === 'function') {
+     // [AI Note]: 컴포넌트는 Phase 2에서 FunctionComponent가 호출해 요소 VNode로 풀어 준다. 여기서는 만들지 않는다.
+     throw new Error('renderVNode는 컴포넌트 VNode를 직접 그릴 수 없습니다. 컴포넌트를 호출해 요소 VNode로 바꾼 뒤 넘겨 주세요.');
+@@ -19,11 +23,21 @@ export function renderVNode(vnode: VNode): Node {
+   return element;
+ }
+ 
++// [AI Note]: 영역 상자 안을 통째로 그린다. 영역 상자 자신(id · class 등)은 건드리지 않는다 (§5 보이지 않는 감싸개).
++// 상태 갱신 흐름에서는 쓰지 않는다 — 처음 그릴 때 · 미리보기 · Patch 도중 오류 복구에서만 쓴다.
++export function renderAreaChildren(area: Element, children: AreaChildren): void {
++  area.replaceChildren(...children.map(renderVNode));
++}
++
+ // [AI Note]: props 분기 — 문자열·숫자는 속성, true는 빈 속성, false·null·undefined는 생략,
+-// 함수·객체는 설정하지 않고 prop마다 warn 1회 (이벤트 처리는 ISSUE-16에서).
++// style이 객체면 StyleMap으로 보고 속성 글로 쓴다(빈 묶음이면 속성 없음),
++// 그 밖의 함수·객체는 설정하지 않고 prop마다 warn 1회 (이벤트 처리는 phase2에서).
+ function applyProps(element: Element, vnode: ElementVNode): void {
+   for (const [name, value] of Object.entries(vnode.props)) {
+-    if (typeof value === 'string' || typeof value === 'number') {
++    if (name === 'style' && typeof value === 'object' && value !== null && !Array.isArray(value)) {
++      const text = styleMapToText(value as StyleMap);
++      if (text !== '') element.setAttribute('style', text);
++    } else if (typeof value === 'string' || typeof value === 'number') {
+       element.setAttribute(name, String(value));
+     } else if (value === true) {
+       element.setAttribute(name, '');
+diff --git a/packages/react-dom-bindings/src/client/sanitize.ts b/packages/react-dom-bindings/src/client/sanitize.ts
+new file mode 100644
+index 0000000..c632911
+--- /dev/null
++++ b/packages/react-dom-bindings/src/client/sanitize.ts
+@@ -0,0 +1,94 @@
++// [AI Note]: "미리보기에서 빼고 Patch 때 막는 목록"의 단 하나의 기준 (dev_todo 공통 약속).
++// 미리보기(setAreaHtml)는 여기서 찾은 것을 빼고 그리고, Patch 때 검사(checkHtml)는 같은 목록을 문제로 알린다.
++// 두 곳이 어긋나면 "미리보기에는 있는데 Patch는 통과" 같은 틈이 생기므로 기준을 이 파일 하나에 둔다.
++
++/** 요소째 빼는 것: <script> · <iframe> · <object> · <embed> · <style> (+ <link rel="stylesheet">은 아래에서 따로 판정) */
++const BLOCKED_ELEMENTS = new Set(['script', 'iframe', 'object', 'embed', 'style']);
++
++/** 주소를 담는 속성 중 `javascript:`를 막을 것 */
++const URL_ATTRIBUTES = new Set(['href', 'src', 'action', 'formaction']);
++
++export type DangerousKind =
++  /** 요소 자체가 막힌 종류 (`<script>` · `<iframe>` · `<object>` · `<embed>` · `<style>` · `<link rel="stylesheet">`) */
++  | 'ELEMENT'
++  /** `on…` 이벤트 핸들러 속성 */
++  | 'EVENT_ATTRIBUTE'
++  /** `javascript:` 주소 속성 */
++  | 'JAVASCRIPT_URL';
++
++export interface DangerousFinding {
++  /** 찾은 요소 (요소째 막힌 경우 그 요소, 속성이면 그 속성을 가진 요소) */
++  readonly node: Element;
++  /** 소문자 태그 이름 */
++  readonly element: string;
++  /** 문제가 된 속성 이름. 요소째 막힌 경우 `null` */
++  readonly attribute: string | null;
++  readonly kind: DangerousKind;
++}
++
++/**
++ * root 아래에서 위험한 것을 찾아 문서 순서대로 알려 준다. DOM은 고치지 않는다.
++ * 막힌 요소 안쪽은 요소째 빠질 것이므로 따로 세지 않는다. `<template>` 안(비활성 내용)도 훑는다.
++ * 깊은 트리에서도 스택이 넘치지 않게 반복문으로 훑는다 (B20).
++ */
++export function scanDangerous(root: ParentNode): DangerousFinding[] {
++  const findings: DangerousFinding[] = [];
++  // 문서 순서(앞 → 뒤)를 지키려고 스택에 뒤에서부터 넣는다
++  const stack: ParentNode[] = [root];
++  while (stack.length > 0) {
++    const parent = stack.pop()!;
++    const children = Array.from(parent.children);
++    const next: ParentNode[] = [];
++    for (const element of children) {
++      const tag = element.localName;
++      if (isBlockedElement(element)) {
++        findings.push({ node: element, element: tag, attribute: null, kind: 'ELEMENT' });
++        continue;
++      }
++      for (const name of element.getAttributeNames()) {
++        if (/^on/i.test(name)) {
++          findings.push({ node: element, element: tag, attribute: name, kind: 'EVENT_ATTRIBUTE' });
++        } else if (URL_ATTRIBUTES.has(name) && isJavascriptUrl(element.getAttribute(name) ?? '')) {
++          findings.push({ node: element, element: tag, attribute: name, kind: 'JAVASCRIPT_URL' });
++        }
++      }
++      if (element instanceof HTMLTemplateElement) next.push(element.content);
++      next.push(element);
++    }
++    // 스택은 뒤에서 꺼내므로 뒤집어 넣어야 앞 형제부터 처리된다
++    for (let i = next.length - 1; i >= 0; i--) stack.push(next[i]);
++  }
++  return findings;
++}
++
++/** 찾은 것을 실제로 뺀다: 속성은 `removeAttribute`, 요소는 통째로 `remove`. 뺀 목록을 돌려준다 */
++export function removeDangerous(root: ParentNode): DangerousFinding[] {
++  const findings = scanDangerous(root);
++  for (const finding of findings) {
++    if (finding.attribute === null) finding.node.remove();
++    else finding.node.removeAttribute(finding.attribute);
++  }
++  return findings;
++}
++
++function isBlockedElement(element: Element): boolean {
++  const tag = element.localName;
++  if (BLOCKED_ELEMENTS.has(tag)) return true;
++  if (tag === 'link') {
++    // rel 값을 공백으로 쪼갠 낱말 중 stylesheet가 있으면 해당 (대소문자 무시)
++    return (element.getAttribute('rel') ?? '')
++      .split(/\s+/)
++      .some((word) => word.toLowerCase() === 'stylesheet');
++  }
++  return false;
++}
++
++// [AI Note]: 파서가 글을 읽은 뒤의 값으로 판정한다. 문자 참조(`jav&#x61;script:`)는 이미 풀려 있다.
++// URL 규칙처럼 앞쪽의 공백 · 제어문자를 자르고 값 안의 탭 · 줄바꿈을 지운 뒤 소문자로 비교한다 (B12).
++function isJavascriptUrl(value: string): boolean {
++  const normalized = value
++    .replace(/^[\u0000- ]+/, '')
++    .replace(/[\t\n\r]/g, '')
++    .toLowerCase();
++  return normalized.startsWith('javascript:');
++}
+diff --git a/packages/react-dom-bindings/src/client/setAreaHtml.ts b/packages/react-dom-bindings/src/client/setAreaHtml.ts
+new file mode 100644
+index 0000000..8f74895
+--- /dev/null
++++ b/packages/react-dom-bindings/src/client/setAreaHtml.ts
+@@ -0,0 +1,12 @@
++import { removeDangerous } from './sanitize';
++
++// [AI Note]: 편집창 글 → 미리보기(테스트 영역). 칠 때마다 불린다.
++// 살아 있는 요소에 innerHTML로 바로 넣지 않는다: `<img src=x onerror=…>`는 파싱 · 삽입 순간 실행될 수 있다.
++// 비활성 문서인 <template> 안에서 읽고 위험한 것(`on…` · script · iframe · object · embed · style · stylesheet link ·
++// `javascript:`)을 뺀 뒤에야 영역으로 옮긴다. 영역 상자 자신은 건드리지 않고 안의 자식만 바꾼다 (§5).
++export function setAreaHtml(area: Element, html: string): void {
++  const template = document.createElement('template');
++  template.innerHTML = html;
++  removeDangerous(template.content);
++  area.replaceChildren(template.content);
++}
+diff --git a/packages/react-dom-bindings/src/client/style.ts b/packages/react-dom-bindings/src/client/style.ts
+new file mode 100644
+index 0000000..94ed558
+--- /dev/null
++++ b/packages/react-dom-bindings/src/client/style.ts
+@@ -0,0 +1,64 @@
++import type { StyleMap } from '@mini-react/shared';
++
++// [AI Note]: style 속성 글 ↔ StyleMap. 브라우저 CSSOM(`el.style`)으로 읽지 않고 글을 직접 쪼갠다.
++// CSSOM은 축약형(`background`)을 낱개 여러 개로 풀고 모르는 항목을 버려서 VNode와 실제 DOM이 어긋난다 (jsdom에서 확인).
++// 쪼갤 때 괄호 · 따옴표 · /* … */ 주석 안의 `;` `:`는 구분자로 보지 않는다.
++export function parseStyleText(text: string): StyleMap {
++  const entries = new Map<string, string>();
++  let depth = 0;
++  let quote: string | null = null;
++  let inComment = false;
++  let start = 0;
++  let colon = -1;
++
++  const flush = (end: number): void => {
++    if (colon < 0) return;
++    // 이름 쪽 주석은 걷어 낸다. 값 쪽 주석 · !important는 값의 일부로 그대로 둔다
++    const rawName = text.slice(start, colon).replace(/\/\*[\s\S]*?\*\//g, '').trim();
++    const value = text.slice(colon + 1, end).trim();
++    if (rawName === '' || value === '') return;
++    const name = rawName.startsWith('--') ? rawName : rawName.toLowerCase();
++    entries.set(name, value);
++  };
++
++  for (let i = 0; i < text.length; i++) {
++    const c = text[i];
++    if (inComment) {
++      if (c === '*' && text[i + 1] === '/') {
++        inComment = false;
++        i++;
++      }
++      continue;
++    }
++    if (quote !== null) {
++      if (c === '\\') i++;
++      else if (c === quote) quote = null;
++      continue;
++    }
++    if (c === '/' && text[i + 1] === '*') {
++      inComment = true;
++      i++;
++    } else if (c === '"' || c === "'") {
++      quote = c;
++    } else if (c === '(') {
++      depth++;
++    } else if (c === ')') {
++      if (depth > 0) depth--;
++    } else if (c === ':') {
++      if (depth === 0 && colon < 0) colon = i;
++    } else if (c === ';' && depth === 0) {
++      flush(i);
++      start = i + 1;
++      colon = -1;
++    }
++  }
++  flush(text.length);
++  // Object.fromEntries는 `__proto__`도 보통 항목으로 담는다
++  return Object.fromEntries(entries);
++}
++
++export function styleMapToText(map: StyleMap): string {
++  return Object.entries(map)
++    .map(([name, value]) => `${name}: ${value}`)
++    .join('; ');
++}
+diff --git a/packages/react-dom-bindings/src/client/vnodesToHtml.ts b/packages/react-dom-bindings/src/client/vnodesToHtml.ts
+new file mode 100644
+index 0000000..d85ea16
+--- /dev/null
++++ b/packages/react-dom-bindings/src/client/vnodesToHtml.ts
+@@ -0,0 +1,76 @@
++import { COMMENT_NODE, TEXT_NODE } from '@mini-react/shared';
++import type { AreaChildren, ElementVNode, StyleMap, VNode } from '@mini-react/shared';
++import { styleMapToText } from './style';
++
++const VOID_ELEMENTS = new Set([
++  'area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input', 'link', 'meta', 'param', 'source', 'track', 'wbr',
++]);
++
++// 안의 글을 이스케이프 없이 그대로 읽는 요소 (HTML 파서의 원문 글 요소). 여기서 &lt; 로 쓰면 글자 그대로 `&lt;`가 된다
++const RAW_TEXT_ELEMENTS = new Set(['style', 'script', 'xmp', 'iframe', 'noembed', 'noframes']);
++
++// 여는 태그 바로 뒤의 첫 줄바꿈 하나를 파서가 버리는 요소
++const SWALLOW_FIRST_NEWLINE = new Set(['pre', 'textarea', 'listing']);
++
++// [AI Note]: 저장한 VNode → 편집창에 채울 HTML 글. 뒤로 · 앞으로 때 편집창이 그 기록의 모습을 보이게 한다 (P1-30).
++// 공백 · 주석을 그대로 쓰고(결정 5 B), "HTML 글 → 파싱 → domToVNode"가 원래 VNode가 되도록 이스케이프 규칙을 맞춘다.
++// DOM을 만지지 않는 순수 문자열 변환이다.
++export function vnodesToHtml(children: AreaChildren): string {
++  return children.map((node) => nodeToHtml(node, false)).join('');
++}
++
++function nodeToHtml(node: VNode, raw: boolean): string {
++  if (node.type === TEXT_NODE) {
++    const value = (node.props as { nodeValue: string }).nodeValue;
++    return raw ? value : escapeText(value);
++  }
++  if (node.type === COMMENT_NODE) {
++    return `<!--${(node.props as { nodeValue: string }).nodeValue}-->`;
++  }
++  if (typeof node.type === 'function') {
++    throw new Error('vnodesToHtml은 컴포넌트 VNode를 쓸 수 없습니다. 컴포넌트를 호출해 요소 VNode로 바꾼 뒤 넘겨 주세요.');
++  }
++  return elementToHtml(node as ElementVNode);
++}
++
++function elementToHtml(node: ElementVNode): string {
++  const tag = node.type;
++  const open = `<${tag}${attributesToHtml(node)}>`;
++  if (VOID_ELEMENTS.has(tag)) return open;
++
++  const raw = RAW_TEXT_ELEMENTS.has(tag);
++  let inner = node.children.map((child) => nodeToHtml(child, raw)).join('');
++  // [AI Note]: <pre>·<textarea> 바로 뒤의 첫 줄바꿈은 파서가 버린다. 글자가 "\n"으로 시작하면 하나 더 써서 보존한다
++  if (SWALLOW_FIRST_NEWLINE.has(tag) && inner.startsWith('\n')) inner = '\n' + inner;
++  return `${open}${inner}</${tag}>`;
++}
++
++function attributesToHtml(node: ElementVNode): string {
++  let out = '';
++  for (const [name, value] of Object.entries(node.props)) {
++    const text = attributeValue(name, value);
++    if (text !== null) out += ` ${name}="${escapeAttribute(text)}"`;
++  }
++  return out;
++}
++
++// 속성 값 정규화 (diff · renderVNode와 같은 규칙): 문자열 · 숫자 → 문자열, true → "", false · null · undefined → 없음,
++// style 객체는 속성 글로(빈 묶음이면 없음), 그 밖의 함수 · 객체는 속성으로 안 다룸
++function attributeValue(name: string, value: unknown): string | null {
++  if (name === 'style' && typeof value === 'object' && value !== null && !Array.isArray(value)) {
++    const text = styleMapToText(value as StyleMap);
++    return text === '' ? null : text;
++  }
++  if (typeof value === 'string') return value;
++  if (typeof value === 'number') return String(value);
++  if (value === true) return '';
++  return null;
++}
++
++function escapeText(value: string): string {
++  return value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
++}
++
++function escapeAttribute(value: string): string {
++  return value.replace(/&/g, '&amp;').replace(/"/g, '&quot;');
++}
+diff --git a/packages/react-dom-bindings/src/index.ts b/packages/react-dom-bindings/src/index.ts
+index af49068..a1a8a96 100644
+--- a/packages/react-dom-bindings/src/index.ts
++++ b/packages/react-dom-bindings/src/index.ts
+@@ -1 +1,11 @@
+-export { renderVNode } from './client/renderVNode';
++export { renderVNode, renderAreaChildren } from './client/renderVNode';
++export { domToVNode, readAreaChildren } from './client/domToVNode';
++export { parseStyleText, styleMapToText } from './client/style';
++export { patch } from './client/patch';
++export type { PatchObserver } from './client/patch';
++export { vnodesToHtml } from './client/vnodesToHtml';
++export { setAreaHtml } from './client/setAreaHtml';
++export { scanDangerous, removeDangerous } from './client/sanitize';
++export type { DangerousFinding, DangerousKind } from './client/sanitize';
++export { checkHtml, formatProblems, PROBLEM_LABELS } from './client/checkHtml';
++export type { HtmlProblem, HtmlProblemKind } from './client/checkHtml';
+diff --git a/packages/react-dom/src/createVDomRoot.ts b/packages/react-dom/src/createVDomRoot.ts
+new file mode 100644
+index 0000000..6337e66
+--- /dev/null
++++ b/packages/react-dom/src/createVDomRoot.ts
+@@ -0,0 +1,82 @@
++import { diff, invertPatches } from '@mini-react/react-reconciler';
++import { patch, readAreaChildren, renderAreaChildren } from '@mini-react/react-dom-bindings';
++import type { PatchObserver } from '@mini-react/react-dom-bindings';
++import type { AreaChildren, Patch } from '@mini-react/shared';
++import { History } from './history';
++
++export interface CreateVDomRootOptions {
++  /**
++   * Diff 시각화(확장)용 관찰 콜백. `update` · `back` · `forward`가 실제 영역에 patch를 하나 적용할 때마다
++   * `{ patch, node, stage }`로 불린다 (REMOVE는 지우기 직전 `before`, 나머지는 적용 직후 `after`).
++   * 무변경 `update` · 경계 이동처럼 patch가 없으면 불리지 않고, 예외 복구(C2)의 다시 그리기도 알리지 않는다.
++   */
++  onPatch?: PatchObserver;
++}
++
++export interface VDomRoot {
++  /** 지금(current) 기록의 VNode. 테스트 영역 · 편집창 · 다음 Patch의 기준 */
++  snapshot(): AreaChildren;
++  /**
++   * Patch 흐름: 지금 기록의 VNode와 next를 diff → 실제 영역에 patch → 새 기록으로 저장.
++   * 바뀐 게 없으면 아무것도 하지 않고 `false` (무변경 Patch는 기록하지 않는다, §3.3).
++   * patch 도중 예외가 나면 기록은 그대로 두고 실제 영역을 지금 기록으로 복구한 뒤 원래 예외를 다시 던진다 (C2).
++   */
++  update(next: AreaChildren): boolean;
++  /**
++   * 한 칸 뒤로: 실제 영역에 저장해 둔 역패치(이미 역순)를 적용하고 이동한 기록의 snapshot을 돌려준다.
++   * 처음(0번)이면 아무 일 없이 `null` (경계 무시). 호출한 쪽이 돌려받은 snapshot으로 테스트 영역 · 편집창을 채운다.
++   * 이동 도중 예외가 나면 C2와 같은 복구 후 원래 예외를 다시 던지고 current는 움직이지 않는다.
++   */
++  back(): AreaChildren | null;
++  /** 한 칸 앞으로: 저장해 둔 patches를 순서대로 적용. 끝이면 `null`. 나머지는 `back`과 같다 */
++  forward(): AreaChildren | null;
++}
++
++// [AI Note]: react-dom은 DOM을 직접 만지지 않는다. DOM 접근은 전부 react-dom-bindings(readAreaChildren · patch · renderAreaChildren)를 거친다.
++// 만들 때 실제 영역을 딱 한 번 읽어 0번 기록으로 삼고(P1-20), 그 뒤 diff 기준은 항상 History에 저장한 VNode다.
++// 실제 영역 DOM을 다시 읽어 비교하면 P1-33("두 VNode를 비교")을 어기고, 바깥에서 고친 DOM에 기준이 흔들린다.
++export function createVDomRoot(realArea: Element, options: CreateVDomRootOptions = {}): VDomRoot {
++  const { onPatch } = options;
++  const history = new History({ snapshot: readAreaChildren(realArea), patches: [], inverse: [] });
++
++  // [AI Note]: C2 복구 경로 한 개. 영역을 통째로 다시 그리는 것은 정상 갱신에서는 금지(P1-24 · P1-34)이고,
++  // patch 도중 예외로 DOM이 반쯤 적용된 상태가 되었을 때 "지금 기록 모습"으로 되돌리는 이 한 곳에서만 쓴다.
++  // 복구 뒤 원래 예외를 그대로 다시 던져 페이지(fixture)가 알릴 수 있게 한다.
++  // update · back · forward가 모두 이 함수를 지나므로, 기록(current)은 patch가 성공한 뒤에만 움직이고 실패하면 건드리지 않는다.
++  function applyOrRecover(patches: readonly Patch[]): void {
++    try {
++      // [AI Note]: 세 동작(update · back · forward)이 모두 이 함수를 지나므로 관찰 콜백도 여기 한 곳에서 전달한다 (Diff 시각화).
++      patch(realArea, patches, onPatch);
++    } catch (error) {
++      renderAreaChildren(realArea, history.current.entry.snapshot);
++      throw error;
++    }
++  }
++
++  return {
++    snapshot: () => history.current.entry.snapshot,
++
++    update(next) {
++      const patches = diff(history.current.entry.snapshot, next);
++      if (patches.length === 0) return false;
++      applyOrRecover(patches);
++      history.push({ snapshot: next, patches, inverse: invertPatches(patches) });
++      return true;
++    },
++
++    back() {
++      const here = history.current;
++      if (here.prev === null) return null;
++      // inverse는 이미 역순으로 뒤집어 둔 목록이라 그대로 순서대로 적용한다 (결정 7 · 되돌리는 순서 = 역순)
++      applyOrRecover(here.entry.inverse);
++      return history.back()!.snapshot;
++    },
++
++    forward() {
++      const target = history.current.next;
++      if (target === null) return null;
++      applyOrRecover(target.entry.patches);
++      return history.forward()!.snapshot;
++    },
++  };
++}
+diff --git a/packages/react-dom/src/history.ts b/packages/react-dom/src/history.ts
+new file mode 100644
+index 0000000..f624b83
+--- /dev/null
++++ b/packages/react-dom/src/history.ts
+@@ -0,0 +1,77 @@
++import { HISTORY_LIMIT } from '@mini-react/shared';
++import type { HistoryEntry, HistoryNode } from '@mini-react/shared';
++
++// [AI Note]: State History = 양방향 연결 리스트 (알고리즘 결정 7 B + VNode). head(가장 오래된) · current(지금) · size(개수).
++// 순수 데이터라 DOM을 모른다. 실제 DOM에 적용하는 일(역패치 · patch)은 createVDomRoot가 한다.
++// 연결 리스트를 고른 이유: 한도 50을 넘으면 맨 앞(head)을 빼야 하는데, 배열이면 번호를 전부 당겨야 한다.
++// 저장한 HistoryEntry는 절대 고치지 않는다 (P1-27). 노드의 prev · next만 바뀐다.
++export class History {
++  #head: HistoryNode;
++  #current: HistoryNode;
++  #size = 1;
++
++  /** 초기 모습이 0번 기록 = 뒤로가기의 바닥 (§3.3) */
++  constructor(initial: HistoryEntry) {
++    this.#head = this.#current = { entry: initial, prev: null, next: null };
++  }
++
++  get head(): HistoryNode {
++    return this.#head;
++  }
++
++  get current(): HistoryNode {
++    return this.#current;
++  }
++
++  /** 지금 들고 있는 기록 수 (0번 포함) */
++  get size(): number {
++    return this.#size;
++  }
++
++  /**
++   * current 뒤에 새 기록을 붙이고 current를 옮긴다.
++   * - 뒤로 간 상태였다면 앞쪽(redo) 기록은 끊는다 (갈림길 정책). 끊은 만큼 size도 뺀다.
++   * - 50개를 넘으면 head를 다음으로 옮긴다 (새 맨 앞이 새 바닥).
++   */
++  push(entry: HistoryEntry): void {
++    // [AI Note]: 끊은 기록 수를 size에서 빼지 않으면 한도 근처에서 head를 너무 일찍 빼는 버그가 난다 (B17).
++    let cut = this.#current.next;
++    while (cut !== null) {
++      const after = cut.next;
++      cut.prev = null;
++      cut.next = null;
++      this.#size--;
++      cut = after;
++    }
++    const node: HistoryNode = { entry, prev: this.#current, next: null };
++    this.#current.next = node;
++    this.#current = node;
++    this.#size++;
++    if (this.#size > HISTORY_LIMIT) this.#dropHead();
++  }
++
++  /** 한 칸 뒤로. 이동한 기록을 돌려주고, 처음(0번이 바닥)이면 아무 일 없이 `null` (경계 무시) */
++  back(): HistoryEntry | null {
++    const prev = this.#current.prev;
++    if (prev === null) return null;
++    this.#current = prev;
++    return prev.entry;
++  }
++
++  /** 한 칸 앞으로. 이동한 기록을 돌려주고, 끝이면 아무 일 없이 `null` (경계 무시) */
++  forward(): HistoryEntry | null {
++    const next = this.#current.next;
++    if (next === null) return null;
++    this.#current = next;
++    return next.entry;
++  }
++
++  #dropHead(): void {
++    const old = this.#head;
++    const second = old.next!;
++    second.prev = null;
++    old.next = null;
++    this.#head = second;
++    this.#size--;
++  }
++}
+diff --git a/packages/react-dom/src/index.ts b/packages/react-dom/src/index.ts
+new file mode 100644
+index 0000000..02cdfd7
+--- /dev/null
++++ b/packages/react-dom/src/index.ts
+@@ -0,0 +1,3 @@
++export { History } from './history';
++export { createVDomRoot } from './createVDomRoot';
++export type { VDomRoot, CreateVDomRootOptions } from './createVDomRoot';
+diff --git a/packages/react-reconciler/src/diff.ts b/packages/react-reconciler/src/diff.ts
+new file mode 100644
+index 0000000..0038703
+--- /dev/null
++++ b/packages/react-reconciler/src/diff.ts
+@@ -0,0 +1,150 @@
++import { COMMENT_NODE, TEXT_NODE } from '@mini-react/shared';
++import type { AreaChildren, Key, Patch, Path, StyleMap, VNode } from '@mini-react/shared';
++
++// [AI Note]: 이전 · 새 VNode 두 개만 비교해 "고칠 일 목록"을 만든다 (P1-33 — 실제 DOM을 다시 읽지 않는다).
++// DOM을 전혀 모른다. 한 줄 = 종류 · 경로 · 전 · 후 (알고리즘 결정 3 A). 경로는 영역 상자 안 자식부터 (결정 4 A).
++// 필수 동작은 위치 기반 (결정 2): 같은 자리 · 같은 종류면 그 자리에서 고치고, 다르면 통째로 교체한다.
++export function diff(oldChildren: AreaChildren, newChildren: AreaChildren): Patch[] {
++  const patches: Patch[] = [];
++  diffChildren(oldChildren, newChildren, [], patches);
++  return patches;
++}
++
++function diffChildren(oldChildren: readonly VNode[], newChildren: readonly VNode[], parent: Path, out: Patch[]): void {
++  // [AI Note]: Key 확장 (알고리즘 결정 2 B). "자식 목록 단위"로 판단한다 — 옛 · 새 목록의 모든 자식에 key가 있고
++  // 각 목록 안에서 중복이 없을 때만 key 표 매칭. 아니면 필수 동작(위치 비교) 그대로.
++  if (isKeyed(oldChildren) && isKeyed(newChildren)) {
++    diffKeyedChildren(oldChildren, newChildren, parent, out);
++    return;
++  }
++  const common = Math.min(oldChildren.length, newChildren.length);
++  // ① 겹치는 자리부터 재귀 비교
++  for (let i = 0; i < common; i++) {
++    diffNode(oldChildren[i], newChildren[i], [...parent, i], out);
++  }
++  // [AI Note]: 목록은 순서대로 하나씩 적용하고 경로는 "그 순간의 트리" 기준이라 순서가 중요하다 (알고리즘 결정 3 · 4).
++  // ② 남는 옛 자식은 뒤에서부터 REMOVE (앞 번호가 안 밀림) → ③ 남는 새 자식은 앞에서부터 INSERT (앞 번호가 먼저 자리 잡음)
++  for (let i = oldChildren.length - 1; i >= common; i--) {
++    out.push({ kind: 'REMOVE', path: [...parent, i], node: oldChildren[i] });
++  }
++  for (let i = common; i < newChildren.length; i++) {
++    out.push({ kind: 'INSERT', path: [...parent, i], node: newChildren[i] });
++  }
++}
++
++/** 모든 자식에 key가 있고 중복이 없는가 (글자 · 주석 노드는 key가 없으므로 섞여 있으면 false). 빈 목록은 true */
++function isKeyed(children: readonly VNode[]): boolean {
++  const seen = new Set<Key>();
++  for (const child of children) {
++    const key = (child as { key?: Key }).key;
++    // 1 과 "1"은 다른 key (Set의 같음 비교 그대로)
++    if (key === undefined || seen.has(key)) return false;
++    seen.add(key);
++  }
++  return true;
++}
++
++// [AI Note]: key 비교 순서 — ① 새 목록에 없는 옛 key를 뒤에서부터 REMOVE → ② 새 목록을 앞에서부터 보며
++// 현재 목록에서 그 key의 자리(from)가 to와 다르면 MOVE, 없으면 INSERT → ③ 짝이 맞은 노드끼리 재귀 diff (태그가 다르면 REPLACE).
++// ②가 끝나면 목록 순서가 새 목록과 같아져 ③의 경로는 최종 자리 기준이고, 재귀 diff는 이 목록의 구조를 바꾸지 않는다.
++// 최소 이동 수는 보장하지 않는다 (예: [a,b,c] → [b,c,a]는 1번이면 되지만 2번 이동). 단순함 우선 (최장 증가 부분 수열은 버린 후보).
++function diffKeyedChildren(oldChildren: readonly VNode[], newChildren: readonly VNode[], parent: Path, out: Patch[]): void {
++  const newKeys = new Set(newChildren.map((child) => (child as { key: Key }).key));
++  const oldByKey = new Map<Key, VNode>();
++  oldChildren.forEach((child) => oldByKey.set((child as { key: Key }).key, child));
++
++  // ① 사라진 key: 뒤에서부터 REMOVE (앞 번호가 안 밀림). 남은 옛 key 순서를 current에 추적한다
++  const current: Key[] = [];
++  for (let i = oldChildren.length - 1; i >= 0; i--) {
++    const old = oldChildren[i];
++    if (!newKeys.has((old as { key: Key }).key)) out.push({ kind: 'REMOVE', path: [...parent, i], node: old });
++  }
++  for (const old of oldChildren) {
++    const key = (old as { key: Key }).key;
++    if (newKeys.has(key)) current.push(key);
++  }
++
++  // ② 새 목록 앞에서부터: 0..to-1은 이미 새 목록과 같으므로 from >= to. 자리가 다르면 MOVE, 없으면 INSERT
++  for (let to = 0; to < newChildren.length; to++) {
++    const key = (newChildren[to] as { key: Key }).key;
++    const from = current.indexOf(key);
++    if (from === -1) {
++      out.push({ kind: 'INSERT', path: [...parent, to], node: newChildren[to] });
++      current.splice(to, 0, key);
++    } else if (from !== to) {
++      out.push({ kind: 'MOVE', parent, from, to });
++      current.splice(from, 1);
++      current.splice(to, 0, key);
++    }
++  }
++
++  // ③ 짝이 맞은 노드끼리 재귀 diff (새로 INSERT한 노드는 통째로 새것이라 비교하지 않음)
++  newChildren.forEach((child, to) => {
++    const old = oldByKey.get((child as { key: Key }).key);
++    if (old !== undefined) diffNode(old, child, [...parent, to], out);
++  });
++}
++
++function diffNode(oldNode: VNode, newNode: VNode, path: Path, out: Patch[]): void {
++  if (oldNode.type !== newNode.type) {
++    out.push({ kind: 'REPLACE', path, before: oldNode, after: newNode });
++    return;
++  }
++  if (oldNode.type === TEXT_NODE || oldNode.type === COMMENT_NODE) {
++    const before = (oldNode.props as { nodeValue: string }).nodeValue;
++    const after = (newNode.props as { nodeValue: string }).nodeValue;
++    if (before !== after) out.push({ kind: 'SET_TEXT', path, before, after });
++    return;
++  }
++  diffAttrs(oldNode, newNode, path, out);
++  diffStyle(oldNode, newNode, path, out);
++  diffChildren(oldNode.children, newNode.children, path, out);
++}
++
++// [AI Note]: 속성 값 정규화 — 문자열 · 숫자 → 문자열, true → "" (boolean 속성), false · null · undefined → 속성 없음.
++// 함수 · style이 아닌 객체는 Phase 1에서 속성으로 다루지 않는다 (이벤트는 phase2). style은 항목별 비교(StyleMap)라 여기서 뺀다.
++function readAttrs(node: VNode): Map<string, string> {
++  const attrs = new Map<string, string>();
++  for (const [name, value] of Object.entries(node.props)) {
++    if (name === 'style' && isStyleMap(value)) continue;
++    if (typeof value === 'string') attrs.set(name, value);
++    else if (typeof value === 'number') attrs.set(name, String(value));
++    else if (value === true) attrs.set(name, '');
++  }
++  return attrs;
++}
++
++function readStyle(node: VNode): StyleMap {
++  const value = (node.props as { style?: unknown }).style;
++  return isStyleMap(value) ? value : {};
++}
++
++function isStyleMap(value: unknown): value is StyleMap {
++  return typeof value === 'object' && value !== null && !Array.isArray(value);
++}
++
++function diffAttrs(oldNode: VNode, newNode: VNode, path: Path, out: Patch[]): void {
++  const before = readAttrs(oldNode);
++  const after = readAttrs(newNode);
++  for (const [name, oldValue] of before) {
++    const newValue = after.get(name);
++    if (newValue === undefined) out.push({ kind: 'SET_ATTR', path, name, before: oldValue, after: null });
++    else if (newValue !== oldValue) out.push({ kind: 'SET_ATTR', path, name, before: oldValue, after: newValue });
++  }
++  for (const [name, newValue] of after) {
++    if (!before.has(name)) out.push({ kind: 'SET_ATTR', path, name, before: null, after: newValue });
++  }
++}
++
++function diffStyle(oldNode: VNode, newNode: VNode, path: Path, out: Patch[]): void {
++  const before = readStyle(oldNode);
++  const after = readStyle(newNode);
++  for (const [property, oldValue] of Object.entries(before)) {
++    const newValue = after[property];
++    if (newValue === undefined) out.push({ kind: 'SET_STYLE', path, property, before: oldValue, after: null });
++    else if (newValue !== oldValue) out.push({ kind: 'SET_STYLE', path, property, before: oldValue, after: newValue });
++  }
++  for (const [property, newValue] of Object.entries(after)) {
++    if (!(property in before)) out.push({ kind: 'SET_STYLE', path, property, before: null, after: newValue });
++  }
++}
+diff --git a/packages/react-reconciler/src/index.ts b/packages/react-reconciler/src/index.ts
+new file mode 100644
+index 0000000..28e4dfa
+--- /dev/null
++++ b/packages/react-reconciler/src/index.ts
+@@ -0,0 +1,2 @@
++export { diff } from './diff';
++export { invertPatches } from './invertPatches';
+diff --git a/packages/react-reconciler/src/invertPatches.ts b/packages/react-reconciler/src/invertPatches.ts
+new file mode 100644
+index 0000000..64162d7
+--- /dev/null
++++ b/packages/react-reconciler/src/invertPatches.ts
+@@ -0,0 +1,27 @@
++import type { Patch } from '@mini-react/shared';
++
++// [AI Note]: 역패치 = 각 patch의 전(before) · 후(after)를 뒤집고, 목록 순서도 거꾸로 (알고리즘 결정 7 세부 — 역순).
++// patch는 "그 순간의 트리" 기준 경로로 순서대로 적용되므로, 되돌릴 때는 나중에 한 일부터 거꾸로 해야 경로가 맞는다.
++// 입력은 고치지 않고 새 객체를 만든다. HistoryEntry.inverse는 이 결과를 그대로(이미 역순) 순서대로 적용한다.
++export function invertPatches(patches: readonly Patch[]): Patch[] {
++  return patches.map(invertPatch).reverse();
++}
++
++function invertPatch(patch: Patch): Patch {
++  switch (patch.kind) {
++    case 'SET_TEXT':
++      return { kind: 'SET_TEXT', path: patch.path, before: patch.after, after: patch.before };
++    case 'SET_ATTR':
++      return { kind: 'SET_ATTR', path: patch.path, name: patch.name, before: patch.after, after: patch.before };
++    case 'SET_STYLE':
++      return { kind: 'SET_STYLE', path: patch.path, property: patch.property, before: patch.after, after: patch.before };
++    case 'INSERT':
++      return { kind: 'REMOVE', path: patch.path, node: patch.node };
++    case 'REMOVE':
++      return { kind: 'INSERT', path: patch.path, node: patch.node };
++    case 'REPLACE':
++      return { kind: 'REPLACE', path: patch.path, before: patch.after, after: patch.before };
++    case 'MOVE':
++      return { kind: 'MOVE', parent: patch.parent, from: patch.to, to: patch.from };
++  }
++}
