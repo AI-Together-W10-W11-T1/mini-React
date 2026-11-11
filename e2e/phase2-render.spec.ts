@@ -17,9 +17,15 @@ test('QA-1 페이지를 처음 연다: 칸 · 버튼 · 렌더/Patch 버튼 없�
   await expect(page.getByTestId('name-input')).toHaveValue('');
   await expect(page.getByTestId('greeting-text')).toHaveText('이름을 입력해 주세요');
 
-  // 페이지 어디에도 "렌더" · "Patch" 버튼이 없다: 버튼은 [+1] · [+3] · [그대로]뿐이다 (상태를 바꾸면 화면이 저절로 갱신된다)
+  // ③ 할 일 입력창 · [추가] · 안내 · 요약
+  await expect(page.getByTestId('todo-input')).toHaveValue('');
+  await expect(page.getByTestId('todo-add')).toHaveText('추가');
+  await expect(page.getByTestId('todo-empty')).toHaveText('할 일이 없어요');
+  await expect(page.getByTestId('todo-summary')).toHaveText('전체 0개 · 완료 0개');
+
+  // 페이지 어디에도 "렌더" · "Patch" 버튼이 없다: 버튼은 [+1] · [+3] · [그대로] · [추가] 네 개뿐이다 (상태를 바꾸면 화면이 저절로 갱신된다)
   const buttonTexts = await page.getByRole('button').allTextContents();
-  expect(buttonTexts.map((t) => t.trim())).toEqual(['+1', '+3', '그대로']);
+  expect(buttonTexts.map((t) => t.trim())).toEqual(['+1', '+3', '그대로', '추가']);
   expect(buttonTexts.some((t) => /렌더|patch/i.test(t))).toBe(false);
 
   // app-root 안에 최상위 <main> 하나 (영역 상자는 보이지 않는 감싸개)

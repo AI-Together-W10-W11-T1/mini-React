@@ -14,6 +14,7 @@ test('QA-2 [+1]을 누르면 카운터가 1이 되고(D-01), 렌더 1 → 2, 붙
     same: '[data-testid="counter-same"]',
     nameInput: '[data-testid="name-input"]',
     greeting: '[data-testid="greeting-text"]',
+    empty: '[data-testid="todo-empty"]',
   });
   const watcher = await watchApp(page);
   expect(await renderCount(page)).toBe(1);
@@ -30,6 +31,7 @@ test('QA-2 [+1]을 누르면 카운터가 1이 되고(D-01), 렌더 1 → 2, 붙
   expect(await sameNode(page, 'same', '[data-testid="counter-same"]')).toBe(true);
   expect(await sameNode(page, 'nameInput', '[data-testid="name-input"]')).toBe(true);
   expect(await sameNode(page, 'greeting', '[data-testid="greeting-text"]')).toBe(true);
+  expect(await sameNode(page, 'empty', '[data-testid="todo-empty"]')).toBe(true);
   const m = (await watcher.take()).body;
   expect(m.characterData).toBe(1);
   expect(m.childList).toBe(0);

@@ -104,3 +104,37 @@ export async function renderCount(page: Page): Promise<number> {
 export async function counterText(page: Page): Promise<string> {
   return (await page.getByTestId('counter-value').textContent()) ?? '';
 }
+
+/**
+ * 지금까지 ③ 목록의 `useMemo`가 다시 계산한 횟수. Dev-19 ~ Dev-20은 페이지가 노출한 `window.__memoCount`(바깥 변수)로 읽고,
+ * Dev-21에서 기록판 `log-memo` 칸을 읽도록 바꾼다.
+ */
+export async function memoCount(page: Page): Promise<number> {
+  return page.evaluate(() => (window as unknown as { __memoCount: number }).__memoCount);
+}
+
+/** 할 일 입력창에 글을 쓰고 [추가]를 누른다 */
+export async function addTodo(page: Page, text: string): Promise<void> {
+  await page.getByTestId('todo-input').fill(text);
+  await page.getByTestId('todo-add').click();
+}
+
+/** 항목 줄 `<li>`를 가리키는 선택자 (`data-id`) */
+export function itemSel(id: string): string {
+  return `[data-testid="todo-item"][data-id="${id}"]`;
+}
+
+/** 항목 줄 안의 요소를 가리키는 선택자 (예: `inItem('todo-1', 'todo-remove')`) */
+export function inItem(id: string, testId: string): string {
+  return `${itemSel(id)} [data-testid="${testId}"]`;
+}
+
+/** 화면에 보이는 항목 글자들 (위에서 아래 순서) */
+export function itemTexts(page: Page): Promise<string[]> {
+  return page.getByTestId('todo-text').allTextContents();
+}
+
+/** 화면에 보이는 항목 id들 (위에서 아래 순서) */
+export function itemIds(page: Page): Promise<string[]> {
+  return page.getByTestId('todo-item').evaluateAll((els) => els.map((el) => el.getAttribute('data-id') ?? ''));
+}
