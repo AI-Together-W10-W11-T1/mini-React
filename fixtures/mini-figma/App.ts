@@ -181,7 +181,7 @@ export function App(): VNode {
     h(LayerPanel, { main: doc.main, instances: doc.instances, selectedId, open: layersOpen, onToggle: onToggleLayers, onSelect: selectAndReveal, onMove, variables: doc.variables, onVariableChange }),
     h(Canvas, { main: doc.main, instances: doc.instances, variables: doc.variables, selectedId, onSelect: selectAndReveal }),
     // [인스턴스 생성]은 속성 패널 오른쪽 아래(메인을 골랐을 때)에 있다 — [삭제]와 같은 자리
-    h(PropertyPanel, { main: doc.main, instances: doc.instances, selectedId, onEdit, onReset, onDelete: deleteSelected, onAdd: addAndReveal }),
+    h(PropertyPanel, { main: doc.main, instances: doc.instances, variables: doc.variables, selectedId, onEdit, onReset, onDelete: deleteSelected, onAdd: addAndReveal }),
     // 실제 영역 구역 = 5번째 자식 [0,4]. DOM 순서는 맨 끝, 자리는 CSS로 정한다 (앞 네 개의 경로 접두 [0,0] ~ [0,3]은 그대로)
     h(PreviewPanel, {}),
   );

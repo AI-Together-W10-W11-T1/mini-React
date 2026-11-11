@@ -1,12 +1,14 @@
 import { h } from '@mini-react/react';
 import type { Props, VNode } from '@mini-react/shared';
+import { resolveColor, varIdOf } from '../color';
 import { instanceName, isOverridden, mergeProps } from '../model';
-import type { Field, IconKind, Instance, MainProps, Size } from '../model';
+import type { Field, IconKind, Instance, MainProps, Size, Variable } from '../model';
 import { ColorPalette } from './ColorPalette';
 
 interface PropertyPanelProps {
   main: MainProps;
   instances: readonly Instance[];
+  variables: readonly Variable[];
   selectedId: string | null;
   /** 한 칸의 값이 바뀌었다고 루트에 알린다 (루트가 고른 대상에 맞게 메인 · 인스턴스를 고친다) */
   onEdit: (field: Field, value: MainProps[Field]) => void;
@@ -53,7 +55,7 @@ function propRow(field: Field, name: string, control: VNode, override: OverrideI
 // [AI Note]: 선택 상자 · 체크박스 · 글자 칸은 모두 `onInput`으로만 받는다 — 엔진 이벤트는 click · input뿐이고, 선택 상자를 onClick으로 받으면
 // 열 때마다 불린다 (Chromium은 select · checkbox도 input 이벤트를 낸다, dev_todo 공통 주의 4). 값은 `value` / `checked` 프로퍼티로 그려서
 // 입력칸을 다시 만들지 않고 그 자리에서 고친다 → 한 글자마다 바로 반영돼도 포커스 · 커서가 유지된다 (MF-15).
-function propRows(values: MainProps, onEdit: PropertyPanelProps['onEdit'], override: OverrideInfo | null): VNode[] {
+function propRows(values: MainProps, onEdit: PropertyPanelProps['onEdit'], override: OverrideInfo | null, variables: readonly Variable[], fallback: string | undefined): VNode[] {
   const select = <T extends string>(field: Field, testId: string, label: string, current: T, options: readonly (readonly [T, string])[]): VNode =>
     propRow(
       field,
@@ -94,7 +96,22 @@ function propRows(values: MainProps, onEdit: PropertyPanelProps['onEdit'], overr
     ),
     select('icon', 'prop-icon', '아이콘 종류', values.icon, ICON_OPTIONS),
     // [AI Note]: 색 칸 = 팔레트 판(칩 8개 + 직접 고르기). 고른 색 `#rrggbb`를 그대로 onEdit('color', hex)로 올린다 — 다른 칸과 같은 경로 (FD-21 · 22 · 25).
-    propRow('color', '색', h(ColorPalette, { value: values.color, onPick: (hex: string) => onEdit('color', hex) }), override, 'row'),
+    // [AI Note]: 값 칸에는 푼 hex를 보이고, 연결 중이면 변수 id를 `link`로 알린다 (없는 id는 연결 아닌 것처럼 — 푼 색 · 상자 「없음」). 팔레트가 올리는 `var:<id>` · hex를 그대로 onEdit('color', …)로 올린다.
+    (() => {
+      const linkId = varIdOf(values.color);
+      return propRow(
+        'color',
+        '색',
+        h(ColorPalette, {
+          value: resolveColor(values.color, variables, fallback),
+          link: linkId !== null && variables.some((v) => v.id === linkId) ? linkId : null,
+          variables,
+          onPick: (color: string) => onEdit('color', color),
+        }),
+        override,
+        'row',
+      );
+    })(),
   ];
 }
 
@@ -103,7 +120,7 @@ function propRows(values: MainProps, onEdit: PropertyPanelProps['onEdit'], overr
 // 인스턴스 이름은 그 인스턴스의 지금 글자이고 빈 글자면 id (④-3). 인스턴스를 골랐을 때 칸에 보이는 값은 mergeProps(메인 값 위에 인스턴스 값) 결과다.
 // 메인 · 인스턴스가 같은 5칸 부품을 쓰고, 인스턴스의 override 칸에만 파랑 표시 + ↻가 붙는다.
 export function PropertyPanel(props: Props): VNode {
-  const { main, instances, selectedId, onEdit, onReset, onDelete, onAdd } = props as unknown as PropertyPanelProps;
+  const { main, instances, variables, selectedId, onEdit, onReset, onDelete, onAdd } = props as unknown as PropertyPanelProps;
   const target = selectedId === 'main' ? null : instances.find((it) => it.id === selectedId);
   const title = selectedId === 'main' ? '메인 Button' : target === undefined || target === null ? null : `인스턴스 · ${instanceName(main, target)}`;
   return h(
@@ -113,10 +130,10 @@ export function PropertyPanel(props: Props): VNode {
       ? h('p', { class: 'property-empty', 'data-testid': 'property-empty' }, '캔버스나 레이어에서 하나를 골라 보세요')
       : h('h2', { class: 'property-title', 'data-testid': 'property-title' }, title),
     selectedId === 'main'
-      ? h('div', { class: 'prop-rows', 'data-testid': 'prop-rows' }, propRows(main, onEdit, null))
+      ? h('div', { class: 'prop-rows', 'data-testid': 'prop-rows' }, propRows(main, onEdit, null, variables, undefined))
       : target === undefined || target === null
         ? null
-        : h('div', { class: 'prop-rows', 'data-testid': 'prop-rows' }, propRows(mergeProps(main, target), onEdit, { instance: target, onReset })),
+        : h('div', { class: 'prop-rows', 'data-testid': 'prop-rows' }, propRows(mergeProps(main, target), onEdit, { instance: target, onReset }, variables, main.color)),
     // [AI Note]: 패널 오른쪽 아래 버튼 자리 하나 — 메인을 고르면 [인스턴스 생성], 인스턴스를 고르면 [삭제](MF-24, 메인은 못 지움), 아무것도 안 골랐으면 없음.
     // 두 버튼은 같은 자리 · 같은 태그라 메인 ↔ 인스턴스로 고르기를 바꾸면 엔진이 노드를 다시 만들지 않고 속성 · 글자 · 핸들러만 고친다.
     title === null

@@ -94,13 +94,15 @@
 
       /* 실제 영역 구역: 카드(.app > * 규칙 재사용) = 머리글(제목만) + 상자. [Patch] · [실행 취소] · [다시 실행]는 도구 막대로 옮겼다(PP-07 변경).
          상자 = 바탕색(--bg) · 24px 모서리 · 24px 안쪽 여백, 점무늬 · 테두리 없음 (제목 아래 선으로 구분). 깜빡임 층은 상자와 같은 크기로 겹치고 마우스를 안 받는다. */
+      /* 실제 영역 카드: 좌우 · 아래 여백 0 + 상자가 카드 폭을 꽉 채운다 → 제목 · 「컴포넌트」 · 버튼이 위 테스트 영역과 같은 세로줄(카드 왼쪽 + 24px)에 선다. 카드 모서리 밖으로 상자가 안 나오게 잘라 낸다 */
       .real-section { display: flex; flex-direction: column; gap: 12px; }
-      .real-header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; } /* 제목 아래 선 없음 — 카드 · 상자 모양으로 이미 구분된다 */
+      .app > .real-section { padding: 20px 0 0; overflow: hidden; }
+      .real-header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; padding: 0 24px; } /* 제목 아래 선 없음 — 카드 · 상자 모양으로 이미 구분된다 */
       .real-header .panel-title { margin: 0; }
       .real-frame { position: relative; display: flex; flex: 1 1 auto; min-height: 0; }
-      .real-area { flex: 1 1 auto; min-width: 0; min-height: 120px; padding: 24px; background: var(--bg); border: 0; border-radius: 24px; } /* 점무늬 · 테두리 없음, 배경색은 바탕색(--bg) 상자 */
+      .real-area { flex: 1 1 auto; min-width: 0; min-height: 120px; padding: 24px; background: var(--bg); border: 0; border-radius: 0; } /* 점무늬 · 테두리 없음, 카드를 꽉 채워 모서리는 카드가 둥글게, 배경색은 바탕색(--bg) 상자 */
       .real-area .figma-button { cursor: default; }
-      .real-overlay { position: absolute; inset: 0; pointer-events: none; overflow: hidden; border-radius: 24px; }
+      .real-overlay { position: absolute; inset: 0; pointer-events: none; overflow: hidden; border-radius: 0; }
       /* 깜빡임 박스: 바뀐 노드 위에 잠깐 뜨고 옅어져 사라진다. 파랑 버튼 위에서도 보이게 흰 테두리 + 파랑 바깥선 + 연한 흰 바탕. 그림자 · 주황 없음 (Phase 1 overlay.ts가 .viz-box를 만든다) */
       .viz-box { position: absolute; box-sizing: border-box; border: 2px solid var(--ink); outline: 2px solid var(--accent); border-radius: 12px; background: rgba(255, 255, 255, 0.22); animation: viz-flash 0.7s ease-out forwards; }
       @keyframes viz-flash { 0% { opacity: 1; } 100% { opacity: 0; } }
@@ -139,6 +141,7 @@
       .chip { width: 32px; height: 32px; padding: 0; border: 2px solid rgba(255, 255, 255, 0.24); border-radius: 50%; cursor: pointer; box-shadow: none; }
       .chip[aria-pressed='true'] { outline: 2px solid var(--accent); outline-offset: 2px; }
       .palette-custom { display: flex; align-items: center; gap: 10px; }
+      .variable-select { width: 100%; } /* 변수 상자(task_007): 팔레트 판 맨 아래, 판 폭을 꽉 채움. 모양은 다른 선택 상자(.prop-row select)와 같다 */
       .color-input { width: 44px; height: 36px; padding: 2px; border: 1px solid var(--line); border-radius: 12px; background: var(--bg); cursor: pointer; }
       /* 색 입력칸 · 체크박스 포커스도 글자 칸처럼 파랑 (키보드로 올 때만 :focus-visible) */
       .color-input:focus-visible, .prop-row input[type='checkbox']:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }

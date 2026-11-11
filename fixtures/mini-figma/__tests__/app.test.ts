@@ -660,14 +660,15 @@ describe('팔레트 판 (Dev-3)', () => {
     }
   });
 
-  it('색 입력칸(prop-color)은 type=color이고 값은 지금 색이며, 값 글자(color-hex)도 지금 색이다. 색 칸에 <select>가 없다', () => {
+  it('색 입력칸(prop-color)은 type=color이고 값은 지금 색이며, 값 글자(color-hex)도 지금 색이다. 색 칸의 <select>는 변수 상자(prop-variable) 하나뿐이다', () => {
     const input = byId('prop-color') as HTMLInputElement;
     expect(input.localName).toBe('input');
     expect(input.type).toBe('color');
     expect(input.value).toBe('#0052ff');
     expect(byId('color-hex').textContent).toBe('#0052ff');
     expect(root.querySelector('[data-testid="color-palette"]')).not.toBeNull();
-    expect(root.querySelector('[data-testid="prop-row"][data-field="color"] select')).toBeNull();
+    const selects = Array.from(root.querySelectorAll('[data-testid="prop-row"][data-field="color"] select'));
+    expect(selects.map((el) => el.getAttribute('data-testid'))).toEqual(['prop-variable']);
   });
 
   it('칩을 누르면 onEdit로 메인 값 · 버튼 배경 · 칩 표시 · 입력칸 값 · 값 글자가 같이 바뀐다 (칩 8개 전부)', async () => {
@@ -1886,5 +1887,192 @@ describe('변수 구역 (VR-04 · 06)', () => {
   it('변수 구역에 patch 글자가 없다 (MF-05) · Hook 칸은 8칸 그대로 (새 칸 없음)', () => {
     expect(byId('variable-panel').textContent).not.toMatch(/patch/i);
     expect(instance.hooks).toHaveLength(8);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// task_007 색 변수 Variables — 연결 UI (Dev-4: VR-02 · 05 · 06, VP-1 · 5 · 7 · 8 · 9)
+// ---------------------------------------------------------------------------
+describe('연결 UI — 변수 상자 (VR-02 · 05)', () => {
+  const linkBox = (): HTMLSelectElement => byId('prop-variable') as HTMLSelectElement;
+  const linkOptions = (): string[] => Array.from(linkBox().options).map((o) => o.textContent ?? '');
+  const hexText = (): string => byId('color-hex').textContent ?? '';
+  const meaningful = (): Patch[] => instance.lastPatches.filter((p) => p.kind !== 'SET_EVENT');
+  const panelCounts = (): Record<string, number> => countsUnder(instance.lastPatches, PANEL_PREFIX_ALL);
+  const setVar = async (id: string, value: string): Promise<void> => {
+    const el = root.querySelector<HTMLInputElement>(`[data-testid="variable-row"][data-id="${id}"] [data-testid="variable-color"]`)!;
+    el.value = value;
+    el.dispatchEvent(new Event('input'));
+    await Promise.resolve();
+  };
+  const doc = (): typeof INITIAL_DOC => slot(0) as typeof INITIAL_DOC;
+  const linkMain = async (id: string): Promise<void> => {
+    await click(buttonOf('main'));
+    await choose('prop-variable', id);
+  };
+
+  it('색 칸에 <select>는 prop-variable 하나뿐이다 (옵션 없음 · Primary · Danger · Success, 값은 변수 id)', async () => {
+    await click(buttonOf('main'));
+    const selects = root.querySelectorAll('[data-testid="prop-row"][data-field="color"] select');
+    expect(selects).toHaveLength(1);
+    expect(selects[0]).toBe(linkBox());
+    expect(linkOptions()).toEqual(['없음', 'Primary', 'Danger', 'Success']);
+    expect(Array.from(linkBox().options).map((o) => o.value)).toEqual(['', 'primary', 'danger', 'success']);
+    expect(linkBox().value).toBe('');
+    expect(pressedChips()).toEqual(['#0052ff']);
+    await click(buttonOf('b3'));
+    expect(linkBox().value).toBe('');
+    expect(pressedChips()).toEqual(['#cf202f']);
+  });
+
+  it('VP-1 메인(선택)을 Primary에 연결: main.color = var:primary, 캔버스 · 변수 구역 0줄, 속성 패널 { SET_PROP 1 + SET_ATTR 1 + SET_TEXT 1 }, 렌더 1번', async () => {
+    await click(buttonOf('main'));
+    const other = doc();
+    const before = renders;
+    await choose('prop-variable', 'primary');
+    expect(renders - before).toBe(1);
+    expect(doc().main.color).toBe('var:primary');
+    expect(doc().instances).toBe(other.instances);
+    expect(doc().variables).toBe(other.variables);
+    expect(canvasCounts(meaningful())).toEqual({});
+    expect(layerCounts(meaningful())).toEqual({});
+    expect(panelCounts()).toEqual({ SET_PROP: 1, SET_ATTR: 1, SET_TEXT: 1 });
+    expect(pressedChips()).toEqual([]);
+    expect(hexText()).toBe('Primary');
+    expect((byId('prop-color') as HTMLInputElement).value).toBe('#0052ff');
+    expect(linkBox().value).toBe('primary');
+    expect(bgs()).toEqual([rgb('#0052ff'), rgb('#0052ff'), rgb('#0052ff'), rgb('#cf202f')]);
+  });
+
+  it('VP-2 · 3 (VP-1 뒤) Primary #f4b000 → 캔버스 SET_STYLE 6 · b3 줄 0 · 레이어 노드 0 · 변수 구역 3줄 · 속성 패널 SET_PROP 1 / #0066ff → SET_STYLE 3', async () => {
+    await linkMain('primary');
+    const b3 = buttonOf('b3');
+    const layerBefore = layerRow('b1');
+    await setVar('primary', '#f4b000');
+    expect(canvasCounts(meaningful())).toEqual({ SET_STYLE: 6 });
+    expect(buttonOf('b3')).toBe(b3);
+    expect(layerRow('b1')).toBe(layerBefore);
+    expect(layerCounts(meaningful())).toEqual({ SET_STYLE: 1, SET_PROP: 1, SET_TEXT: 1 });
+    expect(panelCounts()).toEqual({ SET_PROP: 1 });
+    expect(bgs()).toEqual([rgb('#f4b000'), rgb('#f4b000'), rgb('#f4b000'), rgb('#cf202f')]);
+    expect(fgOf('main')).toBe(rgb('#0a0b0d'));
+    expect(linkBox().value).toBe('primary');
+    expect(hexText()).toBe('Primary');
+    await setVar('primary', '#0066ff');
+    // #f4b000 (먹 글자) → #0066ff (흰 글자)라 이번엔 글자색도 바뀐다 — 글자색이 안 바뀌는 VP-3(3줄)은 아래에서 따로 센다
+    expect(canvasCounts(meaningful())).toEqual({ SET_STYLE: 6 });
+  });
+
+  it('VP-3 (VP-1 뒤) Primary #0066ff (글자색 흰 그대로) → 캔버스 SET_STYLE 3 (메인 · b1 · b2 배경만)', async () => {
+    await linkMain('primary');
+    await setVar('primary', '#0066ff');
+    expect(canvasCounts(meaningful())).toEqual({ SET_STYLE: 3 });
+  });
+
+  it('VP-4 (VP-1 뒤) b2에 칩 #05b169(override) → Primary #f4b000: 캔버스 SET_STYLE 4(메인 · b1), b2 · b3 줄 0 · b2 노드 같은 참조', async () => {
+    await linkMain('primary');
+    await click(buttonOf('b2'));
+    await pick('#05b169');
+    const b2 = buttonOf('b2');
+    await setVar('primary', '#f4b000');
+    expect(canvasCounts(meaningful())).toEqual({ SET_STYLE: 4 });
+    expect(buttonOf('b2')).toBe(b2);
+    expect(bgOf('b2')).toBe(rgb('#05b169'));
+    expect(panelCounts()).toEqual({});
+  });
+
+  it('VP-5 · 6 b3(선택)를 Danger에 연결(푼 색 같음) → 캔버스 0줄 · 속성 패널 3줄, Danger #05b169 → b3만 SET_STYLE 2, 다른 버튼 노드 같은 참조', async () => {
+    await click(buttonOf('b3'));
+    await choose('prop-variable', 'danger');
+    expect(doc().instances.find((it) => it.id === 'b3')?.color).toBe('var:danger');
+    expect(canvasCounts(meaningful())).toEqual({});
+    expect(panelCounts()).toEqual({ SET_PROP: 1, SET_ATTR: 1, SET_TEXT: 1 });
+    expect(hexText()).toBe('Danger');
+    const [m, b1, b2] = [buttonOf('main'), buttonOf('b1'), buttonOf('b2')];
+    await setVar('danger', '#05b169');
+    expect(canvasCounts(meaningful())).toEqual({ SET_STYLE: 2 });
+    expect([buttonOf('main'), buttonOf('b1'), buttonOf('b2')]).toEqual([m, b1, b2]);
+    expect(bgOf('b3')).toBe(rgb('#05b169'));
+    expect(fgOf('b3')).toBe(rgb('#0a0b0d'));
+    expect(panelCounts()).toEqual({ SET_PROP: 1 });
+    expect(hexText()).toBe('Danger');
+  });
+
+  it('VP-7 (VP-1 뒤) 같은 색 칩 #0052ff 클릭 = 연결 풀림: main.color = #0052ff, 캔버스 0줄, 속성 패널 3줄, 렌더 1번 · 이후 Primary 값이 안 따라감', async () => {
+    await linkMain('primary');
+    const before = renders;
+    await pick('#0052ff');
+    expect(renders - before).toBe(1);
+    expect(doc().main.color).toBe('#0052ff');
+    expect(canvasCounts(meaningful())).toEqual({});
+    expect(panelCounts()).toEqual({ SET_PROP: 1, SET_ATTR: 1, SET_TEXT: 1 });
+    expect(linkBox().value).toBe('');
+    expect(pressedChips()).toEqual(['#0052ff']);
+    expect(hexText()).toBe('#0052ff');
+    await setVar('primary', '#f4b000');
+    expect(canvasCounts(meaningful())).toEqual({});
+  });
+
+  it('VP-8 (VP-1 뒤) 상자 「없음」 → 지금 푼 hex로 저장: 겉모습 그대로 · 캔버스 0줄. Primary가 #f4b000일 때 「없음」이면 #f4b000이 저장됨', async () => {
+    await linkMain('primary');
+    await setVar('primary', '#f4b000');
+    await choose('prop-variable', '');
+    expect(doc().main.color).toBe('#f4b000');
+    expect(canvasCounts(meaningful())).toEqual({});
+    expect(pressedChips()).toEqual(['#f4b000']); // #f4b000은 팔레트 4번째 칩이라 연결이 풀리면 그 칩이 눌림 (qa_todo는 「팔레트에 없다」고 틀리게 적었다)
+    expect(hexText()).toBe('#f4b000');
+    await setVar('primary', '#0052ff');
+    expect(bgOf('main')).toBe(rgb('#f4b000'));
+  });
+
+  it('VP-9 (VP-5 뒤, b3 선택) ↻ → b3가 메인(Primary 연결)을 따름: 캔버스 SET_STYLE 1 (배경 #cf202f → #0052ff), 이름 글자 Primary', async () => {
+    await linkMain('primary');
+    await click(buttonOf('b3'));
+    await choose('prop-variable', 'danger');
+    const reset = root.querySelector<HTMLElement>('[data-testid="prop-row"][data-field="color"] [data-testid="prop-reset"]');
+    expect(reset).not.toBeNull();
+    await click(reset!);
+    expect(doc().instances.find((it) => it.id === 'b3')).toEqual({ id: 'b3', label: '삭제' });
+    expect(canvasCounts(meaningful())).toEqual({ SET_STYLE: 1 });
+    expect(bgOf('b3')).toBe(rgb('#0052ff'));
+    expect(fgOf('b3')).toBe(rgb('#ffffff'));
+    expect(hexText()).toBe('Primary');
+    expect(linkBox().value).toBe('primary');
+    expect(root.querySelector('[data-testid="prop-row"][data-field="color"] [data-testid="prop-reset"]')).toBeNull();
+  });
+
+  it('같은 변수 상자 값을 다시 고르면 렌더 0번 · 같은 doc', async () => {
+    await linkMain('primary');
+    const before = renders;
+    const d = doc();
+    await choose('prop-variable', 'primary');
+    expect(renders - before).toBe(0);
+    expect(doc()).toBe(d);
+  });
+
+  it('메인이 연결일 때 추가한 b4는 메인을 따라 Primary 값에 같이 바뀐다 · 인스턴스 연결은 다른 인스턴스 · variables를 같은 참조로 둔다', async () => {
+    await linkMain('primary');
+    await clickAdd();
+    await setVar('primary', '#f4b000');
+    expect(bgOf('b4')).toBe(rgb('#f4b000'));
+    await click(buttonOf('b2'));
+    const before = doc();
+    await choose('prop-variable', 'success');
+    expect(doc().variables).toBe(before.variables);
+    expect(doc().main).toBe(before.main);
+    expect(doc().instances.find((it) => it.id === 'b1')).toBe(before.instances.find((it) => it.id === 'b1'));
+    expect(doc().instances.find((it) => it.id === 'b2')?.color).toBe('var:success');
+  });
+
+  it('A57 doc에 var:ghost가 들어 있으면 푼 색(메인 색)으로 칠하고 상자는 「없음」, 이름 글자 대신 푼 hex', async () => {
+    await click(buttonOf('b1'));
+    // UI로는 없는 id를 못 만들므로 doc 칸 값을 바꿔 다시 그려 본다
+    const hook = instance.hooks[0] as StateHook;
+    hook.value = { ...doc(), main: { ...doc().main, color: '#112233' }, instances: doc().instances.map((it) => (it.id === 'b1' ? { ...it, color: 'var:ghost' } : it)) };
+    instance.update();
+    expect(bgOf('b1')).toBe(rgb('#112233'));
+    expect(linkBox().value).toBe('');
+    expect(hexText()).toBe('#112233');
+    expect(pressedChips()).toEqual([]);
   });
 });
