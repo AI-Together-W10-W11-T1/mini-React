@@ -20,7 +20,7 @@ export function App(): VNode {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [history, setHistory] = useState<UndoState>(EMPTY_UNDO);
   const [nextId, setNextId] = useState(4);
-  // Dev-5 시점에는 selectedId · nextId · applyEdit가 아직 쓰이지 않는다. 고르기는 Dev-6, 편집은 Dev-7 ~ 8, 추가는 Dev-9에서 연결한다.
+  // nextId · applyEdit는 아직 쓰이지 않는다. 편집은 Dev-7 ~ 8, 추가는 Dev-9에서 연결한다.
 
   // [AI Note]: 모든 편집은 이 함수 하나를 거친다 — doc과 history를 같이 바꾼다 (한 동작의 setter 두 번 = 모아서 렌더 한 번, 결정 9 B).
   // next가 지금 doc과 같은 객체면(바뀐 것 없음) 어느 setter도 새 값을 못 받아 렌더 · 기록이 모두 안 일어난다.
@@ -31,11 +31,15 @@ export function App(): VNode {
     setDoc(next);
   };
 
+  // [AI Note]: 고르기는 selectedId만 바꾼다 — applyEdit를 거치지 않으므로 doc · history가 그대로라 Undo 기록에 안 남는다 (MF-30 · ④-7).
+  // 같은 것을 다시 고르면 같은 값(Object.is)이라 다시 그리지 않는다.
+  const onSelect = (id: string): void => setSelectedId(id);
+
   return h(
     'div',
     { class: 'app' },
-    h(LayerPanel, { main: doc.main, instances: doc.instances }),
-    h(Canvas, { main: doc.main, instances: doc.instances }),
-    h(PropertyPanel, {}),
+    h(LayerPanel, { main: doc.main, instances: doc.instances, selectedId, onSelect }),
+    h(Canvas, { main: doc.main, instances: doc.instances, selectedId, onSelect }),
+    h(PropertyPanel, { main: doc.main, instances: doc.instances, selectedId }),
   );
 }

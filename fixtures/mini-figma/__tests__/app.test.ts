@@ -1,8 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { render } from '@mini-react/react-dom';
 import type { FunctionComponent } from '@mini-react/react-reconciler';
-import type { Patch, Path } from '@mini-react/shared';
+import type { Patch, Path, StateHook } from '@mini-react/shared';
 import { App } from '../App';
+import { INITIAL_DOC } from '../model';
+import { EMPTY_UNDO } from '../undo';
 
 // [AI Note]: mini-figma 앱 단위 테스트 (jsdom, render(App, root)). 화면에는 patch 목록 · 렌더 횟수를 그리지 않으므로(MF-05)
 // patch 종류 · 개수는 render()가 돌려주는 인스턴스의 lastPatches로 확인한다.
@@ -44,6 +46,23 @@ const area = (): HTMLElement => {
 const testId = (el: Element | undefined | null): string | null => el?.getAttribute('data-testid') ?? null;
 const buttons = (): HTMLElement[] => Array.from(root.querySelectorAll<HTMLElement>('[data-testid="figma-button"]'));
 const labels = (): string[] => Array.from(root.querySelectorAll('[data-testid="btn-label"]')).map((el) => el.textContent ?? '');
+const buttonOf = (id: string): HTMLElement => {
+  const found = buttons().find((b) => b.getAttribute('data-id') === id);
+  if (found === undefined) throw new Error(`캔버스에 ${id} 버튼이 없다`);
+  return found;
+};
+const layerRow = (id: string): HTMLElement => {
+  const found = root.querySelector<HTMLElement>(id === 'main' ? '[data-testid="layer-main"]' : `[data-testid="layer-item"][data-id="${id}"]`);
+  if (found === null) throw new Error(`레이어에 ${id} 행이 없다`);
+  return found;
+};
+/** 사용자가 누른 뒤 마이크로태스크 Batching(결정 9 B)으로 렌더가 끝나길 기다린다. 준비 동작마다 한 번씩 부른다 */
+const click = async (el: Element): Promise<void> => {
+  (el as HTMLElement).click();
+  await Promise.resolve();
+};
+/** App의 useState 칸 값 (호출 순서: 0 doc · 1 selectedId · 2 history · 3 nextId) */
+const slot = (index: number): unknown => (instance.hooks[index] as StateHook).value;
 const layerNames = (): string[] =>
   Array.from(root.querySelectorAll('[data-testid="layer-item"] [data-testid="layer-name"]')).map((el) => el.textContent ?? '');
 
@@ -136,5 +155,64 @@ describe('시작 화면 (MF-16 · MF-04)', () => {
 
   it('처음 그리기(mount)는 patch를 만들지 않는다 (lastPatches 비어 있음)', () => {
     expect(instance.lastPatches).toEqual([]);
+  });
+});
+
+describe('고르기 (MF-20 · D-05)', () => {
+  it('P-1 처음 → b2 고르기: 캔버스 { SET_ATTR: 1 } · 레이어 { SET_ATTR: 1 }, 속성 패널 경로에 REPLACE 1줄 이상(빈 <p> → 머리 <h2>)', async () => {
+    const emptyP = root.querySelector('[data-testid="property-empty"]');
+    await click(buttonOf('b2'));
+    expect(canvasCounts(instance.lastPatches)).toEqual({ SET_ATTR: 1 });
+    expect(layerCounts(instance.lastPatches)).toEqual({ SET_ATTR: 1 });
+    const panelReplaces = instance.lastPatches.filter((p) => p.kind === 'REPLACE' && startsWith(p.path, [0, 2]));
+    expect(panelReplaces.length).toBeGreaterThanOrEqual(1);
+    // 화면: 머리 <h2> 「인스턴스 · 취소」, 빈 안내 <p>는 DOM에서 빠짐
+    expect(root.querySelector('[data-testid="property-title"]')?.textContent).toBe('인스턴스 · 취소');
+    expect(root.querySelector('[data-testid="property-title"]')?.localName).toBe('h2');
+    expect(root.querySelector('[data-testid="property-empty"]')).toBeNull();
+    expect(emptyP?.isConnected).toBe(false);
+  });
+
+  it('P-1 + b2 버튼과 b2 행에만 selected 클래스가 붙는다 (캔버스 · 레이어 모두)', async () => {
+    await click(buttonOf('b2'));
+    expect(buttons().filter((b) => b.classList.contains('selected')).map((b) => b.getAttribute('data-id'))).toEqual(['b2']);
+    expect(Array.from(root.querySelectorAll('.layer-row.selected')).map((r) => r.getAttribute('data-id'))).toEqual(['b2']);
+  });
+
+  it('P-2 b2 선택 → b3 고르기: 캔버스 { SET_ATTR: 2 } · 레이어 { SET_ATTR: 2 } (b2 표시가 빠지고 b3에 붙음)', async () => {
+    await click(buttonOf('b2'));
+    await click(buttonOf('b3'));
+    expect(canvasCounts(instance.lastPatches)).toEqual({ SET_ATTR: 2 });
+    expect(layerCounts(instance.lastPatches)).toEqual({ SET_ATTR: 2 });
+    expect(root.querySelector('[data-testid="property-title"]')?.textContent).toBe('인스턴스 · 삭제');
+    expect(buttons().filter((b) => b.classList.contains('selected')).map((b) => b.getAttribute('data-id'))).toEqual(['b3']);
+  });
+
+  it('레이어 행을 눌러도 고른다 (메인 행 → 「메인 Button」, b3 행 → 「인스턴스 · 삭제」). 캔버스 · 레이어 표시가 같은 대상', async () => {
+    await click(layerRow('main'));
+    expect(root.querySelector('[data-testid="property-title"]')?.textContent).toBe('메인 Button');
+    expect(buttonOf('main').classList.contains('selected')).toBe(true);
+    expect(layerRow('main').classList.contains('selected')).toBe(true);
+    await click(layerRow('b3'));
+    expect(root.querySelector('[data-testid="property-title"]')?.textContent).toBe('인스턴스 · 삭제');
+    expect(buttonOf('b3').classList.contains('selected')).toBe(true);
+    expect(layerRow('b3').classList.contains('selected')).toBe(true);
+    expect(layerRow('main').classList.contains('selected')).toBe(false);
+  });
+
+  it('이미 고른 것을 다시 누르면 같은 값이라 다시 그리지 않는다 (렌더 0번, lastPatches 그대로)', async () => {
+    await click(buttonOf('b2'));
+    const before = instance.lastPatches;
+    await click(buttonOf('b2'));
+    expect(instance.lastPatches).toBe(before);
+  });
+
+  it('고르기는 Undo 기록에 넣지 않는다: doc · history가 그대로(같은 객체), selectedId만 바뀐다', async () => {
+    await click(buttonOf('b2'));
+    await click(layerRow('main'));
+    await click(buttonOf('b3'));
+    expect(slot(0)).toBe(INITIAL_DOC);
+    expect(slot(2)).toBe(EMPTY_UNDO);
+    expect(slot(1)).toBe('b3');
   });
 });

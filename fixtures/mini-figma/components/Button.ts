@@ -9,6 +9,8 @@ interface ButtonProps {
   hasIcon: boolean;
   icon: Component;
   color: Color;
+  selected: boolean;
+  onSelect: () => void;
 }
 
 // [AI Note]: 메인 컴포넌트 = 이 함수. 메인 버튼도 인스턴스 버튼도 같은 Button을 `h(Button, props)`로 부른다.
@@ -21,10 +23,17 @@ interface ButtonProps {
 // 둘 다 key가 있으면 key 표로 맞춰서 아이콘 켜기 = INSERT 1줄(글자 앞), 끄기 = REMOVE 1줄이고 글자 <span> 노드는 그대로 남는다.
 // 아이콘의 key는 컴포넌트 key라 엔진이 풀 때 결과 <span>에 물려준다 (resolveComponents.inheritKey).
 export function Button(props: Props): VNode {
-  const { id, label, size, hasIcon, icon, color } = props as unknown as ButtonProps;
+  const { id, label, size, hasIcon, icon, color, selected, onSelect } = props as unknown as ButtonProps;
   return h(
     'button',
-    { type: 'button', class: `figma-button btn-${size} btn-${color}`, 'data-id': id, 'data-testid': 'figma-button' },
+    {
+      type: 'button',
+      // 고른 버튼에는 클래스 selected가 더 붙는다 (바뀌면 class 속성만 고쳐지고 버튼 노드는 그대로)
+      class: `figma-button btn-${size} btn-${color}${selected ? ' selected' : ''}`,
+      'data-id': id,
+      'data-testid': 'figma-button',
+      onClick: onSelect,
+    },
     hasIcon ? h(icon, { key: 'icon' }) : null,
     h('span', { key: 'label', class: 'btn-label', 'data-testid': 'btn-label' }, label),
   );

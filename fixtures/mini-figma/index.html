@@ -24,8 +24,9 @@
 
       /* 레이어 창 */
       .layer-list { margin: 8px 0 0; padding: 0; list-style: none; }
-      .layer-row { display: flex; align-items: center; gap: 6px; padding: 4px 6px; border-radius: 4px; }
+      .layer-row { display: flex; align-items: center; gap: 6px; padding: 4px 6px; border-radius: 4px; cursor: pointer; }
       .layer-name { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
+      .layer-row.selected { background: var(--select-bg); outline: 2px solid var(--select); }
 
       /* 캔버스: 메인 버튼 상자 + 인스턴스 버튼 줄. 인스턴스가 많아지면 줄바꿈 (mobile 가로 스크롤 방지, Q17-5) */
       .canvas-main { margin-bottom: 16px; padding-bottom: 16px; border-bottom: 1px dashed var(--line); }
@@ -41,6 +42,7 @@
       .btn-blue { background: var(--blue); }
       .btn-red { background: var(--red); }
       .btn-green { background: var(--green); }
+      .figma-button.selected { outline: 3px solid var(--select); outline-offset: 2px; }
 
       .property-empty { margin: 0; color: var(--label); }
 

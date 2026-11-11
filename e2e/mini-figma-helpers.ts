@@ -41,6 +41,18 @@ export function canvasOrder(page: Page): Promise<string[]> {
     .evaluateAll((els) => els.map((el) => el.getAttribute('data-id') ?? ''));
 }
 
+/** `selected` 클래스가 붙은 캔버스 버튼들의 id (위치 순) */
+export function selectedOnCanvas(page: Page): Promise<string[]> {
+  return page.locator('[data-testid="figma-button"].selected').evaluateAll((els) => els.map((el) => el.getAttribute('data-id') ?? ''));
+}
+
+/** `selected` 클래스가 붙은 레이어 행들의 id (메인 행은 `main`) */
+export function selectedInLayer(page: Page): Promise<string[]> {
+  return page
+    .locator('[data-testid="layer-main"].selected, [data-testid="layer-item"].selected')
+    .evaluateAll((els) => els.map((el) => el.getAttribute('data-id') ?? ''));
+}
+
 /** 속성 패널 머리 글 (`<h2 data-testid="property-title">`) */
 export async function titleText(page: Page): Promise<string> {
   return (await page.getByTestId('property-title').textContent()) ?? '';
