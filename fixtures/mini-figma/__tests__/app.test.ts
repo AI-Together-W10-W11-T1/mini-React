@@ -694,6 +694,7 @@ describe('팔레트 판 (Dev-3)', () => {
     const before = chips();
     const input = byId('prop-color');
     await pick('#cf202f');
+    expect(toolbarCounts(instance.lastPatches), '첫 수정 = [↶]이 켜짐').toEqual({ SET_ATTR: 1 });
     expect(canvasCounts(instance.lastPatches)).toEqual({ SET_STYLE: 3 });
     expect(layerCounts(instance.lastPatches)).toEqual({});
     expect(panelCounts(instance.lastPatches)).toEqual({ SET_ATTR: 2, SET_PROP: 1, SET_TEXT: 1 });
@@ -704,12 +705,18 @@ describe('팔레트 판 (Dev-3)', () => {
 
   it('P-26 색 입력칸 input 연속 #112233 → #223344 → #334455 → #ffee00: 각각 캔버스 { SET_STYLE: 3 }, 마지막만 { SET_STYLE: 6 }(글자색 흰 → 먹). past 1칸 (한 단계)', async () => {
     const input = byId('prop-color');
+    let first = true;
     for (const hex of ['#112233', '#223344', '#334455']) {
       await typeInto('prop-color', hex);
+      expect(toolbarCounts(instance.lastPatches), `${hex} 도구 막대: 첫 input만 [↶]이 켜짐`).toEqual(first ? { SET_ATTR: 1 } : {});
+      first = false;
+      expect(layerCounts(instance.lastPatches), `${hex} 레이어`).toEqual({});
       expect(canvasCounts(instance.lastPatches), hex).toEqual({ SET_STYLE: 3 });
       expect(pressedChips(), `${hex}는 칩 8개 밖 색`).toEqual([]);
     }
     await typeInto('prop-color', '#ffee00');
+    expect(toolbarCounts(instance.lastPatches)).toEqual({});
+    expect(layerCounts(instance.lastPatches)).toEqual({});
     expect(canvasCounts(instance.lastPatches)).toEqual({ SET_STYLE: 6 });
     expect(['main', 'b1', 'b2'].map(fgOf)).toEqual([rgb('#0a0b0d'), rgb('#0a0b0d'), rgb('#0a0b0d')]);
     expect(byId('color-hex').textContent).toBe('#ffee00');
@@ -783,6 +790,7 @@ describe('팔레트 판 (Dev-3)', () => {
   it('P-27 b1(메인 따름) 선택 → 칩 #05b169: 캔버스 { SET_STYLE: 2 }(b1 버튼만 배경 + 글자색, 메인 · b2 · b3 줄 0) · 속성 패널 REPLACE 1줄 이상(「메인 따름」 <span> → ↻ <button>)', async () => {
     await click(buttonOf('b1'));
     await pick('#05b169');
+    expect(toolbarCounts(instance.lastPatches), '첫 수정 = [↶]이 켜짐').toEqual({ SET_ATTR: 1 });
     expect(canvasCounts(instance.lastPatches)).toEqual({ SET_STYLE: 2 });
     expect(layerCounts(instance.lastPatches)).toEqual({});
     expect(instance.lastPatches.filter((p) => p.kind === 'REPLACE' && startsWith(p.path, PANEL_PREFIX)).length).toBeGreaterThanOrEqual(1);
