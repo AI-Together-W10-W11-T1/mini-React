@@ -84,7 +84,9 @@ export function App(): VNode {
   // [AI Note]: 키보드 = 마운트 때 한 번이 아니라 "핸들러가 읽는 state가 바뀔 때마다" document에 다시 등록한다 (엔진 이벤트는 click · input뿐이라 keydown은 직접 등록, MF-34).
   // deps에 doc · selectedId · history를 넣어서 핸들러가 늘 이번 렌더의 값을 본다 — 빠지면 "b1을 고르고 b2를 고른 뒤 Delete"가 옛 선택 b1을 지운다.
   // 다시 등록하기 전 cleanup이 먼저 removeEventListener를 불러서 리스너는 항상 1개다 (등록 − 해제 = 1). unmount() 때도 cleanup이 돈다.
-  // 한 동작(삭제 · Undo · Redo)은 모두 이번 렌더의 doc 하나에서 계산한다. 입력칸 안의 키 · 수정키 규칙은 keys.ts의 keyAction이 정한다 (preventDefault 안 함).
+  // 한 동작(삭제 · Undo · Redo)은 모두 이번 렌더의 doc 하나에서 계산한다. 입력칸 안의 키 · 수정키 규칙은 keys.ts의 keyAction이 정한다.
+  // Undo · Redo로 처리한 키만 preventDefault로 브라우저 기본 Undo/Redo를 막는다 (Q18): 안 막으면 브라우저 글자 되돌리기가 남은 라벨 칸에 겹쳐 적용되고,
+  // 그 input을 onInput이 새 수정으로 기록해 한 키에 두 단계가 되돌아가고 Redo가 사라진다. 라벨 칸 안 키(action null)와 Delete · Backspace는 막지 않는다.
   useEffect(() => {
     const onKey = (event: KeyboardEvent): void => {
       const target = event.target as Element | null;
@@ -95,10 +97,17 @@ export function App(): VNode {
         shiftKey: event.shiftKey,
         altKey: event.altKey,
         targetTag: target?.tagName ?? null,
+        targetType: target instanceof HTMLInputElement ? target.type : null,
       });
-      if (action === 'delete') deleteSelected();
-      else if (action === 'undo') moveThroughHistory(undo(history, doc));
-      else if (action === 'redo') moveThroughHistory(redo(history, doc));
+      if (action === 'delete') {
+        deleteSelected();
+      } else if (action === 'undo') {
+        event.preventDefault();
+        moveThroughHistory(undo(history, doc));
+      } else if (action === 'redo') {
+        event.preventDefault();
+        moveThroughHistory(redo(history, doc));
+      }
     };
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);

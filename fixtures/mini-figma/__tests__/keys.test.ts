@@ -10,6 +10,7 @@ const press = (key: string, mods: Partial<KeyInfo> = {}): KeyInfo => ({
   shiftKey: false,
   altKey: false,
   targetTag: 'BODY',
+  targetType: null,
   ...mods,
 });
 
