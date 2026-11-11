@@ -45,6 +45,10 @@
       .figma-button.selected { outline: 3px solid var(--select); outline-offset: 2px; }
 
       .property-empty { margin: 0; color: var(--label); }
+      /* 속성 칸: 이름 + 입력 부품. 긴 글자도 칸 안에서 줄어들게 min-width: 0 */
+      .prop-row { display: flex; align-items: center; gap: 8px; margin: 8px 0; }
+      .prop-name { flex: 0 0 6rem; color: var(--label); font-size: 0.875rem; }
+      .prop-row input[type='text'], .prop-row select { flex: 1 1 auto; min-width: 0; padding: 6px 8px; font: inherit; }
 
       @media (max-width: 720px) {
         .app { grid-template-columns: minmax(0, 1fr); }

@@ -3,8 +3,8 @@ import type { VNode } from '@mini-react/shared';
 import { Canvas } from './components/Canvas';
 import { LayerPanel } from './components/LayerPanel';
 import { PropertyPanel } from './components/PropertyPanel';
-import { INITIAL_DOC } from './model';
-import type { Doc } from './model';
+import { INITIAL_DOC, setMainField } from './model';
+import type { Doc, Field, MainProps } from './model';
 import { EMPTY_UNDO, recordEdit } from './undo';
 import type { UndoGroup, UndoState } from './undo';
 
@@ -20,11 +20,11 @@ export function App(): VNode {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [history, setHistory] = useState<UndoState>(EMPTY_UNDO);
   const [nextId, setNextId] = useState(4);
-  // nextId · applyEdit는 아직 쓰이지 않는다. 편집은 Dev-7 ~ 8, 추가는 Dev-9에서 연결한다.
+  // nextId는 아직 쓰이지 않는다 (추가는 Dev-9에서 연결한다).
 
   // [AI Note]: 모든 편집은 이 함수 하나를 거친다 — doc과 history를 같이 바꾼다 (한 동작의 setter 두 번 = 모아서 렌더 한 번, 결정 9 B).
   // next가 지금 doc과 같은 객체면(바뀐 것 없음) 어느 setter도 새 값을 못 받아 렌더 · 기록이 모두 안 일어난다.
-  // group = 같은 대상 + 같은 칸 연달아 수정이면 한 단계로 묶는 기준, 추가 · 삭제 · 순서 · ↻는 null (Dev-7부터 쓴다).
+  // group = 같은 대상 + 같은 칸 연달아 수정이면 한 단계로 묶는 기준, 추가 · 삭제 · 순서 · ↻는 null.
   const applyEdit = (next: Doc, group: UndoGroup | null): void => {
     if (next === doc) return;
     setHistory(recordEdit(history, doc, next, group));
@@ -35,11 +35,17 @@ export function App(): VNode {
   // 같은 것을 다시 고르면 같은 값(Object.is)이라 다시 그리지 않는다.
   const onSelect = (id: string): void => setSelectedId(id);
 
+  // [AI Note]: 속성 패널 한 칸이 바뀌면 불린다. 고른 대상이 메인이면 setMainField → applyEdit (묶음 기준 = 메인 + 그 칸).
+  // 인스턴스 편집은 Dev-8에서 이 함수에 더한다. 같은 값이면 setMainField가 같은 Doc을 돌려줘서 렌더 · 기록이 없다.
+  const onEdit = (field: Field, value: MainProps[Field]): void => {
+    if (selectedId === 'main') applyEdit(setMainField(doc, field, value), { target: 'main', field });
+  };
+
   return h(
     'div',
     { class: 'app' },
     h(LayerPanel, { main: doc.main, instances: doc.instances, selectedId, onSelect }),
     h(Canvas, { main: doc.main, instances: doc.instances, selectedId, onSelect }),
-    h(PropertyPanel, { main: doc.main, instances: doc.instances, selectedId }),
+    h(PropertyPanel, { main: doc.main, instances: doc.instances, selectedId, onEdit }),
   );
 }

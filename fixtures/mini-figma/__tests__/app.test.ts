@@ -1,10 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { render } from '@mini-react/react-dom';
 import type { FunctionComponent } from '@mini-react/react-reconciler';
-import type { Patch, Path, StateHook } from '@mini-react/shared';
+import type { Patch, Path, StateHook, VNode } from '@mini-react/shared';
 import { App } from '../App';
 import { INITIAL_DOC } from '../model';
 import { EMPTY_UNDO } from '../undo';
+import type { UndoState } from '../undo';
 
 // [AI Note]: mini-figma 앱 단위 테스트 (jsdom, render(App, root)). 화면에는 patch 목록 · 렌더 횟수를 그리지 않으므로(MF-05)
 // patch 종류 · 개수는 render()가 돌려주는 인스턴스의 lastPatches로 확인한다.
@@ -37,6 +38,12 @@ const layerCounts = (patches: readonly Patch[]): Record<string, number> => count
 
 let root: HTMLElement;
 let instance: FunctionComponent;
+/** App이 실행된 횟수 = 렌더 횟수 (화면에 렌더 횟수를 안 그리므로 감싸개로 센다) */
+let renders = 0;
+const CountedApp = (): VNode => {
+  renders += 1;
+  return App();
+};
 
 const area = (): HTMLElement => {
   const app = root.firstElementChild as HTMLElement | null;
@@ -61,6 +68,30 @@ const click = async (el: Element): Promise<void> => {
   (el as HTMLElement).click();
   await Promise.resolve();
 };
+const byId = (id: string): HTMLElement => {
+  const found = root.querySelector<HTMLElement>(`[data-testid="${id}"]`);
+  if (found === null) throw new Error(`data-testid="${id}"가 없다`);
+  return found;
+};
+/** 입력칸에 글자를 쓰고 `input` 이벤트를 보낸 뒤 렌더가 끝나길 기다린다 (사용자가 한 글자 입력한 것과 같다) */
+const typeInto = async (id: string, text: string): Promise<void> => {
+  const input = byId(id) as HTMLInputElement;
+  input.value = text;
+  input.dispatchEvent(new Event('input'));
+  await Promise.resolve();
+};
+const choose = async (id: string, value: string): Promise<void> => {
+  const select = byId(id) as HTMLSelectElement;
+  select.value = value;
+  select.dispatchEvent(new Event('input'));
+  await Promise.resolve();
+};
+const toggle = async (id: string, checked: boolean): Promise<void> => {
+  const box = byId(id) as HTMLInputElement;
+  box.checked = checked;
+  box.dispatchEvent(new Event('input'));
+  await Promise.resolve();
+};
 /** App의 useState 칸 값 (호출 순서: 0 doc · 1 selectedId · 2 history · 3 nextId) */
 const slot = (index: number): unknown => (instance.hooks[index] as StateHook).value;
 const layerNames = (): string[] =>
@@ -70,7 +101,8 @@ beforeEach(() => {
   root = document.createElement('div');
   root.setAttribute('data-testid', 'app-root');
   document.body.append(root);
-  instance = render(App, root);
+  renders = 0;
+  instance = render(CountedApp, root);
 });
 
 afterEach(() => {
@@ -214,5 +246,112 @@ describe('고르기 (MF-20 · D-05)', () => {
     expect(slot(0)).toBe(INITIAL_DOC);
     expect(slot(2)).toBe(EMPTY_UNDO);
     expect(slot(1)).toBe('b3');
+  });
+});
+
+describe('메인 속성 편집 (MF-14 · MF-15 · P2-10 · D-01 ~ D-04) — patch 기대 표 P-3 ~ P-8', () => {
+  // 준비: 메인을 골라 둔다 (준비 동작마다 렌더를 끝낸 뒤 센 동작을 한다)
+  beforeEach(async () => {
+    await click(buttonOf('main'));
+  });
+
+  it('메인을 고르면 속성 패널에 머리 「메인 Button」과 5칸(라벨 · 크기 · 아이콘 보이기 · 아이콘 종류 · 색)이 현재 값으로 뜬다', () => {
+    expect(byId('property-title').textContent).toBe('메인 Button');
+    expect(Array.from(root.querySelectorAll('[data-testid="prop-row"]')).map((r) => r.getAttribute('data-field'))).toEqual(['label', 'size', 'hasIcon', 'icon', 'color']);
+    expect((byId('prop-label') as HTMLInputElement).value).toBe('버튼');
+    expect((byId('prop-size') as HTMLSelectElement).value).toBe('M');
+    expect((byId('prop-hasicon') as HTMLInputElement).checked).toBe(false);
+    expect((byId('prop-icon') as HTMLSelectElement).value).toBe('star');
+    expect((byId('prop-color') as HTMLSelectElement).value).toBe('blue');
+  });
+
+  it('P-3 라벨 한 글자(`버튼!`): 캔버스 { SET_TEXT: 2 }(메인 · b1, b2 · b3는 override) · 레이어 { SET_TEXT: 1 }(b1 행 이름). 렌더 한 번', async () => {
+    const before = renders;
+    await typeInto('prop-label', '버튼!');
+    expect(canvasCounts(instance.lastPatches)).toEqual({ SET_TEXT: 2 });
+    expect(layerCounts(instance.lastPatches)).toEqual({ SET_TEXT: 1 });
+    expect(renders - before).toBe(1);
+    expect(labels()).toEqual(['버튼!', '버튼!', '취소', '삭제']);
+    expect(layerNames()).toEqual(['버튼!', '취소', '삭제']);
+  });
+
+  it('라벨 입력칸은 다시 만들지 않는다: 같은 노드이고 값은 입력한 글자 그대로 (커서 유지)', async () => {
+    const input = byId('prop-label') as HTMLInputElement;
+    await typeInto('prop-label', '버튼!');
+    await typeInto('prop-label', '버튼!?');
+    expect(byId('prop-label')).toBe(input);
+    expect(input.value).toBe('버튼!?');
+  });
+
+  it('P-4 크기 `L`: 캔버스 { SET_ATTR: 4 }(class) · 레이어 { }', async () => {
+    await choose('prop-size', 'L');
+    expect(canvasCounts(instance.lastPatches)).toEqual({ SET_ATTR: 4 });
+    expect(layerCounts(instance.lastPatches)).toEqual({});
+    expect(buttons().every((b) => b.classList.contains('btn-L'))).toBe(true);
+  });
+
+  it('P-5 색 초록: 캔버스 { SET_ATTR: 3 }(메인 · b1 · b2, b3는 빨강 override) · 레이어 { }', async () => {
+    await choose('prop-color', 'green');
+    expect(canvasCounts(instance.lastPatches)).toEqual({ SET_ATTR: 3 });
+    expect(layerCounts(instance.lastPatches)).toEqual({});
+    expect(buttons().map((b) => b.className.match(/btn-(blue|red|green)/)?.[0])).toEqual(['btn-green', 'btn-green', 'btn-green', 'btn-red']);
+  });
+
+  it('P-6 아이콘 켜기: 캔버스 { INSERT: 4 }(REPLACE · REMOVE · SET_TEXT 0, 각 INSERT 경로 마지막 = 0) · 레이어 { }. 글자 <span> 노드는 같은 참조', async () => {
+    const labelSpans = Array.from(root.querySelectorAll('[data-testid="btn-label"]'));
+    const before = renders;
+    await toggle('prop-hasicon', true);
+    expect(canvasCounts(instance.lastPatches)).toEqual({ INSERT: 4 });
+    expect(layerCounts(instance.lastPatches)).toEqual({});
+    expect(renders - before).toBe(1);
+    const inserts = instance.lastPatches.filter((p) => p.kind === 'INSERT' && startsWith(p.path, CANVAS_PREFIX));
+    expect(inserts).toHaveLength(4);
+    for (const p of inserts) expect(p.kind === 'INSERT' && p.path[p.path.length - 1]).toBe(0);
+    // 아이콘은 글자 앞, 글자 <span>은 다시 만들지 않았다
+    expect(Array.from(root.querySelectorAll('[data-testid="btn-icon"]')).map((el) => el.textContent)).toEqual(['★', '★', '★', '★']);
+    expect(Array.from(root.querySelectorAll('[data-testid="btn-label"]'))).toEqual(labelSpans);
+    for (const icon of Array.from(root.querySelectorAll('[data-testid="btn-icon"]'))) {
+      expect(icon.nextElementSibling?.getAttribute('data-testid')).toBe('btn-label');
+    }
+  });
+
+  it('P-7 (P-6 뒤) 아이콘 끄기: 캔버스 { REMOVE: 4 } · 레이어 { }', async () => {
+    await toggle('prop-hasicon', true);
+    await toggle('prop-hasicon', false);
+    expect(canvasCounts(instance.lastPatches)).toEqual({ REMOVE: 4 });
+    expect(layerCounts(instance.lastPatches)).toEqual({});
+    expect(root.querySelectorAll('[data-testid="btn-icon"]')).toHaveLength(0);
+  });
+
+  it('P-8 (P-6 뒤) 종류 `♥`: 캔버스 { SET_TEXT: 4 } — 컴포넌트가 풀려 같은 <span>의 글자 변경으로만 보인다 (Instance swap). 아이콘 노드 같은 참조', async () => {
+    await toggle('prop-hasicon', true);
+    const icons = Array.from(root.querySelectorAll('[data-testid="btn-icon"]'));
+    await choose('prop-icon', 'heart');
+    expect(canvasCounts(instance.lastPatches)).toEqual({ SET_TEXT: 4 });
+    expect(layerCounts(instance.lastPatches)).toEqual({});
+    expect(Array.from(root.querySelectorAll('[data-testid="btn-icon"]'))).toEqual(icons);
+    expect(icons.map((el) => el.textContent)).toEqual(['♥', '♥', '♥', '♥']);
+  });
+
+  it('같은 값을 다시 쓰면 렌더 0번이다 (크기 M → M)', async () => {
+    const before = renders;
+    await choose('prop-size', 'M');
+    expect(renders - before).toBe(0);
+  });
+
+  it('메인 편집은 applyEdit를 거쳐 doc과 history를 같이 바꾼다: 같은 칸 연달아 = 한 단계로 묶이고 다른 칸이면 새 단계', async () => {
+    await typeInto('prop-label', '버튼!');
+    await typeInto('prop-label', '버튼!?');
+    expect((slot(2) as UndoState).past).toHaveLength(1);
+    expect((slot(2) as UndoState).group).toEqual({ target: 'main', field: 'label' });
+    await choose('prop-size', 'L');
+    expect((slot(2) as UndoState).past).toHaveLength(2);
+    expect((slot(2) as UndoState).group).toEqual({ target: 'main', field: 'size' });
+  });
+
+  it('메인을 바꿔도 doc의 instances 배열은 같은 참조다', async () => {
+    const before = (slot(0) as typeof INITIAL_DOC).instances;
+    await choose('prop-color', 'green');
+    expect((slot(0) as typeof INITIAL_DOC).instances).toBe(before);
   });
 });
