@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { h } from '@mini-react/react';
+import { h, useEffect, useState } from '@mini-react/react';
 import type { AreaChildren, Patch, Props, VNode } from '@mini-react/shared';
 import { FunctionComponent } from '../FunctionComponent';
 import type { FunctionComponentHost } from '../FunctionComponent';
@@ -165,6 +165,115 @@ describe('FunctionComponent — hooks 배열 (P2-04)', () => {
     fc.mount();
     fc.update();
     expect(fc.hooks).toHaveLength(0);
+  });
+});
+
+describe('FunctionComponent — update 중 host.apply 예외 복구 (검수 1회차 NB-7 · 정책 「§5 update 중 patch 예외」)', () => {
+  /** apply가 던지도록 켤 수 있는 host. mount 호출은 인자와 함께 기록 */
+  function makeFlakyHost() {
+    const mounts: AreaChildren[] = [];
+    const applies: (readonly Patch[])[] = [];
+    const state = { failApply: false, failMount: false };
+    const host: FunctionComponentHost = {
+      mount: (children) => {
+        if (state.failMount && mounts.length > 0) throw new Error('recovery boom');
+        mounts.push(children);
+      },
+      apply: (patches) => {
+        applies.push(patches);
+        if (state.failApply) throw new Error('apply boom');
+      },
+    };
+    return { host, mounts, applies, state };
+  }
+
+  it('apply가 던지면 마지막으로 성공한 VNode로 host.mount([previous])를 다시 부른 뒤 원래 예외를 던진다', () => {
+    let label = 'a';
+    const { host, mounts, state } = makeFlakyHost();
+    const fc = new FunctionComponent((): VNode => h('p', null, label), {}, host);
+    fc.mount();
+    const first = mounts[0];
+    state.failApply = true;
+    label = 'b';
+    expect(() => fc.update()).toThrow('apply boom');
+    expect(mounts).toHaveLength(2);
+    expect(mounts[1]).toEqual(first); // 'a' 모습 (새 'b' 아님)
+    expect(mounts[1]).toEqual([el('p', {}, text('a'))]);
+  });
+
+  it('실패한 update의 effect는 돌지 않고, 이전 VNode는 그대로라 다음 update는 옛것 기준으로 정상이다', () => {
+    let label = 'a';
+    const ran: string[] = [];
+    const { host, applies, state } = makeFlakyHost();
+    const fc = new FunctionComponent(
+      (): VNode => {
+        useEffect(() => {
+          ran.push(label);
+        });
+        return h('p', null, label);
+      },
+      {},
+      host,
+    );
+    fc.mount();
+    expect(ran).toEqual(['a']);
+    state.failApply = true;
+    label = 'b';
+    expect(() => fc.update()).toThrow('apply boom');
+    expect(ran).toEqual(['a']); // 화면에 반영 안 됐으니 effect도 안 돈다
+    expect(fc.lastPatches).toEqual([]); // 성공한 update의 diff만 남는다 (mount 직후 = 빈 목록)
+    state.failApply = false;
+    applies.length = 0;
+    fc.update();
+    expect(applies).toEqual([[{ kind: 'SET_TEXT', path: [0, 0], before: 'a', after: 'b' }]]);
+    expect(ran).toEqual(['a', 'b']);
+  });
+
+  it('복구(host.mount)도 실패하면 원래 예외를 던지고 복구 예외는 recoveryError로 붙인다', () => {
+    let label = 'a';
+    const { host, state } = makeFlakyHost();
+    const fc = new FunctionComponent((): VNode => h('p', null, label), {}, host);
+    fc.mount();
+    state.failApply = true;
+    state.failMount = true;
+    label = 'b';
+    let caught: unknown;
+    try {
+      fc.update();
+    } catch (error) {
+      caught = error;
+    }
+    expect(caught).toBeInstanceOf(Error);
+    expect((caught as Error).message).toBe('apply boom'); // 복구 예외가 원인을 덮지 않음
+    expect(((caught as { recoveryError?: Error }).recoveryError as Error).message).toBe('recovery boom');
+  });
+
+  it('setter가 일으킨 update에서 apply가 던져도 같은 복구 (호출한 쪽으로 예외, 상태 값은 남음)', () => {
+    let setN: (next: number) => void = () => {};
+    const { host, mounts, state } = makeFlakyHost();
+    const fc = new FunctionComponent(
+      (): VNode => {
+        const [n, s] = useState(0);
+        setN = s;
+        return h('p', null, String(n));
+      },
+      {},
+      host,
+    );
+    fc.mount();
+    state.failApply = true;
+    expect(() => setN(1)).toThrow('apply boom');
+    expect(mounts[1]).toEqual([el('p', {}, text('0'))]);
+    expect(fc.hooks[0]).toMatchObject({ value: 1 }); // 기존 정책: 렌더가 아닌 setter가 바꾼 state는 남음
+  });
+
+  it('바뀐 게 없으면(patch 0건) apply도 복구도 없다', () => {
+    const { host, applies, mounts } = makeFlakyHost();
+    const fc = new FunctionComponent((): VNode => h('p', null, 'x'), {}, host);
+    fc.mount();
+    fc.update();
+    expect(applies).toHaveLength(0);
+    expect(mounts).toHaveLength(1);
   });
 });
 

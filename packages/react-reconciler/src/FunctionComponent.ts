@@ -87,10 +87,29 @@ export class FunctionComponent {
     const effects = this.takePendingEffects();
     // [AI Note]: Phase 1 diff를 그대로 재사용한다 (P2-19). App() 결과 하나 = 영역 자식 목록 [결과] (Phase 1 규칙)
     const patches = diff([this.previous], [next]);
-    this.patches = patches;
-    if (patches.length > 0) this.host.apply(patches);
+    if (patches.length > 0) this.applyOrRecover(patches, this.previous);
+    this.patches = patches; // 성공한 update의 diff만 남긴다 (실패하면 위에서 예외로 빠져나가 이전 값 그대로)
     this.previous = next;
     this.runEffects(effects);
+  }
+
+  // [AI Note]: update 중 patch가 도중에 던지면 DOM이 반쯤만 고쳐진 채 "이전 VNode"는 옛것이라 어긋난다 (검수 NB-7).
+  // 그래서 마지막으로 성공한 VNode(previous)로 영역을 다시 그린 뒤 원래 예외를 위로 던진다 — Phase 1 C2(createVDomRoot)와 같은 복구 규칙.
+  // 이 복구가 영역을 통째로 다시 그리는 "정상 갱신에서는 금지"된 경로의 유일한 Phase 2 쓰임이다. effect는 화면에 반영되지 않았으니 돌리지 않는다.
+  // 복구도 실패하면 던지는 것은 여전히 원래 예외이고, 복구 예외는 `recoveryError`로 붙인다 (복구 예외가 원인을 덮지 않도록).
+  private applyOrRecover(patches: readonly Patch[], previous: VNode): void {
+    try {
+      this.host.apply(patches);
+    } catch (error) {
+      try {
+        this.host.mount([previous]);
+      } catch (recoveryError) {
+        if (typeof error === 'object' && error !== null && Object.isExtensible(error)) {
+          Object.defineProperty(error, 'recoveryError', { value: recoveryError, configurable: true, writable: true });
+        }
+      }
+      throw error;
+    }
   }
 
   /** 정리: 남은 모든 effect의 cleanup을 실행한다. 이후 setter는 아무 일 없다. 두 번 불러도 두 번째는 아무 일 없다 */

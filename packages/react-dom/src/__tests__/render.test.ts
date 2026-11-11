@@ -453,3 +453,24 @@ describe('옮긴 검사 ⑥ [+3] 렌더 3번 · 같은 값 렌더 0번 + DOM 변
     expect(watcher.take()).toHaveLength(0);
   });
 });
+
+describe('update 중 patch 예외 복구 (검수 1회차 NB-7 · 정책 「§5」)', () => {
+  it('실제 DOM이 밖에서 망가져 patch가 던지면 영역을 마지막 성공 모습으로 다시 그리고 예외는 setter 호출자에게 간다', () => {
+    const box = makeContainer();
+    let setN: Setter<number> = () => {};
+    const App = (): VNode => {
+      const [n, s] = useState(0);
+      setN = s;
+      return h('main', null, h('p', null, `n=${n}`));
+    };
+    render(App, box);
+    expect(box.textContent).toBe('n=0');
+    box.querySelector('p')!.remove(); // 밖에서 DOM을 망가뜨림 → 다음 patch의 경로가 없다
+    expect(() => setN(1)).toThrow('patch:');
+    expect(box.textContent).toBe('n=0'); // 마지막으로 성공한 VNode로 다시 그려 짐 (새 n=1이 아님)
+    expect(box.querySelectorAll('p')).toHaveLength(1);
+    // 이후 setter는 복구된 DOM 위에서 정상으로 돈다
+    setN(2);
+    expect(box.textContent).toBe('n=2');
+  });
+});
