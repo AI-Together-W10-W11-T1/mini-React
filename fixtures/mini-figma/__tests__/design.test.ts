@@ -64,3 +64,37 @@ describe('색 변수 (FD-01 · 03) — 문서 값이 변수로 정의돼 있다'
     for (const value of shadows) expect(value).toBe('none');
   });
 });
+
+describe('깜빡임 박스 .viz-box (PP-08 · Dev-6 · Dev-7)', () => {
+  // [AI Note]: Phase 1 overlay.ts가 만드는 .viz-box 박스의 모양 규칙. Phase 1 페이지의 주황 · 그림자 모양을 이 앱 디자인(파랑 · 흰색, 그림자 없음)에 맞게 다시 썼는지 소스로 본다.
+  const rule = indexHtml.match(/\.viz-box\s*\{([^}]*)\}/)?.[1] ?? '';
+  const keyframes = indexHtml.match(/@keyframes\s+viz-flash\s*\{[\s\S]*?\}\s*\}/)?.[0] ?? '';
+
+  it('.viz-box 규칙과 viz-flash 애니메이션이 있다 (검사가 헛돌지 않게)', () => {
+    expect(rule).not.toBe('');
+    expect(rule).toContain('animation: viz-flash');
+    expect(keyframes).not.toBe('');
+  });
+
+  it('주황이 없다: 규칙 · 키프레임에 Phase 1 주황(#e8590c · #ff922b · rgba(255, 146, 43)) 계열이 한 건도 없다', () => {
+    for (const text of [rule, keyframes]) {
+      const lower = text.toLowerCase();
+      for (const banned of ['#e8590c', '#ff922b', '#f6ad55', '#fffaf0', 'orange', 'rgba(255, 146', 'rgba(232, 89']) expect(lower, banned).not.toContain(banned);
+    }
+  });
+
+  it('그림자가 없다: .viz-box · 키프레임에 box-shadow · filter: drop-shadow가 아예 없거나 none이다', () => {
+    for (const text of [rule, keyframes]) {
+      const shadows = Array.from(text.matchAll(/box-shadow:\s*([^;}]+)/g)).map((m) => m[1].trim());
+      for (const value of shadows) expect(value).toBe('none');
+      expect(text).not.toContain('drop-shadow');
+      expect(text).not.toContain('text-shadow');
+    }
+  });
+
+  it('이 앱 디자인 색만 쓴다: 흰 테두리(var(--ink)) + 파랑 바깥선(var(--accent)), 박스는 레이아웃을 안 민다(position: absolute)', () => {
+    expect(rule).toMatch(/border:\s*2px solid var\(--ink\)/);
+    expect(rule).toMatch(/outline:\s*2px solid var\(--accent\)/);
+    expect(rule).toContain('position: absolute');
+  });
+});

@@ -14,19 +14,20 @@ const press = (key: string, mods: Partial<KeyInfo> = {}): KeyInfo => ({
   ...mods,
 });
 
+// [AI Note]: patch-preview(task_006)에서 앱 편집 Undo/Redo가 없어져 Ctrl/Cmd+Z = back(실제 영역 [뒤로]), +Shift = forward로 이름을 바꿨다. 키 규칙(Q18 · Q17-4)은 그대로.
 describe('keyAction — 정해진 키 (MF-33)', () => {
   it.each<[string, KeyInfo, KeyAction]>([
     ['Delete (수정키 없음)', press('Delete'), 'delete'],
     ['Backspace (수정키 없음)', press('Backspace'), 'delete'],
-    ['Ctrl+z', press('z', { ctrlKey: true }), 'undo'],
-    ['Meta+z (Cmd)', press('z', { metaKey: true }), 'undo'],
-    ['Ctrl+Z (Caps Lock)', press('Z', { ctrlKey: true }), 'undo'],
-    ['Ctrl+Shift+z', press('z', { ctrlKey: true, shiftKey: true }), 'redo'],
-    ['Ctrl+Shift+Z (key가 대문자로 옴)', press('Z', { ctrlKey: true, shiftKey: true }), 'redo'],
-    ['Meta+Shift+z', press('z', { metaKey: true, shiftKey: true }), 'redo'],
-    ['Meta+Shift+Z (key가 대문자로 옴)', press('Z', { metaKey: true, shiftKey: true }), 'redo'],
-    ['Ctrl+Meta+z (둘 다 눌림)', press('z', { ctrlKey: true, metaKey: true }), 'undo'],
-    ['Ctrl+Meta+Shift+Z (둘 다 눌림)', press('Z', { ctrlKey: true, metaKey: true, shiftKey: true }), 'redo'],
+    ['Ctrl+z', press('z', { ctrlKey: true }), 'back'],
+    ['Meta+z (Cmd)', press('z', { metaKey: true }), 'back'],
+    ['Ctrl+Z (Caps Lock)', press('Z', { ctrlKey: true }), 'back'],
+    ['Ctrl+Shift+z', press('z', { ctrlKey: true, shiftKey: true }), 'forward'],
+    ['Ctrl+Shift+Z (key가 대문자로 옴)', press('Z', { ctrlKey: true, shiftKey: true }), 'forward'],
+    ['Meta+Shift+z', press('z', { metaKey: true, shiftKey: true }), 'forward'],
+    ['Meta+Shift+Z (key가 대문자로 옴)', press('Z', { metaKey: true, shiftKey: true }), 'forward'],
+    ['Ctrl+Meta+z (둘 다 눌림)', press('z', { ctrlKey: true, metaKey: true }), 'back'],
+    ['Ctrl+Meta+Shift+Z (둘 다 눌림)', press('Z', { ctrlKey: true, metaKey: true, shiftKey: true }), 'forward'],
   ])('%s → %s', (_name, info, expected) => {
     expect(keyAction(info)).toBe(expected);
   });
@@ -92,7 +93,7 @@ describe('keyAction — 글자 입력칸(글자 input · textarea) 안의 키는
   });
 });
 
-describe('keyAction — 선택 상자 · 체크박스 · 색 입력칸 안: Undo/Redo는 앱 동작, Delete · Backspace는 무시 (Q18 ②, 색 입력칸은 ④-3)', () => {
+describe('keyAction — 선택 상자 · 체크박스 · 색 입력칸 안: 뒤로 · 앞으로(State History)는 앱 동작, Delete · Backspace는 무시 (Q18 ②, 색 입력칸은 ④-3)', () => {
   describe.each<[string, string, string | null]>([
     ['SELECT', 'SELECT', null],
     ['select 소문자', 'select', null],
@@ -102,11 +103,11 @@ describe('keyAction — 선택 상자 · 체크박스 · 색 입력칸 안: Undo
     ['input 소문자 · type 대문자 COLOR', 'input', 'COLOR'],
   ])('target = %s', (_label, tag, type) => {
     const at = { targetTag: tag, targetType: type };
-    it('Ctrl+z · Meta+z → undo, Ctrl+Shift+Z · Meta+Shift+Z → redo', () => {
-      expect(keyAction(press('z', { ...at, ctrlKey: true }))).toBe('undo');
-      expect(keyAction(press('z', { ...at, metaKey: true }))).toBe('undo');
-      expect(keyAction(press('Z', { ...at, ctrlKey: true, shiftKey: true }))).toBe('redo');
-      expect(keyAction(press('Z', { ...at, metaKey: true, shiftKey: true }))).toBe('redo');
+    it('Ctrl+z · Meta+z → back, Ctrl+Shift+Z · Meta+Shift+Z → forward', () => {
+      expect(keyAction(press('z', { ...at, ctrlKey: true }))).toBe('back');
+      expect(keyAction(press('z', { ...at, metaKey: true }))).toBe('back');
+      expect(keyAction(press('Z', { ...at, ctrlKey: true, shiftKey: true }))).toBe('forward');
+      expect(keyAction(press('Z', { ...at, metaKey: true, shiftKey: true }))).toBe('forward');
     });
     it('Delete · Backspace → null', () => {
       expect(keyAction(press('Delete', at))).toBeNull();
@@ -139,10 +140,10 @@ describe('keyAction — 입력칸이 아닌 곳은 전부 처리', () => {
     ['BODY', 'BODY'],
     ['없음(null)', null],
   ])('targetTag = %s', (_label, tag) => {
-    it('Delete → delete, Ctrl+z → undo, Ctrl+Shift+Z → redo', () => {
+    it('Delete → delete, Ctrl+z → back, Ctrl+Shift+Z → forward', () => {
       expect(keyAction(press('Delete', { targetTag: tag }))).toBe('delete');
-      expect(keyAction(press('z', { ctrlKey: true, targetTag: tag }))).toBe('undo');
-      expect(keyAction(press('Z', { ctrlKey: true, shiftKey: true, targetTag: tag }))).toBe('redo');
+      expect(keyAction(press('z', { ctrlKey: true, targetTag: tag }))).toBe('back');
+      expect(keyAction(press('Z', { ctrlKey: true, shiftKey: true, targetTag: tag }))).toBe('forward');
     });
   });
 });
