@@ -556,3 +556,35 @@ test('QA-A14 입력 100자: 한 글자씩 입력해도 입력칸 노드 · 포�
   expect((await canvasLabels(page))[0]).toBe('버튼');
   await expect(input).toHaveValue('버튼');
 });
+
+test('QA-A27 새로고침: 색을 바꾸고 추가 · 삭제 · Undo까지 한 뒤 reload하면 시작 색 · 선택 없음 · [↶] [↷] 모두 꺼짐이고 Ctrl+Z · Ctrl+Shift+Z는 아무 일 없다', async ({ page }) => {
+  await page.goto(URL);
+  await selectOnCanvas(page, 'main');
+  await pickColor(page, '#05b169');
+  await page.getByTestId('add-instance').click();
+  await selectOnCanvas(page, 'b2');
+  await page.getByTestId('delete-instance').click();
+  await pressUndo(page); // 삭제를 되돌림 → [↷]도 켜진 상태
+  await expect(page.getByTestId('undo-button')).toBeEnabled();
+  await expect(page.getByTestId('redo-button')).toBeEnabled();
+
+  await page.reload();
+
+  // 시작 색(메인 #0052ff · b3 #cf202f), 선택 없음, 시작 목록
+  expect(await colorsOf(page)).toEqual([rgb('#0052ff'), rgb('#0052ff'), rgb('#0052ff'), rgb('#cf202f')]);
+  expect(await canvasOrder(page)).toEqual(['b1', 'b2', 'b3']);
+  await expect(page.getByTestId('property-empty')).toHaveCount(1);
+  expect(await selectedOnCanvas(page)).toEqual([]);
+  // [↶] [↷] 둘 다 꺼져 있고 키도 아무 일 없다
+  await expect(page.getByTestId('undo-button')).toBeDisabled();
+  await expect(page.getByTestId('redo-button')).toBeDisabled();
+  const watch = await watchApp(page);
+  await pressUndo(page);
+  await pressRedo(page);
+  expect((await watch.take()).body.total, 'Ctrl+Z · Ctrl+Shift+Z = DOM 변경 0').toBe(0);
+  expect(await colorsOf(page)).toEqual([rgb('#0052ff'), rgb('#0052ff'), rgb('#0052ff'), rgb('#cf202f')]);
+  // 번호도 처음부터: 추가하면 b4
+  await page.getByTestId('add-instance').click();
+  expect(await canvasOrder(page)).toEqual(['b1', 'b2', 'b3', 'b4']);
+  await expect(page.getByTestId('undo-button')).toBeEnabled();
+});
